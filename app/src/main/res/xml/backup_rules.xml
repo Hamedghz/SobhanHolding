@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!--
+   In this sample, we back up all shared preferences and files located in
+   the given domain. This is not recommended for real apps, as it may cause
+   sensitive data to be backed up. More info at:
+   https://developer.android.com/guide/topics/data/autobackup
+-->
+    <include domain="sharedpref" path="."/>
+    <include domain="database" path="."/>
+    <include domain="file" path="."/>
+</full-backup-content>
