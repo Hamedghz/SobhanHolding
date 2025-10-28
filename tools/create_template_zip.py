@@ -12,6 +12,7 @@ def create_archive(output: Path, source_dir: Path) -> Path:
         raise SystemExit(f"Source directory '{source_dir}' does not exist or is not a directory.")
 
     output = output.with_suffix(".zip")
+    output.parent.mkdir(parents=True, exist_ok=True)
 
     if output.exists():
         output.unlink()
