@@ -1,23 +1,30 @@
 package com.example.productgallery.data.model
 
-import androidx.room.Embedded
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-import androidx.room.Relation
+import java.math.BigDecimal
 
-@Entity(tableName = "products")
+/**
+ * Represents a product with its variants loaded from the Excel catalog. The data classes mirror
+ * the schema described in the functional specification so the same models can be reused across
+ * the data, domain and presentation layers.
+ */
 data class Product(
-    @PrimaryKey val productCode: String,
+    val productCode: String,
     val description: String,
-    val line: String,
-    val brandName: String
-)
-
-data class ProductWithVariants(
-    @Embedded val product: Product,
-    @Relation(
-        parentColumn = "productCode",
-        entityColumn = "productCode"
-    )
+    val line: SalesLine,
+    val brand: String,
+    val imageFile: String?,
     val variants: List<ProductVariant>
 )
+
+/**
+ * Individual purchasable variant belonging to a [Product].
+ */
+data class ProductVariant(
+    val variantIndex: Int,
+    val stockQuantity: Int,
+    val zahedanPrice: BigDecimal,
+    val otherCitiesPrice: BigDecimal,
+    val customerNames: List<String>
+)
+
+enum class SalesLine { A, B, C, D }
