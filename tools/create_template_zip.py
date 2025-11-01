@@ -1,4 +1,4 @@
-"""Utility script to package the Android gallery template into a zip archive."""
+"""Utility script to package the legacy gallery module into a zip archive."""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ def create_archive(output: Path, source_dir: Path) -> Path:
     if output.exists():
         output.unlink()
 
-    # shutil.make_archive expects the base name without the extension.
     base_name = output.with_suffix("")
     shutil.make_archive(str(base_name), "zip", root_dir=source_dir.parent, base_dir=source_dir.name)
     return output
@@ -25,19 +24,19 @@ def create_archive(output: Path, source_dir: Path) -> Path:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Create a distributable zip archive of the Android gallery template.",
+        description="Create a distributable zip archive of the legacy gallery module.",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("offline_gallery_template.zip"),
-        help="Destination path for the generated zip archive (default: offline_gallery_template.zip).",
+        default=Path("legacy_gallery_template"),
+        help="Destination path for the generated zip archive (default: legacy_gallery_template.zip).",
     )
     parser.add_argument(
         "--source",
         type=Path,
-        default=Path("android_gallery_template"),
-        help="Source project directory to package (default: android_gallery_template).",
+        default=Path("legacygallery"),
+        help="Source project directory to package (default: legacygallery).",
     )
     return parser.parse_args()
 
