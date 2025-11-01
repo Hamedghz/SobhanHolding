@@ -4,83 +4,104 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavType
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
-import com.example.productgallery.ui.composables.BottomNavBar
-import com.example.productgallery.ui.composables.NavigationItem
-import com.example.productgallery.ui.composables.TopAppBar
-import com.example.productgallery.ui.screen.GalleryScreen
-import com.example.productgallery.ui.screen.ProductDetailsScreen
-import com.example.productgallery.ui.screen.RequestFormScreen
-import com.example.productgallery.ui.screen.RequestScreen
+import com.example.productgallery.AppContainer
+import com.example.productgallery.ProductGalleryApp
+import com.example.productgallery.ui.navigation.AppDestination
+import com.example.productgallery.ui.screens.gallery.GalleryScreen
+import com.example.productgallery.ui.screens.gallery.GalleryViewModel
+import com.example.productgallery.ui.screens.gallery.GalleryViewModelFactory
+import com.example.productgallery.ui.screens.importer.ImportScreen
+import com.example.productgallery.ui.screens.importer.ImportViewModel
+import com.example.productgallery.ui.screens.importer.ImportViewModelFactory
+import com.example.productgallery.ui.screens.requests.RequestsScreen
+import com.example.productgallery.ui.screens.requests.RequestsViewModel
+import com.example.productgallery.ui.screens.requests.RequestsViewModelFactory
 import com.example.productgallery.ui.theme.ProductGalleryTheme
 
 class MainActivity : ComponentActivity() {
+
+    private val container: AppContainer by lazy {
+        (application as ProductGalleryApp).container
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             ProductGalleryTheme {
-                MainScreen()
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    ProductGalleryNavHost(container = container)
+                }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+private fun ProductGalleryNavHost(container: AppContainer) {
     val navController = rememberNavController()
+
     Scaffold(
-        topBar = { TopAppBar(title = "Product Gallery") },
-        bottomBar = { BottomNavBar(navController = navController) }
-    ) { innerPadding ->
+        bottomBar = {
+            val backStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = backStackEntry?.destination?.route
+            NavigationBar {
+                AppDestination.values().forEach { destination ->
+                    val selected = currentRoute == destination.route
+                    NavigationBarItem(
+                        selected = selected,
+                        onClick = {
+                            navController.navigate(destination.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        label = { Text(destination.label) },
+                        icon = {},
+                    )
+                }
+            }
+        }
+    ) { paddingValues ->
         NavHost(
-            navController,
-            startDestination = NavigationItem.Gallery.route,
-            modifier = Modifier.padding(innerPadding)
+            navController = navController,
+            startDestination = AppDestination.Gallery.route,
+            modifier = Modifier.padding(paddingValues)
         ) {
-            composable(NavigationItem.Gallery.route) {
-                GalleryScreen(navController)
+            composable(AppDestination.Gallery.route) {
+                val viewModel: GalleryViewModel = viewModel(
+                    factory = GalleryViewModelFactory(container.productService)
+                )
+                GalleryScreen(viewModel = viewModel)
             }
-            composable(NavigationItem.Requests.route) {
-                RequestScreen(
-                    onAddRequest = {
-                        // For simplicity, we'll navigate to a dummy product for new requests
-                        navController.navigate("request_form/DUMMY/1")
-                    },
-                    onEditRequest = { request ->
-                        navController.navigate("request_form/${request.productCode}/${request.variantIndex}")
-                    }
+            composable(AppDestination.Requests.route) {
+                val viewModel: RequestsViewModel = viewModel(
+                    factory = RequestsViewModelFactory(container.requestService)
                 )
+                RequestsScreen(viewModel = viewModel)
             }
-            composable(
-                "product_details/{productCode}",
-                arguments = listOf(navArgument("productCode") { type = NavType.StringType })
-            ) { backStackEntry ->
-                ProductDetailsScreen(
-                    navController = navController,
-                    productCode = backStackEntry.arguments?.getString("productCode") ?: ""
+            composable(AppDestination.Import.route) {
+                val viewModel: ImportViewModel = viewModel(
+                    factory = ImportViewModelFactory(container.excelService)
                 )
-            }
-            composable(
-                "request_form/{productCode}/{variantIndex}",
-                arguments = listOf(
-                    navArgument("productCode") { type = NavType.StringType },
-                    navArgument("variantIndex") { type = NavType.IntType }
-                )
-            ) { backStackEntry ->
-                RequestFormScreen(
-                    navController = navController,
-                    productCode = backStackEntry.arguments?.getString("productCode") ?: "",
-                    variantIndex = backStackEntry.arguments?.getInt("variantIndex") ?: 0
-                )
+                ImportScreen(viewModel = viewModel)
             }
         }
     }
