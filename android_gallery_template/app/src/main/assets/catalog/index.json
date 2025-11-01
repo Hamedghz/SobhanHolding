@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "id": "100001",
+      "brand": "my",
+      "name": "Cream 50ml",
+      "img": "catalog/my/100001.jpg",
+      "price": 1290000
+    },
+    {
+      "id": "100002",
+      "brand": "cinere",
+      "name": "Shampoo 250ml",
+      "img": "catalog/cinere/100002.jpg",
+      "price": 1780000
+    }
+  ]
+}
