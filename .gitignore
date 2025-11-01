@@ -1,2 +1,26 @@
-# Ignore generated archives
-offline_gallery_template.zip
+# Gradle and Android build outputs
+.gradle/
+build/
+**/build/
+
+# Android Studio/IntelliJ project files
+.idea/
+*.iml
+.gradle-cache/
+local.properties
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Generated binaries and archives
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.log
+*.zip
+
+# Misc
+.DS_Store
