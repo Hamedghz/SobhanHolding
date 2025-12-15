@@ -9,6 +9,7 @@ import java.math.BigDecimal
  */
 data class Product(
     val productCode: String,
+    val name: String = "",
     val description: String,
     val line: SalesLine,
     val brand: String,

@@ -29,6 +29,7 @@ class ExcelService(
     private val contentResolver: ContentResolver,
     private val requestDao: RequestDao,
     private val productService: ProductService,
+    private val excelHeaderMapper: ExcelHeaderMapper = ExcelHeaderMapper(),
     private val imageCacheManager: ImageCacheManager,
     private val errorHandler: ErrorHandler,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -39,28 +40,17 @@ class ExcelService(
         emit(ImportState.InProgress(progress = 0, message = "Starting validation"))
         try {
             mutex.withLock {
-                val expectedHeaders = listOf(
-                    "Product Code",
-                    "Description",
-                    "Product Variant Index",
-                    "Stock Quantity",
-                    "Zahedan Price",
-                    "Other Cities Price",
-                    "Line",
-                    "Brand Name",
-                    "Customer Names"
-                )
-
                 val inputStream = openInputStream(uri)
                 val workbook = inputStream.use { stream -> WorkbookFactory.create(stream) }
                 workbook.use { wb ->
                     val sheet = wb.getSheetAt(0)
                     val headerRow = sheet.getRow(sheet.firstRowNum)
-                    val headers = expectedHeaders.indices.map { index ->
-                        headerRow.getCell(index)?.stringCellValue?.trim().orEmpty()
+                    val headers = (0 until headerRow.lastCellNum).mapNotNull { index ->
+                        headerRow.getCell(index)?.stringCellValue?.trim()
                     }
-                    if (headers != expectedHeaders) {
-                        emit(ImportState.Error("Unexpected header row. Expected ${expectedHeaders.joinToString()}"))
+                    val headerMapping = excelHeaderMapper.map(headers)
+                    if (headerMapping == null) {
+                        emit(ImportState.Error("Unexpected header row. Expected legacy or V2 format."))
                         return@withLock
                     }
 
@@ -74,29 +64,66 @@ class ExcelService(
 
                     for (index in (sheet.firstRowNum + 1)..sheet.lastRowNum) {
                         val row = sheet.getRow(index) ?: continue
-                        val productCode = row.readString(0)
+                        val productCode = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> row.readString(headerMapping.columnIndex.getValue("ProductCode"))
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> row.readString(headerMapping.columnIndex.getValue("Product Code"))
+                        }
                         if (productCode.isEmpty()) continue
 
-                        val variantIndex = row.readInt(2)
-                        val stockQuantity = row.readInt(3)
-                        val zahedanPrice = row.readDecimal(4)
-                        val otherCitiesPrice = row.readDecimal(5)
-                        val salesLine = runCatching {
-                            SalesLine.valueOf(row.readString(6).uppercase(Locale.US))
-                        }.getOrElse {
-                            error("Invalid sales line at row $index")
+                        val variantIndex = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> row.readInt(headerMapping.columnIndex.getValue("VariantIndex"))
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> row.readInt(headerMapping.columnIndex.getValue("Product Variant Index"))
                         }
-                        val brand = row.readString(7)
-                        val customers = row.readString(8).takeIf { it.isNotBlank() }?.split(',')
-                            ?.map { it.trim() } ?: emptyList()
+                        val stockQuantity = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> row.readInt(headerMapping.columnIndex.getValue("StockQty"))
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> row.readInt(headerMapping.columnIndex.getValue("Stock Quantity"))
+                        }
+                        val zahedanPrice = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> row.readDecimal(headerMapping.columnIndex.getValue("RetailPrice"))
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> row.readDecimal(headerMapping.columnIndex.getValue("Zahedan Price"))
+                        }
+                        val otherCitiesPrice = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> row.readDecimal(headerMapping.columnIndex.getValue("CountyPrice"))
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> row.readDecimal(headerMapping.columnIndex.getValue("Other Cities Price"))
+                        }
+                        val salesLine = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> SalesLine.A
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> runCatching {
+                                SalesLine.valueOf(row.readString(headerMapping.columnIndex.getValue("Line")).uppercase(Locale.US))
+                            }.getOrElse {
+                                error("Invalid sales line at row $index")
+                            }
+                        }
+                        val brand = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> ""
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> row.readString(headerMapping.columnIndex.getValue("Brand Name"))
+                        }
+                        val customers = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> emptyList()
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> row.readString(headerMapping.columnIndex.getValue("Customer Names")).takeIf { it.isNotBlank() }?.split(',')
+                                ?.map { it.trim() } ?: emptyList()
+                        }
+                        val productName = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> row.readString(headerMapping.columnIndex.getValue("ProductName")).ifBlank { productCode }
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> row.readString(headerMapping.columnIndex.getValue("Description")).ifBlank { productCode }
+                        }
+                        val description = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> row.readString(headerMapping.columnIndex.getValue("Description")).ifBlank { productName }
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> row.readString(headerMapping.columnIndex.getValue("Description"))
+                        }
+                        val imageFile = when (headerMapping) {
+                            is ExcelHeaderMapper.HeaderMapping.V2 -> row.readString(headerMapping.columnIndex.getValue("ImageFile")).ifBlank { null }
+                            is ExcelHeaderMapper.HeaderMapping.Legacy -> null
+                        }
 
                         val builder = productMap.getOrPut(productCode) {
                             ProductBuilder(
                                 productCode = productCode,
-                                description = row.readString(1),
+                                name = productName,
+                                description = description,
                                 line = salesLine,
                                 brand = brand,
-                                imageFile = null
+                                imageFile = imageFile
                             )
                         }
 
@@ -127,6 +154,7 @@ class ExcelService(
                     val productEntities = products.map {
                         ProductEntity(
                             productCode = it.productCode,
+                            productName = it.name,
                             description = it.description,
                             line = it.line.name,
                             brand = it.brand,
@@ -187,6 +215,7 @@ class ExcelService(
 
     private data class ProductBuilder(
         val productCode: String,
+        val name: String,
         val description: String,
         val line: SalesLine,
         val brand: String,
@@ -195,6 +224,7 @@ class ExcelService(
     ) {
         fun build(): Product = Product(
             productCode = productCode,
+            name = name,
             description = description,
             line = line,
             brand = brand,
