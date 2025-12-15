@@ -40,14 +40,14 @@ fun GalleryScreen(
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(products, key = { it.productCode }) { product ->
-                    Card(elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            Text(
-                                text = product.description,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(text = "Brand: ${product.brand}")
+                            Card(elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)) {
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    Text(
+                                        text = product.name.ifBlank { product.description },
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(text = "Brand: ${product.brand}")
                             Text(text = "Variants: ${product.variants.size}")
                         }
                     }

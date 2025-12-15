@@ -52,12 +52,21 @@ tools/create_template_zip.py  # Helper to package the legacy gallery into a dist
    - Command line: `./gradlew :legacygallery:assembleDebug`
    - APK output: `legacygallery/build/outputs/apk/debug/legacygallery-debug.apk`
 
-## Excel Catalogue Requirements
-- Provide a `.xlsx` file with the following header row (exact order):
-  `Product Code`, `Description`, `Product Variant Index`, `Stock Quantity`, `Zahedan Price`, `Other Cities Price`, `Line`, `Brand Name`, `Customer Names`
+## Excel Catalogue Requirements (V2 and Legacy)
+- **Preferred V2 header**: `ProductCode`, `ProductName`, `Description`, `VariantIndex`, `StockQty`, `RetailPrice`, `CountyPrice`, `ImageFile`
+- **Legacy header still accepted**: `Product Code`, `Description`, `Product Variant Index`, `Stock Quantity`, `Zahedan Price`, `Other Cities Price`, `Line`, `Brand Name`, `Customer Names`
 - Numeric cells are parsed for quantities and prices; empty rows are skipped automatically
 - The importer groups rows by product code, sorts variants, saves entities to Room, and updates the cached JSON catalogue in one transaction
 - Import progress emits human-readable status messages so agents see how many rows have been processed
+
+## Images folder setup
+- Product images can be resolved by matching the product code to an image filename (e.g. `12345.jpg`)
+- Place images in a user-selected folder such as `Downloads/GloriaGlass/Images` using Android's file picker
+- When a matching filename is found the gallery can display the offline image without network access
+
+## PDF catalog creation
+- The app can generate a dated catalog filename in the Downloads directory such as `GloriaGlass_Catalog_20240501_1430.pdf`
+- The catalog includes selected products with their descriptive fields and pricing for offline sharing
 
 ## Offline Data & Requests
 - Room database (`products`, `variants`, `requests`) stores imported catalogue data and captured customer requests
