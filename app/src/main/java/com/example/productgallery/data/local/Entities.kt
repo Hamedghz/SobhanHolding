@@ -12,6 +12,7 @@ import java.math.BigDecimal
 )
 data class ProductEntity(
     @PrimaryKey @ColumnInfo(name = "product_code") val productCode: String,
+    @ColumnInfo(name = "product_name") val productName: String,
     val description: String,
     val line: String,
     val brand: String,
