@@ -1,9 +1,10 @@
 <?php
 return [
+    'installed' => false,
     'db' => [
-        'host' => 'localhost',
-        'name' => 'sobhan_holding',
-        'user' => 'root',
+        'host' => '',
+        'name' => '',
+        'user' => '',
         'pass' => '',
         'charset' => 'utf8mb4',
     ],
