@@ -24,3 +24,15 @@ __pycache__/
 
 # Misc
 .DS_Store
+
+# Local JavaScript dependencies from previous scaffold
+node_modules/
+
+# Runtime installer lock and uploaded content
+install.lock
+uploads/carousel/*
+uploads/files/*
+uploads/logo/*
+!uploads/carousel/.htaccess
+!uploads/files/.htaccess
+!uploads/logo/.htaccess
