@@ -4,10 +4,46 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(190) NOT NULL UNIQUE,
   username VARCHAR(100) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin','manager') NOT NULL DEFAULT 'manager',
+  role ENUM('admin','manager','employee') NOT NULL DEFAULT 'employee',
   status ENUM('active','disabled') NOT NULL DEFAULT 'active',
+  description TEXT NULL,
+  upload_quota_mb INT NULL DEFAULT NULL,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS manager_employees (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  manager_id INT UNSIGNED NOT NULL,
+  employee_id INT UNSIGNED NOT NULL,
+  assigned_by INT UNSIGNED NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_manager_employee (manager_id, employee_id),
+  CONSTRAINT fk_manager_employees_manager FOREIGN KEY (manager_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_manager_employees_employee FOREIGN KEY (employee_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_manager_employees_assigned_by FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS modules (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  module_key VARCHAR(100) NOT NULL UNIQUE,
+  module_title VARCHAR(190) NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  status ENUM('active','disabled') NOT NULL DEFAULT 'active',
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_permissions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  module_key VARCHAR(100) NOT NULL,
+  can_view TINYINT(1) NOT NULL DEFAULT 0,
+  can_create TINYINT(1) NOT NULL DEFAULT 0,
+  can_edit TINYINT(1) NOT NULL DEFAULT 0,
+  can_delete TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_module (user_id, module_key),
+  CONSTRAINT fk_permissions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS kpis (
@@ -61,12 +97,14 @@ CREATE TABLE IF NOT EXISTS survey_results (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   survey_id INT UNSIGNED NOT NULL,
   user_id INT UNSIGNED NOT NULL,
-  employee_name VARCHAR(190) NOT NULL,
+  employee_id INT UNSIGNED NULL,
+  employee_name VARCHAR(190) NULL,
   final_score DECIMAL(8,2) NOT NULL DEFAULT 0,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_result_survey FOREIGN KEY (survey_id) REFERENCES surveys(id) ON DELETE CASCADE,
-  CONSTRAINT fk_result_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_result_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_result_employee FOREIGN KEY (employee_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS survey_result_items (
@@ -88,8 +126,21 @@ CREATE TABLE IF NOT EXISTS user_files (
   file_path VARCHAR(255) NOT NULL,
   mime_type VARCHAR(120) NOT NULL,
   file_size INT UNSIGNED NOT NULL,
+  visibility ENUM('private','shared') NOT NULL DEFAULT 'private',
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_file_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS file_shares (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  file_id INT UNSIGNED NOT NULL,
+  shared_with_user_id INT UNSIGNED NOT NULL,
+  shared_by INT UNSIGNED NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_file_share_user (file_id, shared_with_user_id),
+  CONSTRAINT fk_file_shares_file FOREIGN KEY (file_id) REFERENCES user_files(id) ON DELETE CASCADE,
+  CONSTRAINT fk_file_shares_user FOREIGN KEY (shared_with_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_file_shares_by FOREIGN KEY (shared_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS carousel_items (

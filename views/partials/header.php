@@ -14,5 +14,9 @@
         <?php if (setting('logo_path')): ?><img src="<?= e(setting('logo_path')) ?>" alt="لوگو"><?php endif; ?>
         <span><?= e(setting('company_name', 'شرکت پخش سبحان')) ?></span>
     </a>
-    <nav><a href="/login.php" class="btn btn-primary">ورود به سامانه</a></nav>
+    <nav class="site-nav">
+        <a href="/">خانه</a>
+        <a href="/login.php">ورود</a>
+        <a href="#contact">تماس</a>
+    </nav>
 </header>
