@@ -14,6 +14,8 @@
         <?php endif; ?>
         <?php if (Auth::can('survey_results')): ?><a href="/admin/survey-results.php">نتایج ارزیابی</a><?php endif; ?>
         <?php if (Auth::can('files')): ?><a href="/admin/files.php">فایل‌ها</a><?php endif; ?>
+        <?php if (Auth::can('accounting')): ?><a href="/admin/accounting-collections.php">حسابداری</a><?php endif; ?>
+        <?php if (Auth::can('accounting', 'edit')): ?><a href="/admin/accounting-settings.php">تنظیمات حسابداری</a><?php endif; ?>
         <?php if (Auth::can('carousel')): ?>
             <a href="/admin/carousel.php">اسلایدر صفحه اصلی</a>
         <?php endif; ?>

@@ -15,9 +15,20 @@ INSERT INTO modules (module_key, module_title, sort_order, status) VALUES
 ('surveys','نظرسنجی‌ها',40,'active'),
 ('survey_results','نتایج ارزیابی',50,'active'),
 ('files','فایل‌ها',60,'active'),
+('accounting','حسابداری',65,'active'),
 ('carousel','اسلایدر صفحه اصلی',70,'active'),
 ('settings','تنظیمات سایت',80,'active')
 ON DUPLICATE KEY UPDATE module_title = VALUES(module_title), sort_order = VALUES(sort_order), status = VALUES(status);
+
+INSERT INTO accounting_roles (title, sort_order, status) VALUES
+('موزع',10,'active'),
+('تحصیلدار',20,'active'),
+('ویزیتور',30,'active')
+ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), status = VALUES(status);
+
+INSERT INTO accounting_cities (title, sort_order, status) VALUES
+('تهران',10,'active')
+ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), status = VALUES(status);
 
 INSERT INTO carousel_items (title, description, image_path, button_text, button_link, sort_order, status) VALUES
 ('توزیع هوشمند و منظم','تمرکز بر سرعت، دقت و شفافیت در شبکه پخش محصولات.','','ورود به سامانه','/login.php',1,'active'),

@@ -143,6 +143,43 @@ CREATE TABLE IF NOT EXISTS file_shares (
   CONSTRAINT fk_file_shares_by FOREIGN KEY (shared_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS accounting_collections (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  collector_role VARCHAR(80) NOT NULL,
+  full_name VARCHAR(190) NOT NULL,
+  invoice_number VARCHAR(120) NOT NULL,
+  description TEXT NULL,
+  city VARCHAR(120) NOT NULL,
+  image_path VARCHAR(255) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(120) NOT NULL,
+  file_size INT UNSIGNED NOT NULL,
+  status ENUM('sent','registered','needs_followup') NOT NULL DEFAULT 'sent',
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_accounting_status (status),
+  INDEX idx_accounting_invoice (invoice_number),
+  INDEX idx_accounting_city (city)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS accounting_roles (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(120) NOT NULL UNIQUE,
+  sort_order INT NOT NULL DEFAULT 0,
+  status ENUM('active','disabled') NOT NULL DEFAULT 'active',
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS accounting_cities (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(120) NOT NULL UNIQUE,
+  sort_order INT NOT NULL DEFAULT 0,
+  status ENUM('active','disabled') NOT NULL DEFAULT 'active',
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS carousel_items (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(190) NOT NULL,

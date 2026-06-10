@@ -95,6 +95,40 @@ class Database
                 CONSTRAINT fk_file_shares_user FOREIGN KEY (shared_with_user_id) REFERENCES users(id) ON DELETE CASCADE,
                 CONSTRAINT fk_file_shares_by FOREIGN KEY (shared_by) REFERENCES users(id) ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS accounting_collections (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                collector_role VARCHAR(80) NOT NULL,
+                full_name VARCHAR(190) NOT NULL,
+                invoice_number VARCHAR(120) NOT NULL,
+                description TEXT NULL,
+                city VARCHAR(120) NOT NULL,
+                image_path VARCHAR(255) NOT NULL,
+                original_name VARCHAR(255) NOT NULL,
+                mime_type VARCHAR(120) NOT NULL,
+                file_size INT UNSIGNED NOT NULL,
+                status ENUM('sent','registered','needs_followup') NOT NULL DEFAULT 'sent',
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_accounting_status (status),
+                INDEX idx_accounting_invoice (invoice_number),
+                INDEX idx_accounting_city (city)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS accounting_roles (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(120) NOT NULL UNIQUE,
+                sort_order INT NOT NULL DEFAULT 0,
+                status ENUM('active','disabled') NOT NULL DEFAULT 'active',
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS accounting_cities (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(120) NOT NULL UNIQUE,
+                sort_order INT NOT NULL DEFAULT 0,
+                status ENUM('active','disabled') NOT NULL DEFAULT 'active',
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         ];
         foreach ($statements as $statement) {
             $pdo->exec($statement);
@@ -131,12 +165,23 @@ class Database
             ['surveys', 'نظرسنجی‌ها', 40],
             ['survey_results', 'نتایج ارزیابی', 50],
             ['files', 'فایل‌ها', 60],
+            ['accounting', 'حسابداری', 65],
             ['carousel', 'اسلایدر صفحه اصلی', 70],
             ['settings', 'تنظیمات سایت', 80],
         ];
         $stmt = $pdo->prepare('INSERT INTO modules (module_key,module_title,sort_order,status,created_at) VALUES (?,?,?,"active",NOW()) ON DUPLICATE KEY UPDATE module_title=VALUES(module_title), sort_order=VALUES(sort_order), status=VALUES(status)');
         foreach ($modules as $module) {
             $stmt->execute($module);
+        }
+
+        $stmt = $pdo->prepare('INSERT IGNORE INTO accounting_roles (title,sort_order,status,created_at,updated_at) VALUES (?,?,"active",NOW(),NOW())');
+        foreach (['موزع', 'تحصیلدار', 'ویزیتور'] as $index => $title) {
+            $stmt->execute([$title, ($index + 1) * 10]);
+        }
+
+        $stmt = $pdo->prepare('INSERT IGNORE INTO accounting_cities (title,sort_order,status,created_at,updated_at) VALUES (?,?,"active",NOW(),NOW())');
+        foreach (['تهران'] as $index => $title) {
+            $stmt->execute([$title, ($index + 1) * 10]);
         }
 
         if (self::tableExists('site_settings')) {
