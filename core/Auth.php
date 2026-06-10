@@ -17,7 +17,7 @@ class Auth
         if (empty($_SESSION['user_id'])) return null;
         static $user = null;
         if ($user === null) {
-            $user = Database::fetch('SELECT id, name, email, username, role, status FROM users WHERE id = ? AND status = "active"', [$_SESSION['user_id']]);
+            $user = Database::fetch('SELECT id, name, email, username, role, status, description, upload_quota_mb FROM users WHERE id = ? AND status = "active"', [$_SESSION['user_id']]);
         }
         return $user ?: null;
     }
@@ -66,10 +66,86 @@ class Auth
         }
     }
 
+    public static function requireAnyRole(array $roles): void
+    {
+        self::requireLogin();
+        $user = self::user();
+        if (!in_array($user['role'] ?? '', $roles, true)) {
+            http_response_code(403);
+            echo 'دسترسی غیرمجاز';
+            exit;
+        }
+    }
+
     public static function isAdmin(): bool
     {
         $user = self::user();
         return ($user['role'] ?? '') === 'admin';
+    }
+
+    public static function isManager(): bool
+    {
+        $user = self::user();
+        return ($user['role'] ?? '') === 'manager';
+    }
+
+    public static function isEmployee(): bool
+    {
+        $user = self::user();
+        return ($user['role'] ?? '') === 'employee';
+    }
+
+    public static function can(string $moduleKey, string $action = 'view'): bool
+    {
+        $user = self::user();
+        if (!$user) return false;
+        if (($user['role'] ?? '') === 'admin') return true;
+
+        $column = match ($action) {
+            'create' => 'can_create',
+            'edit' => 'can_edit',
+            'delete' => 'can_delete',
+            default => 'can_view',
+        };
+        $permission = Database::fetch("SELECT {$column} allowed FROM user_permissions WHERE user_id = ? AND module_key = ? LIMIT 1", [(int)$user['id'], $moduleKey]);
+        if ($permission) {
+            return (int)$permission['allowed'] === 1;
+        }
+
+        if ($moduleKey === 'dashboard' && $action === 'view') return true;
+        if (in_array($moduleKey, ['files', 'survey_results'], true) && in_array($action, ['view', 'create'], true) && self::isManager()) return true;
+        if ($moduleKey === 'files' && in_array($action, ['view', 'create'], true) && self::isEmployee()) return true;
+        return false;
+    }
+
+    public static function requirePermission(string $moduleKey, string $action = 'view'): void
+    {
+        self::requireLogin();
+        if (!self::can($moduleKey, $action)) {
+            http_response_code(403);
+            echo 'دسترسی غیرمجاز';
+            exit;
+        }
+    }
+
+    public static function assignedEmployeeIds(?int $managerId = null): array
+    {
+        $user = self::user();
+        $managerId = $managerId ?: (int)($user['id'] ?? 0);
+        $rows = Database::fetchAll('SELECT employee_id FROM manager_employees WHERE manager_id = ?', [$managerId]);
+        return array_map('intval', array_column($rows, 'employee_id'));
+    }
+
+    public static function canAccessEmployee(int $employeeId): bool
+    {
+        $user = self::user();
+        if (!$user) return false;
+        if (self::isAdmin()) return true;
+        if (self::isEmployee()) return (int)$user['id'] === $employeeId;
+        if (self::isManager()) {
+            return (bool)Database::fetch('SELECT id FROM manager_employees WHERE manager_id = ? AND employee_id = ? LIMIT 1', [(int)$user['id'], $employeeId]);
+        }
+        return false;
     }
 
     public static function csrfToken(): string
