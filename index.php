@@ -5,8 +5,8 @@ try { $items = Database::fetchAll('SELECT * FROM carousel_items WHERE status="ac
 require __DIR__ . '/views/partials/header.php';
 ?>
 <section class="hero">
-    <h1><?= e(setting('company_name', 'شرکت پخش سبحان')) ?></h1>
-    <p>سامانه داخلی سبک و امن برای مدیریت شاخص‌های عملکرد، نظرسنجی‌ها، فایل‌ها و محتوای صفحه اصلی.</p>
+    <h1><?= e(setting('company_name', 'هلدینگ سبحان')) ?></h1>
+    <p>سامانه هلدینگ سبحان و بخش های وابسته.</p>
 </section>
 <section class="carousel-shell" aria-label="معرفی خدمات">
     <div class="carousel-track" data-carousel-track>
