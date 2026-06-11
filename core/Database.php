@@ -129,6 +129,47 @@ class Database
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS ceo_dashboard_lines (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                report_date DATE NULL,
+                line_code VARCHAR(10) NOT NULL,
+                line_title VARCHAR(100) NULL,
+                sales_amount BIGINT NOT NULL DEFAULT 0,
+                qty INT NOT NULL DEFAULT 0,
+                target_qty INT NOT NULL DEFAULT 0,
+                sort_order INT NOT NULL DEFAULT 0,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_ceo_lines_report (report_date),
+                INDEX idx_ceo_lines_code (line_code),
+                INDEX idx_ceo_lines_active (active)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS ceo_dashboard_visitors (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                report_date DATE NULL,
+                line_code VARCHAR(10) NOT NULL,
+                visitor_name VARCHAR(150) NOT NULL,
+                target_qty INT NOT NULL DEFAULT 0,
+                qty INT NOT NULL DEFAULT 0,
+                sort_order INT NOT NULL DEFAULT 0,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_ceo_visitors_report (report_date),
+                INDEX idx_ceo_visitors_code (line_code),
+                INDEX idx_ceo_visitors_active (active)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS ceo_dashboard_periods (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(150) NOT NULL,
+                from_date DATE NULL,
+                to_date DATE NULL,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_ceo_periods_active (active)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         ];
         foreach ($statements as $statement) {
             $pdo->exec($statement);
@@ -157,6 +198,52 @@ class Database
         if (self::tableExists('user_files') && !self::columnExists('user_files', 'visibility')) {
             $pdo->exec("ALTER TABLE user_files ADD visibility ENUM('private','shared') NOT NULL DEFAULT 'private' AFTER file_size");
         }
+        $ceoLineColumns = [
+            'report_date' => 'ADD report_date DATE NULL AFTER id',
+            'line_code' => 'ADD line_code VARCHAR(10) NOT NULL DEFAULT "" AFTER report_date',
+            'line_title' => 'ADD line_title VARCHAR(100) NULL AFTER line_code',
+            'sales_amount' => 'ADD sales_amount BIGINT NOT NULL DEFAULT 0 AFTER line_title',
+            'qty' => 'ADD qty INT NOT NULL DEFAULT 0 AFTER sales_amount',
+            'target_qty' => 'ADD target_qty INT NOT NULL DEFAULT 0 AFTER qty',
+            'sort_order' => 'ADD sort_order INT NOT NULL DEFAULT 0 AFTER target_qty',
+            'active' => 'ADD active TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order',
+            'created_at' => 'ADD created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP AFTER active',
+            'updated_at' => 'ADD updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at',
+        ];
+        foreach ($ceoLineColumns as $column => $alter) {
+            if (self::tableExists('ceo_dashboard_lines') && !self::columnExists('ceo_dashboard_lines', $column)) {
+                $pdo->exec("ALTER TABLE ceo_dashboard_lines {$alter}");
+            }
+        }
+        $ceoVisitorColumns = [
+            'report_date' => 'ADD report_date DATE NULL AFTER id',
+            'line_code' => 'ADD line_code VARCHAR(10) NOT NULL DEFAULT "" AFTER report_date',
+            'visitor_name' => 'ADD visitor_name VARCHAR(150) NOT NULL DEFAULT "" AFTER line_code',
+            'target_qty' => 'ADD target_qty INT NOT NULL DEFAULT 0 AFTER visitor_name',
+            'qty' => 'ADD qty INT NOT NULL DEFAULT 0 AFTER target_qty',
+            'sort_order' => 'ADD sort_order INT NOT NULL DEFAULT 0 AFTER qty',
+            'active' => 'ADD active TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order',
+            'created_at' => 'ADD created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP AFTER active',
+            'updated_at' => 'ADD updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at',
+        ];
+        foreach ($ceoVisitorColumns as $column => $alter) {
+            if (self::tableExists('ceo_dashboard_visitors') && !self::columnExists('ceo_dashboard_visitors', $column)) {
+                $pdo->exec("ALTER TABLE ceo_dashboard_visitors {$alter}");
+            }
+        }
+        $ceoPeriodColumns = [
+            'title' => 'ADD title VARCHAR(150) NOT NULL DEFAULT "" AFTER id',
+            'from_date' => 'ADD from_date DATE NULL AFTER title',
+            'to_date' => 'ADD to_date DATE NULL AFTER from_date',
+            'active' => 'ADD active TINYINT(1) NOT NULL DEFAULT 1 AFTER to_date',
+            'created_at' => 'ADD created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP AFTER active',
+            'updated_at' => 'ADD updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at',
+        ];
+        foreach ($ceoPeriodColumns as $column => $alter) {
+            if (self::tableExists('ceo_dashboard_periods') && !self::columnExists('ceo_dashboard_periods', $column)) {
+                $pdo->exec("ALTER TABLE ceo_dashboard_periods {$alter}");
+            }
+        }
 
         $modules = [
             ['dashboard', 'داشبورد', 10],
@@ -166,6 +253,7 @@ class Database
             ['survey_results', 'نتایج ارزیابی', 50],
             ['files', 'فایل‌ها', 60],
             ['accounting', 'حسابداری', 65],
+            ['ceo_dashboard', 'داشبورد مدیرعامل', 68],
             ['carousel', 'اسلایدر صفحه اصلی', 70],
             ['settings', 'تنظیمات سایت', 80],
         ];
@@ -187,6 +275,18 @@ class Database
         if (self::tableExists('site_settings')) {
             $settings = [
                 ['hero_subtitle', 'سامانه هلدینگ سبحان و بخش های وابسته.', 'textarea'],
+                ['page_title', 'داشبورد مدیرعامل', 'text'],
+                ['gross_sales_title', 'فروش ناخالص', 'text'],
+                ['discounts_title', 'تخفیفات', 'text'],
+                ['discount_percent_title', 'درصد', 'text'],
+                ['net_sales_title', 'فروش خالص', 'text'],
+                ['line_sales_chart_title', 'ریال فروش لاین', 'text'],
+                ['line_table_title', 'اطلاعات لاین', 'text'],
+                ['visitor_table_title', 'اطلاعات ویزیتورها', 'text'],
+                ['line_share_chart_title', 'سهم فروش هر لاین', 'text'],
+                ['line_achievement_chart_title', 'درصد تحقق لاین', 'text'],
+                ['visitor_achievement_chart_title', 'درصد تحقق ویزیتور', 'text'],
+                ['ceo_dashboard_discounts_amount', '0', 'number'],
             ];
             $stmt = $pdo->prepare('INSERT INTO site_settings (setting_key,setting_value,setting_type,updated_at) VALUES (?,?,?,NOW()) ON DUPLICATE KEY UPDATE setting_type=VALUES(setting_type)');
             foreach ($settings as $setting) {

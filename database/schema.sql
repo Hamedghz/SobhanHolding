@@ -180,6 +180,50 @@ CREATE TABLE IF NOT EXISTS accounting_cities (
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS ceo_dashboard_lines (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  report_date DATE NULL,
+  line_code VARCHAR(10) NOT NULL,
+  line_title VARCHAR(100) NULL,
+  sales_amount BIGINT NOT NULL DEFAULT 0,
+  qty INT NOT NULL DEFAULT 0,
+  target_qty INT NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_ceo_lines_report (report_date),
+  INDEX idx_ceo_lines_code (line_code),
+  INDEX idx_ceo_lines_active (active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ceo_dashboard_visitors (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  report_date DATE NULL,
+  line_code VARCHAR(10) NOT NULL,
+  visitor_name VARCHAR(150) NOT NULL,
+  target_qty INT NOT NULL DEFAULT 0,
+  qty INT NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_ceo_visitors_report (report_date),
+  INDEX idx_ceo_visitors_code (line_code),
+  INDEX idx_ceo_visitors_active (active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ceo_dashboard_periods (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(150) NOT NULL,
+  from_date DATE NULL,
+  to_date DATE NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_ceo_periods_active (active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS carousel_items (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(190) NOT NULL,
