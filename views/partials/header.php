@@ -16,7 +16,6 @@
     </a>
     <nav class="site-nav">
         <a href="/">خانه</a>
-        <a href="/login.php">ورود</a>
         <a href="#contact">تماس</a>
     </nav>
 </header>

@@ -5,7 +5,19 @@ INSERT INTO site_settings (setting_key, setting_value, setting_type) VALUES
 ('meta_description','سامانه داخلی سبک برای مدیریت شاخص‌ها، نظرسنجی‌ها و فایل‌های شرکت پخش سبحان','textarea'),
 ('footer_text','© شرکت پخش سبحان - تمامی حقوق محفوظ است.','text'),
 ('primary_color','#2563eb','color'),
-('logo_path','','image')
+('logo_path','','image'),
+('page_title','داشبورد مدیرعامل','text'),
+('gross_sales_title','فروش ناخالص','text'),
+('discounts_title','تخفیفات','text'),
+('discount_percent_title','درصد','text'),
+('net_sales_title','فروش خالص','text'),
+('line_sales_chart_title','ریال فروش لاین','text'),
+('line_table_title','اطلاعات لاین','text'),
+('visitor_table_title','اطلاعات ویزیتورها','text'),
+('line_share_chart_title','سهم فروش هر لاین','text'),
+('line_achievement_chart_title','درصد تحقق لاین','text'),
+('visitor_achievement_chart_title','درصد تحقق ویزیتور','text'),
+('ceo_dashboard_discounts_amount','0','number')
 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), setting_type = VALUES(setting_type);
 
 INSERT INTO modules (module_key, module_title, sort_order, status) VALUES
@@ -16,6 +28,7 @@ INSERT INTO modules (module_key, module_title, sort_order, status) VALUES
 ('survey_results','نتایج ارزیابی',50,'active'),
 ('files','فایل‌ها',60,'active'),
 ('accounting','حسابداری',65,'active'),
+('ceo_dashboard','داشبورد مدیرعامل',68,'active'),
 ('carousel','اسلایدر صفحه اصلی',70,'active'),
 ('settings','تنظیمات سایت',80,'active')
 ON DUPLICATE KEY UPDATE module_title = VALUES(module_title), sort_order = VALUES(sort_order), status = VALUES(status);

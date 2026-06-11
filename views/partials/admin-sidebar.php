@@ -1,6 +1,6 @@
 <?php $isAdmin = Auth::isAdmin(); ?>
 <aside class="admin-sidebar" id="adminSidebar">
-    <a class="admin-logo" href="/admin/index.php"><?= e(setting('company_name', 'شرکت پخش سبحان')) ?></a>
+    <a class="admin-logo" href="WWW.SOBHANSB.IR"><?= e(setting('company_name', 'شرکت پخش سبحان')) ?></a>
     <nav>
         <?php if (Auth::can('dashboard')): ?><a href="/admin/index.php">داشبورد</a><?php endif; ?>
         <?php if (Auth::can('users')): ?>
@@ -16,6 +16,9 @@
         <?php if (Auth::can('files')): ?><a href="/admin/files.php">فایل‌ها</a><?php endif; ?>
         <?php if (Auth::can('accounting')): ?><a href="/admin/accounting-collections.php">حسابداری</a><?php endif; ?>
         <?php if (Auth::can('accounting', 'edit')): ?><a href="/admin/accounting-settings.php">تنظیمات حسابداری</a><?php endif; ?>
+        <?php if (Auth::can('ceo_dashboard')): ?><a href="/admin/ceo-dashboard.php">داشبورد مدیرعامل</a><?php endif; ?>
+        <?php if (Auth::can('ceo_dashboard', 'edit')): ?><a href="/admin/ceo-dashboard-lines.php">اطلاعات لاین‌ها</a><?php endif; ?>
+        <?php if (Auth::can('ceo_dashboard', 'edit')): ?><a href="/admin/ceo-dashboard-visitors.php">اطلاعات ویزیتورها</a><?php endif; ?>
         <?php if (Auth::can('carousel')): ?>
             <a href="/admin/carousel.php">اسلایدر صفحه اصلی</a>
         <?php endif; ?>

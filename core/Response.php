@@ -35,3 +35,18 @@ function setting(string $key, string $default = ''): string
     }
     return $settings[$key] ?? $default;
 }
+
+function format_number($value): string
+{
+    return number_format((float)$value, 0, '.', ',');
+}
+
+function format_money($value): string
+{
+    return format_number($value);
+}
+
+function format_percent($value, int $decimals = 0): string
+{
+    return number_format((float)$value, $decimals, '.', ',') . '%';
+}
