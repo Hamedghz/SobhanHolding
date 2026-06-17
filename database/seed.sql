@@ -33,7 +33,6 @@ INSERT INTO site_settings (setting_key, setting_value, setting_type) VALUES
 ('ceo_dashboard_show_line_table','1','boolean'),
 ('ceo_dashboard_show_visitor_table','1','boolean'),
 ('sobhan_api_base_url','http://178.131.83.26:18000','text'),
-('sobhan_api_key','','password'),
 ('sobhan_api_timeout','10','number'),
 ('sobhan_api_enabled','0','boolean'),
 ('sobhan_distribution_data_mode','import_file','select'),
@@ -41,6 +40,10 @@ INSERT INTO site_settings (setting_key, setting_value, setting_type) VALUES
 ('sobhan_ai_overwrite_manual_data','0','boolean'),
 ('sobhan_static_pharmacy_mode','1','boolean')
 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), setting_type = VALUES(setting_type);
+
+INSERT INTO site_settings (setting_key, setting_value, setting_type) VALUES
+('sobhan_api_key','','password')
+ON DUPLICATE KEY UPDATE setting_type = VALUES(setting_type);
 
 INSERT INTO modules (module_key, module_title, sort_order, status) VALUES
 ('dashboard','داشبورد',10,'active'),

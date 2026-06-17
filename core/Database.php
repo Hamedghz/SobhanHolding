@@ -43,6 +43,8 @@ class Database
 
     private static function migrate(): void
     {
+        // Runtime bootstrap: normal admin/page requests reach this method through Database::connection().
+        // install.php separately executes database/schema.sql and database/seed.sql only during fresh install.
         if (self::$migrated) return;
         self::$migrated = true;
         $pdo = self::$pdo;

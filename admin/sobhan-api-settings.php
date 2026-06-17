@@ -5,7 +5,7 @@ require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/SobhanApiClient.php';
 
 Auth::requireLogin();
-if (!Auth::can('manage_sobhan_api_settings') && !Auth::can('view_data_source_settings')) {
+if (!Auth::can('view_sobhan_api_settings') && !Auth::can('manage_sobhan_api_settings') && !Auth::can('view_data_source_settings') && !Auth::can('manage_data_source_settings')) {
     http_response_code(403);
     echo 'دسترسی غیرمجاز';
     exit;
