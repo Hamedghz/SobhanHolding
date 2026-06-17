@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
+require_once __DIR__ . '/../core/JalaliDate.php';
 
 Auth::requirePermission('survey_results', 'view');
 $pageTitle = 'نتایج ارزیابی';
@@ -122,10 +123,12 @@ if ($filterEmployee && Auth::canAccessEmployee($filterEmployee)) {
     $params[] = $filterEmployee;
 }
 if ($fromDate !== '') {
+    $fromDate = JalaliDate::toGregorian($fromDate) ?: $fromDate;
     $where[] = 'DATE(r.created_at) >= ?';
     $params[] = $fromDate;
 }
 if ($toDate !== '') {
+    $toDate = JalaliDate::toGregorian($toDate) ?: $toDate;
     $where[] = 'DATE(r.created_at) <= ?';
     $params[] = $toDate;
 }
@@ -166,8 +169,8 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <label class="form-field"><span>نظرسنجی</span><select name="survey_id"><option value="">همه</option><?php foreach ($allSurveys as $s): ?><option value="<?= e($s['id']) ?>" <?= $filterSurvey === (int)$s['id'] ? 'selected' : '' ?>><?= e($s['title']) ?></option><?php endforeach; ?></select></label>
         <?php if (Auth::isAdmin()): ?><label class="form-field"><span>مدیر</span><select name="manager_id"><option value="">همه</option><?php foreach ($managers as $m): ?><option value="<?= e($m['id']) ?>" <?= $filterManager === (int)$m['id'] ? 'selected' : '' ?>><?= e($m['name']) ?></option><?php endforeach; ?></select></label><?php endif; ?>
         <label class="form-field"><span>کارمند</span><select name="employee_id"><option value="">همه</option><?php foreach ($employeeFilterOptions as $employee): ?><option value="<?= e($employee['id']) ?>" <?= $filterEmployee === (int)$employee['id'] ? 'selected' : '' ?>><?= e($employee['name']) ?></option><?php endforeach; ?></select></label>
-        <label class="form-field"><span>از تاریخ</span><input type="date" name="from_date" value="<?= e($fromDate) ?>"></label>
-        <label class="form-field"><span>تا تاریخ</span><input type="date" name="to_date" value="<?= e($toDate) ?>"></label>
+        <label class="form-field"><span>از تاریخ</span><input class="jalali-date-input" name="from_date" inputmode="numeric" placeholder="1404/09/15" value="<?= e(jalali_input_value($fromDate)) ?>"></label>
+        <label class="form-field"><span>تا تاریخ</span><input class="jalali-date-input" name="to_date" inputmode="numeric" placeholder="1404/09/15" value="<?= e(jalali_input_value($toDate)) ?>"></label>
     </div>
     <div class="form-actions"><button class="btn btn-primary">اعمال فیلتر</button><a class="btn" href="/admin/survey-results.php">پاکسازی</a></div>
 </form>
@@ -178,7 +181,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <div class="card score-row">
             <div>
                 <strong><?= e($r['employee_real_name'] ?: $r['employee_name']) ?></strong>
-                <span class="muted"><?= e($r['manager_names'] ?: 'بدون مدیر') ?> | <?= e($r['survey_title']) ?> | <?= e($r['created_at']) ?></span>
+                <span class="muted"><?= e($r['manager_names'] ?: 'بدون مدیر') ?> | <?= e($r['survey_title']) ?> | <?= e(format_jalali_datetime($r['created_at'])) ?></span>
             </div>
             <div class="score-meter"><div class="progress"><span style="width:<?= e((string)$score) ?>%"></span></div><b><?= e(number_format((float)$r['final_score'], 2)) ?></b></div>
         </div>

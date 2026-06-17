@@ -137,6 +137,11 @@ class Database
                 sales_amount BIGINT NOT NULL DEFAULT 0,
                 qty INT NOT NULL DEFAULT 0,
                 target_qty INT NOT NULL DEFAULT 0,
+                target_amount BIGINT NOT NULL DEFAULT 0,
+                supervisor_name VARCHAR(150) NULL,
+                sales_manager_name VARCHAR(150) NULL,
+                supervisor_user_id INT UNSIGNED NULL,
+                sales_manager_user_id INT UNSIGNED NULL,
                 sort_order INT NOT NULL DEFAULT 0,
                 active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
@@ -152,6 +157,9 @@ class Database
                 visitor_name VARCHAR(150) NOT NULL,
                 target_qty INT NOT NULL DEFAULT 0,
                 qty INT NOT NULL DEFAULT 0,
+                target_amount BIGINT NOT NULL DEFAULT 0,
+                sales_amount BIGINT NOT NULL DEFAULT 0,
+                user_id INT UNSIGNED NULL,
                 sort_order INT NOT NULL DEFAULT 0,
                 active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
@@ -169,6 +177,37 @@ class Database
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_ceo_periods_active (active)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS pharmacies (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(150) NOT NULL,
+                slug VARCHAR(100) NOT NULL UNIQUE,
+                sort_order INT NOT NULL DEFAULT 0,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_pharmacies_active (active),
+                INDEX idx_pharmacies_sort (sort_order)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS pharmacy_dashboard_metrics (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                pharmacy_id INT UNSIGNED NOT NULL,
+                report_date DATE NULL,
+                daily_sales BIGINT NOT NULL DEFAULT 0,
+                monthly_sales BIGINT NOT NULL DEFAULT 0,
+                supplier_purchase_amount BIGINT NOT NULL DEFAULT 0,
+                supplier_sales_amount BIGINT NOT NULL DEFAULT 0,
+                open_invoice_amount BIGINT NOT NULL DEFAULT 0,
+                expenses_amount BIGINT NOT NULL DEFAULT 0,
+                pending_checks_amount BIGINT NOT NULL DEFAULT 0,
+                sort_order INT NOT NULL DEFAULT 0,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_pharmacy_metrics_pharmacy (pharmacy_id),
+                INDEX idx_pharmacy_metrics_report (report_date),
+                INDEX idx_pharmacy_metrics_active (active),
+                CONSTRAINT fk_pharmacy_metrics_pharmacy FOREIGN KEY (pharmacy_id) REFERENCES pharmacies(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         ];
         foreach ($statements as $statement) {
@@ -205,7 +244,12 @@ class Database
             'sales_amount' => 'ADD sales_amount BIGINT NOT NULL DEFAULT 0 AFTER line_title',
             'qty' => 'ADD qty INT NOT NULL DEFAULT 0 AFTER sales_amount',
             'target_qty' => 'ADD target_qty INT NOT NULL DEFAULT 0 AFTER qty',
-            'sort_order' => 'ADD sort_order INT NOT NULL DEFAULT 0 AFTER target_qty',
+            'target_amount' => 'ADD target_amount BIGINT NOT NULL DEFAULT 0 AFTER target_qty',
+            'supervisor_name' => 'ADD supervisor_name VARCHAR(150) NULL AFTER target_amount',
+            'sales_manager_name' => 'ADD sales_manager_name VARCHAR(150) NULL AFTER supervisor_name',
+            'supervisor_user_id' => 'ADD supervisor_user_id INT UNSIGNED NULL AFTER sales_manager_name',
+            'sales_manager_user_id' => 'ADD sales_manager_user_id INT UNSIGNED NULL AFTER supervisor_user_id',
+            'sort_order' => 'ADD sort_order INT NOT NULL DEFAULT 0 AFTER sales_manager_user_id',
             'active' => 'ADD active TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order',
             'created_at' => 'ADD created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP AFTER active',
             'updated_at' => 'ADD updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at',
@@ -221,7 +265,10 @@ class Database
             'visitor_name' => 'ADD visitor_name VARCHAR(150) NOT NULL DEFAULT "" AFTER line_code',
             'target_qty' => 'ADD target_qty INT NOT NULL DEFAULT 0 AFTER visitor_name',
             'qty' => 'ADD qty INT NOT NULL DEFAULT 0 AFTER target_qty',
-            'sort_order' => 'ADD sort_order INT NOT NULL DEFAULT 0 AFTER qty',
+            'target_amount' => 'ADD target_amount BIGINT NOT NULL DEFAULT 0 AFTER qty',
+            'sales_amount' => 'ADD sales_amount BIGINT NOT NULL DEFAULT 0 AFTER target_amount',
+            'user_id' => 'ADD user_id INT UNSIGNED NULL AFTER sales_amount',
+            'sort_order' => 'ADD sort_order INT NOT NULL DEFAULT 0 AFTER user_id',
             'active' => 'ADD active TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order',
             'created_at' => 'ADD created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP AFTER active',
             'updated_at' => 'ADD updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at',
@@ -244,6 +291,42 @@ class Database
                 $pdo->exec("ALTER TABLE ceo_dashboard_periods {$alter}");
             }
         }
+        $pharmacyColumns = [
+            'title' => 'ADD title VARCHAR(150) NOT NULL DEFAULT "" AFTER id',
+            'slug' => 'ADD slug VARCHAR(100) NOT NULL DEFAULT "" AFTER title',
+            'sort_order' => 'ADD sort_order INT NOT NULL DEFAULT 0 AFTER slug',
+            'active' => 'ADD active TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order',
+            'created_at' => 'ADD created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP AFTER active',
+            'updated_at' => 'ADD updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at',
+        ];
+        foreach ($pharmacyColumns as $column => $alter) {
+            if (self::tableExists('pharmacies') && !self::columnExists('pharmacies', $column)) {
+                $pdo->exec("ALTER TABLE pharmacies {$alter}");
+            }
+        }
+        $pharmacyMetricColumns = [
+            'pharmacy_id' => 'ADD pharmacy_id INT UNSIGNED NOT NULL DEFAULT 0 AFTER id',
+            'report_date' => 'ADD report_date DATE NULL AFTER pharmacy_id',
+            'daily_sales' => 'ADD daily_sales BIGINT NOT NULL DEFAULT 0 AFTER report_date',
+            'monthly_sales' => 'ADD monthly_sales BIGINT NOT NULL DEFAULT 0 AFTER daily_sales',
+            'supplier_purchase_amount' => 'ADD supplier_purchase_amount BIGINT NOT NULL DEFAULT 0 AFTER monthly_sales',
+            'supplier_sales_amount' => 'ADD supplier_sales_amount BIGINT NOT NULL DEFAULT 0 AFTER supplier_purchase_amount',
+            'open_invoice_amount' => 'ADD open_invoice_amount BIGINT NOT NULL DEFAULT 0 AFTER supplier_sales_amount',
+            'expenses_amount' => 'ADD expenses_amount BIGINT NOT NULL DEFAULT 0 AFTER open_invoice_amount',
+            'pending_checks_amount' => 'ADD pending_checks_amount BIGINT NOT NULL DEFAULT 0 AFTER expenses_amount',
+            'sort_order' => 'ADD sort_order INT NOT NULL DEFAULT 0 AFTER pending_checks_amount',
+            'active' => 'ADD active TINYINT(1) NOT NULL DEFAULT 1 AFTER sort_order',
+            'created_at' => 'ADD created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP AFTER active',
+            'updated_at' => 'ADD updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at',
+        ];
+        foreach ($pharmacyMetricColumns as $column => $alter) {
+            if (self::tableExists('pharmacy_dashboard_metrics') && !self::columnExists('pharmacy_dashboard_metrics', $column)) {
+                $pdo->exec("ALTER TABLE pharmacy_dashboard_metrics {$alter}");
+            }
+        }
+        if (self::tableExists('pharmacy_dashboard_metrics') && self::columnExists('pharmacy_dashboard_metrics', 'supplier_sales_amount') && self::columnExists('pharmacy_dashboard_metrics', 'open_invoice_amount')) {
+            $pdo->exec('UPDATE pharmacy_dashboard_metrics SET open_invoice_amount = supplier_sales_amount WHERE open_invoice_amount = 0 AND supplier_sales_amount > 0');
+        }
 
         $modules = [
             ['dashboard', 'داشبورد', 10],
@@ -254,6 +337,17 @@ class Database
             ['files', 'فایل‌ها', 60],
             ['accounting', 'حسابداری', 65],
             ['ceo_dashboard', 'داشبورد مدیرعامل', 68],
+            ['view_ceo_dashboard', 'مشاهده داشبورد مدیرعامل', 681],
+            ['view_sobhan_api_settings', 'مشاهده تنظیمات API سبحان', 682],
+            ['manage_sobhan_api_settings', 'مدیریت تنظیمات API سبحان', 683],
+            ['use_ai_assistant', 'استفاده از دستیار هوش مصنوعی', 684],
+            ['view_ai_chat', 'مشاهده گفتگوی هوش مصنوعی', 685],
+            ['manage_ai_chat_settings', 'مدیریت تنظیمات گفتگوی هوش مصنوعی', 686],
+            ['view_data_source_settings', 'مشاهده تنظیمات منبع داده', 687],
+            ['manage_data_source_settings', 'مدیریت تنظیمات منبع داده', 688],
+            ['toggle_ai_autofill', 'فعال‌سازی تکمیل خودکار هوش مصنوعی', 689],
+            ['allow_ai_overwrite_manual_data', 'اجازه بازنویسی داده دستی با هوش مصنوعی', 690],
+            ['pharmacy_settings', 'تنظیمات داروخانه', 69],
             ['carousel', 'اسلایدر صفحه اصلی', 70],
             ['settings', 'تنظیمات سایت', 80],
         ];
@@ -272,25 +366,74 @@ class Database
             $stmt->execute([$title, ($index + 1) * 10]);
         }
 
+        $stmt = $pdo->prepare('INSERT INTO pharmacies (title,slug,sort_order,active,created_at,updated_at) VALUES (?,?,?,1,NOW(),NOW()) ON DUPLICATE KEY UPDATE title=VALUES(title), sort_order=VALUES(sort_order), active=VALUES(active)');
+        foreach ([['داروخانه سبحان', 'sobhan', 10], ['داروخانه سنجری', 'sanjari', 20], ['داروخانه اعلایی', 'alaei', 30]] as $pharmacy) {
+            $stmt->execute($pharmacy);
+        }
+
         if (self::tableExists('site_settings')) {
             $settings = [
                 ['hero_subtitle', 'سامانه هلدینگ سبحان و بخش های وابسته.', 'textarea'],
-                ['page_title', 'داشبورد مدیرعامل', 'text'],
-                ['gross_sales_title', 'فروش ناخالص', 'text'],
-                ['discounts_title', 'تخفیفات', 'text'],
-                ['discount_percent_title', 'درصد', 'text'],
-                ['net_sales_title', 'فروش خالص', 'text'],
-                ['line_sales_chart_title', 'ریال فروش لاین', 'text'],
-                ['line_table_title', 'اطلاعات لاین', 'text'],
-                ['visitor_table_title', 'اطلاعات ویزیتورها', 'text'],
-                ['line_share_chart_title', 'سهم فروش هر لاین', 'text'],
-                ['line_achievement_chart_title', 'درصد تحقق لاین', 'text'],
-                ['visitor_achievement_chart_title', 'درصد تحقق ویزیتور', 'text'],
+                ['pwa_name', 'شرکت پخش سبحان', 'text'],
+                ['pwa_short_name', 'سبحان', 'text'],
+                ['pwa_description', 'سامانه هلدینگ سبحان', 'textarea'],
+                ['pwa_theme_color', '#004647', 'color'],
+                ['pwa_background_color', '#ffffff', 'color'],
+                ['pwa_start_url', '/', 'text'],
+                ['pwa_display', 'standalone', 'select'],
+                ['pwa_orientation', 'portrait', 'select'],
+                ['pwa_icon_192', '', 'image'],
+                ['pwa_icon_512', '', 'image'],
+                ['pwa_favicon', '', 'image'],
+                ['ceo_dashboard_page_title', 'داشبورد مدیرعامل', 'text'],
+                ['ceo_dashboard_gross_sales_title', 'فروش ناخالص', 'text'],
+                ['ceo_dashboard_discounts_title', 'تخفیفات', 'text'],
+                ['ceo_dashboard_discount_percent_title', 'درصد', 'text'],
+                ['ceo_dashboard_net_sales_title', 'فروش خالص', 'text'],
+                ['ceo_dashboard_line_sales_chart_title', 'ریال فروش لاین', 'text'],
+                ['ceo_dashboard_line_table_title', 'اطلاعات لاین', 'text'],
+                ['ceo_dashboard_visitor_table_title', 'اطلاعات ویزیتورها', 'text'],
+                ['ceo_dashboard_line_share_chart_title', 'سهم فروش هر لاین', 'text'],
+                ['ceo_dashboard_line_achievement_chart_title', 'درصد تحقق لاین', 'text'],
+                ['ceo_dashboard_visitor_achievement_chart_title', 'درصد تحقق ویزیتور', 'text'],
                 ['ceo_dashboard_discounts_amount', '0', 'number'],
+                ['ceo_dashboard_show_charts', '1', 'boolean'],
+                ['ceo_dashboard_show_line_table', '1', 'boolean'],
+                ['ceo_dashboard_show_visitor_table', '1', 'boolean'],
+                ['sobhan_api_base_url', 'http://178.131.83.26:18000', 'text'],
+                ['sobhan_api_key', '', 'password'],
+                ['sobhan_api_timeout', '10', 'number'],
+                ['sobhan_api_enabled', '0', 'boolean'],
+                ['sobhan_distribution_data_mode', 'import_file', 'select'],
+                ['sobhan_ai_autofill_enabled', '0', 'boolean'],
+                ['sobhan_ai_overwrite_manual_data', '0', 'boolean'],
+                ['sobhan_static_pharmacy_mode', '1', 'boolean'],
             ];
             $stmt = $pdo->prepare('INSERT INTO site_settings (setting_key,setting_value,setting_type,updated_at) VALUES (?,?,?,NOW()) ON DUPLICATE KEY UPDATE setting_type=VALUES(setting_type)');
             foreach ($settings as $setting) {
                 $stmt->execute($setting);
+            }
+            $legacyMap = [
+                'page_title' => 'ceo_dashboard_page_title',
+                'gross_sales_title' => 'ceo_dashboard_gross_sales_title',
+                'discounts_title' => 'ceo_dashboard_discounts_title',
+                'discount_percent_title' => 'ceo_dashboard_discount_percent_title',
+                'net_sales_title' => 'ceo_dashboard_net_sales_title',
+                'line_sales_chart_title' => 'ceo_dashboard_line_sales_chart_title',
+                'line_table_title' => 'ceo_dashboard_line_table_title',
+                'visitor_table_title' => 'ceo_dashboard_visitor_table_title',
+                'line_share_chart_title' => 'ceo_dashboard_line_share_chart_title',
+                'line_achievement_chart_title' => 'ceo_dashboard_line_achievement_chart_title',
+                'visitor_achievement_chart_title' => 'ceo_dashboard_visitor_achievement_chart_title',
+            ];
+            $copyStmt = $pdo->prepare(
+                'UPDATE site_settings target
+                 JOIN site_settings legacy ON legacy.setting_key = ?
+                 SET target.setting_value = legacy.setting_value
+                 WHERE target.setting_key = ? AND (target.setting_value IS NULL OR target.setting_value = "")'
+            );
+            foreach ($legacyMap as $legacyKey => $newKey) {
+                $copyStmt->execute([$legacyKey, $newKey]);
             }
         }
     }

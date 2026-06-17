@@ -164,12 +164,25 @@ img { display: block; max-width: 100%; }
     visibility: hidden;
     background-position: center;
     background-size: cover;
+    background-repeat: no-repeat;
     transition: opacity .7s ease, visibility .7s ease, transform 4s ease;
     transform: scale(1.01);
 }
 
 .hero-slide.has-image {
     background-image: var(--slide-image);
+}
+
+.hero-slide.has-image::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image: var(--slide-image);
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: saturate(1.02);
 }
 
 .hero-slide.active {
@@ -181,6 +194,7 @@ img { display: block; max-width: 100%; }
 .hero-overlay {
     position: absolute;
     inset: 0;
+    z-index: 1;
     background:
         linear-gradient(180deg, rgba(7, 16, 24, .42), rgba(7, 16, 24, .86)),
         linear-gradient(90deg, rgba(7, 16, 24, .76), rgba(7, 16, 24, .28), rgba(7, 16, 24, .76));

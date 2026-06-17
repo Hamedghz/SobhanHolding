@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
+require_once __DIR__ . '/../core/JalaliDate.php';
 
 Auth::requirePermission('accounting', 'view');
 $pageTitle = 'ارسالی‌های حسابداری';
@@ -60,10 +61,12 @@ if ($filters['status'] !== '' && isset($statusLabels[$filters['status']])) {
     $params[] = $filters['status'];
 }
 if ($filters['from_date'] !== '') {
+    $filters['from_date'] = JalaliDate::toGregorian($filters['from_date']) ?: $filters['from_date'];
     $where[] = 'DATE(created_at) >= ?';
     $params[] = $filters['from_date'];
 }
 if ($filters['to_date'] !== '') {
+    $filters['to_date'] = JalaliDate::toGregorian($filters['to_date']) ?: $filters['to_date'];
     $where[] = 'DATE(created_at) <= ?';
     $params[] = $filters['to_date'];
 }
@@ -80,7 +83,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     $out = fopen('php://output', 'w');
     fputcsv($out, ['شناسه', 'نقش', 'نام', 'شماره فاکتور', 'شهرستان', 'توضیحات', 'وضعیت', 'تاریخ']);
     foreach ($items as $item) {
-        fputcsv($out, [$item['id'], $item['collector_role'], $item['full_name'], $item['invoice_number'], $item['city'], $item['description'], $statusLabels[$item['status']] ?? $item['status'], $item['created_at']]);
+        fputcsv($out, [$item['id'], $item['collector_role'], $item['full_name'], $item['invoice_number'], $item['city'], $item['description'], $statusLabels[$item['status']] ?? $item['status'], format_jalali_datetime($item['created_at'])]);
     }
     fclose($out);
     exit;
@@ -97,8 +100,8 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <label class="form-field"><span>توضیحات</span><input name="description" value="<?= e($filters['description']) ?>"></label>
         <label class="form-field"><span>شهرستان</span><select name="city"><option value="">همه</option><?php foreach ($cityOptions as $city): ?><option value="<?= e($city) ?>" <?= $filters['city'] === $city ? 'selected' : '' ?>><?= e($city) ?></option><?php endforeach; ?></select></label>
         <label class="form-field"><span>وضعیت</span><select name="status"><option value="">همه</option><?php foreach ($statusLabels as $key => $label): ?><option value="<?= e($key) ?>" <?= $filters['status'] === $key ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></label>
-        <label class="form-field"><span>از تاریخ</span><input type="date" name="from_date" value="<?= e($filters['from_date']) ?>"></label>
-        <label class="form-field"><span>تا تاریخ</span><input type="date" name="to_date" value="<?= e($filters['to_date']) ?>"></label>
+        <label class="form-field"><span>از تاریخ</span><input class="jalali-date-input" name="from_date" inputmode="numeric" placeholder="1404/09/15" value="<?= e(jalali_input_value($filters['from_date'])) ?>"></label>
+        <label class="form-field"><span>تا تاریخ</span><input class="jalali-date-input" name="to_date" inputmode="numeric" placeholder="1404/09/15" value="<?= e(jalali_input_value($filters['to_date'])) ?>"></label>
     </div>
     <div class="form-actions"><button class="btn btn-primary">اعمال فیلتر</button><a class="btn" href="/admin/accounting-collections.php">پاکسازی</a><a class="btn" href="?<?= e(http_build_query(array_merge($_GET, ['export' => 'csv']))) ?>">خروجی CSV</a><a class="btn" href="/admin/accounting-settings.php">تنظیمات حسابداری</a></div>
 </form>
@@ -135,7 +138,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
                         <?php endforeach; ?>
                     </form>
                 </td>
-                <td><?= e($item['created_at']) ?></td>
+                <td><?= e(format_jalali_datetime($item['created_at'])) ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

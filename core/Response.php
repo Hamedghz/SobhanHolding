@@ -46,7 +46,40 @@ function format_money($value): string
     return format_number($value);
 }
 
+function format_large_number($value): string
+{
+    $number = (float)$value;
+    $abs = abs($number);
+    if ($abs >= 1000000000) {
+        $short = $number / 1000000000;
+        return rtrim(rtrim(number_format($short, $short >= 100 ? 0 : 1, '.', ','), '0'), '.') . ' میلیارد';
+    }
+    if ($abs >= 1000000) {
+        $short = $number / 1000000;
+        return rtrim(rtrim(number_format($short, $short >= 100 ? 0 : 1, '.', ','), '0'), '.') . ' میلیون';
+    }
+    return format_number($number);
+}
+
 function format_percent($value, int $decimals = 0): string
 {
     return number_format((float)$value, $decimals, '.', ',') . '%';
+}
+
+function format_jalali_date(?string $value): string
+{
+    require_once __DIR__ . '/JalaliDate.php';
+    return JalaliDate::toJalali($value);
+}
+
+function format_jalali_datetime(?string $value): string
+{
+    require_once __DIR__ . '/JalaliDate.php';
+    return JalaliDate::toJalaliDateTime($value);
+}
+
+function jalali_input_value(?string $value): string
+{
+    require_once __DIR__ . '/JalaliDate.php';
+    return JalaliDate::inputValue($value);
 }
