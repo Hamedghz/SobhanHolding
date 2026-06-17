@@ -82,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo = new PDO($dbDsn, $dbUser, $dbPass, $options);
 
+            // Fresh install only: runtime repairs/defaults are handled by core/Database.php::migrate().
             $schema = file_get_contents(__DIR__ . '/database/schema.sql');
             foreach (array_filter(array_map('trim', explode(';', $schema))) as $statement) {
                 $pdo->exec($statement);
