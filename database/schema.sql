@@ -188,6 +188,11 @@ CREATE TABLE IF NOT EXISTS ceo_dashboard_lines (
   sales_amount BIGINT NOT NULL DEFAULT 0,
   qty INT NOT NULL DEFAULT 0,
   target_qty INT NOT NULL DEFAULT 0,
+  target_amount BIGINT NOT NULL DEFAULT 0,
+  supervisor_name VARCHAR(150) NULL,
+  sales_manager_name VARCHAR(150) NULL,
+  supervisor_user_id INT UNSIGNED NULL,
+  sales_manager_user_id INT UNSIGNED NULL,
   sort_order INT NOT NULL DEFAULT 0,
   active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
@@ -204,6 +209,9 @@ CREATE TABLE IF NOT EXISTS ceo_dashboard_visitors (
   visitor_name VARCHAR(150) NOT NULL,
   target_qty INT NOT NULL DEFAULT 0,
   qty INT NOT NULL DEFAULT 0,
+  target_amount BIGINT NOT NULL DEFAULT 0,
+  sales_amount BIGINT NOT NULL DEFAULT 0,
+  user_id INT UNSIGNED NULL,
   sort_order INT NOT NULL DEFAULT 0,
   active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
@@ -222,6 +230,39 @@ CREATE TABLE IF NOT EXISTS ceo_dashboard_periods (
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_ceo_periods_active (active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pharmacies (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(150) NOT NULL,
+  slug VARCHAR(100) NOT NULL UNIQUE,
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_pharmacies_active (active),
+  INDEX idx_pharmacies_sort (sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS pharmacy_dashboard_metrics (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  pharmacy_id INT UNSIGNED NOT NULL,
+  report_date DATE NULL,
+  daily_sales BIGINT NOT NULL DEFAULT 0,
+  monthly_sales BIGINT NOT NULL DEFAULT 0,
+  supplier_purchase_amount BIGINT NOT NULL DEFAULT 0,
+  supplier_sales_amount BIGINT NOT NULL DEFAULT 0,
+  open_invoice_amount BIGINT NOT NULL DEFAULT 0,
+  expenses_amount BIGINT NOT NULL DEFAULT 0,
+  pending_checks_amount BIGINT NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_pharmacy_metrics_pharmacy (pharmacy_id),
+  INDEX idx_pharmacy_metrics_report (report_date),
+  INDEX idx_pharmacy_metrics_active (active),
+  CONSTRAINT fk_pharmacy_metrics_pharmacy FOREIGN KEY (pharmacy_id) REFERENCES pharmacies(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS carousel_items (
@@ -244,6 +285,30 @@ CREATE TABLE IF NOT EXISTS site_settings (
   setting_type VARCHAR(50) NOT NULL DEFAULT 'text',
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO modules (module_key,module_title,sort_order,status,created_at) VALUES
+('view_ceo_dashboard','مشاهده داشبورد مدیرعامل',681,'active',NOW()),
+('view_sobhan_api_settings','مشاهده تنظیمات API سبحان',682,'active',NOW()),
+('manage_sobhan_api_settings','مدیریت تنظیمات API سبحان',683,'active',NOW()),
+('use_ai_assistant','استفاده از دستیار هوش مصنوعی',684,'active',NOW()),
+('view_ai_chat','مشاهده گفتگوی هوش مصنوعی',685,'active',NOW()),
+('manage_ai_chat_settings','مدیریت تنظیمات گفتگوی هوش مصنوعی',686,'active',NOW()),
+('view_data_source_settings','مشاهده تنظیمات منبع داده',687,'active',NOW()),
+('manage_data_source_settings','مدیریت تنظیمات منبع داده',688,'active',NOW()),
+('toggle_ai_autofill','فعال‌سازی تکمیل خودکار هوش مصنوعی',689,'active',NOW()),
+('allow_ai_overwrite_manual_data','اجازه بازنویسی داده دستی با هوش مصنوعی',690,'active',NOW())
+ON DUPLICATE KEY UPDATE module_title=VALUES(module_title), sort_order=VALUES(sort_order), status=VALUES(status);
+
+INSERT INTO site_settings (setting_key,setting_value,setting_type,updated_at) VALUES
+('sobhan_api_base_url','http://178.131.83.26:18000','text',NOW()),
+('sobhan_api_key','','password',NOW()),
+('sobhan_api_timeout','10','number',NOW()),
+('sobhan_api_enabled','0','boolean',NOW()),
+('sobhan_distribution_data_mode','import_file','select',NOW()),
+('sobhan_ai_autofill_enabled','0','boolean',NOW()),
+('sobhan_ai_overwrite_manual_data','0','boolean',NOW()),
+('sobhan_static_pharmacy_mode','1','boolean',NOW())
+ON DUPLICATE KEY UPDATE setting_type=VALUES(setting_type);
 
 CREATE TABLE IF NOT EXISTS activity_logs (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -101,6 +101,16 @@ class Auth
         if (!$user) return false;
         if (($user['role'] ?? '') === 'admin') return true;
 
+        $aliases = [
+            'view_ceo_dashboard' => ['ceo_dashboard'],
+            'ceo_dashboard' => ['view_ceo_dashboard'],
+            'view_sobhan_api_settings' => ['manage_sobhan_api_settings'],
+            'view_ai_chat' => ['ai_chat'],
+            'ai_chat' => ['view_ai_chat'],
+            'ai_assistant' => ['use_ai_assistant'],
+            'use_ai_assistant' => ['ai_assistant'],
+        ];
+
         $column = match ($action) {
             'create' => 'can_create',
             'edit' => 'can_edit',
@@ -110,6 +120,13 @@ class Auth
         $permission = Database::fetch("SELECT {$column} allowed FROM user_permissions WHERE user_id = ? AND module_key = ? LIMIT 1", [(int)$user['id'], $moduleKey]);
         if ($permission) {
             return (int)$permission['allowed'] === 1;
+        }
+
+        foreach ($aliases[$moduleKey] ?? [] as $aliasKey) {
+            $permission = Database::fetch("SELECT {$column} allowed FROM user_permissions WHERE user_id = ? AND module_key = ? LIMIT 1", [(int)$user['id'], $aliasKey]);
+            if ($permission && (int)$permission['allowed'] === 1) {
+                return true;
+            }
         }
 
         if ($moduleKey === 'dashboard' && $action === 'view') return true;

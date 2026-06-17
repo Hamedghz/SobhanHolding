@@ -121,11 +121,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $users = Database::fetchAll('SELECT * FROM users ORDER BY id DESC');
 $employees = Database::fetchAll('SELECT id,name,email FROM users WHERE role = "employee" AND status = "active" ORDER BY name');
 $modules = Database::fetchAll('SELECT * FROM modules WHERE status = "active" ORDER BY sort_order ASC, id ASC');
+$moduleMeta = [
+    'dashboard' => ['group' => 'داشبوردها', 'route' => '/admin/index.php', 'description' => 'داشبورد عمومی پنل مدیریت'],
+    'ceo_dashboard' => ['group' => 'داشبوردها', 'route' => '/admin/ceo-dashboard.php', 'description' => 'نسخه قدیمی دسترسی داشبورد مدیرعامل'],
+    'view_ceo_dashboard' => ['group' => 'داشبوردها', 'route' => '/admin/ceo-dashboard.php', 'description' => 'مشاهده داشبورد مدیرعامل و گزارش‌های API سبحان'],
+    'kpis' => ['group' => 'گزارش‌ها', 'route' => '/admin/kpis.php', 'description' => 'مدیریت شاخص‌های ارزیابی'],
+    'accounting' => ['group' => 'گزارش‌ها', 'route' => '/admin/accounting-collections.php', 'description' => 'دریافت‌ها و گزارش‌های حسابداری'],
+    'use_ai_assistant' => ['group' => 'هوش مصنوعی', 'route' => '/admin/ceo-dashboard.php', 'description' => 'استفاده از کادر تحلیل هوش مصنوعی در داشبورد'],
+    'view_ai_chat' => ['group' => 'هوش مصنوعی', 'route' => '/admin/ai-chat.php', 'description' => 'مشاهده صفحه گفتگوی هوش مصنوعی'],
+    'manage_ai_chat_settings' => ['group' => 'هوش مصنوعی', 'route' => '/admin/ai-chat.php', 'description' => 'مدیریت تنظیمات مربوط به گفتگوی هوش مصنوعی'],
+    'settings' => ['group' => 'تنظیمات', 'route' => '/admin/settings.php', 'description' => 'تنظیمات عمومی سایت و PWA'],
+    'view_sobhan_api_settings' => ['group' => 'تنظیمات', 'route' => '/admin/sobhan-api-settings.php', 'description' => 'مشاهده تنظیمات اتصال API سبحان'],
+    'manage_sobhan_api_settings' => ['group' => 'تنظیمات', 'route' => '/admin/sobhan-api-settings.php', 'description' => 'ذخیره و تست اتصال API سبحان'],
+    'view_data_source_settings' => ['group' => 'تنظیمات', 'route' => '/admin/sobhan-api-settings.php#data-source-settings', 'description' => 'مشاهده وضعیت منبع داده داشبورد'],
+    'manage_data_source_settings' => ['group' => 'تنظیمات', 'route' => '/admin/sobhan-api-settings.php#data-source-settings', 'description' => 'تغییر منبع داده شرکت پخش'],
+    'toggle_ai_autofill' => ['group' => 'تنظیمات', 'route' => '/admin/sobhan-api-settings.php#data-source-settings', 'description' => 'فعال یا غیرفعال کردن تکمیل خودکار هوش مصنوعی'],
+    'allow_ai_overwrite_manual_data' => ['group' => 'تنظیمات', 'route' => '/admin/sobhan-api-settings.php#data-source-settings', 'description' => 'اجازه جداگانه برای بازنویسی داده دستی یا ایمپورت‌شده'],
+    'pharmacy_settings' => ['group' => 'تنظیمات', 'route' => '/admin/pharmacy-settings.php', 'description' => 'تنظیمات داشبورد داروخانه‌ها'],
+    'users' => ['group' => 'کاربران', 'route' => '/admin/users.php', 'description' => 'مدیریت کاربران، نقش‌ها و دسترسی‌ها'],
+    'files' => ['group' => 'فایل‌ها', 'route' => '/admin/files.php', 'description' => 'مدیریت فایل‌ها و اشتراک‌گذاری'],
+    'surveys' => ['group' => 'نظرسنجی', 'route' => '/admin/surveys.php', 'description' => 'تعریف و مدیریت نظرسنجی‌ها'],
+    'survey_results' => ['group' => 'نظرسنجی', 'route' => '/admin/survey-results.php', 'description' => 'مشاهده نتایج ارزیابی'],
+    'carousel' => ['group' => 'محتوای سایت', 'route' => '/admin/carousel.php', 'description' => 'مدیریت اسلایدر صفحه اصلی'],
+];
+$groupOrder = ['داشبوردها', 'گزارش‌ها', 'هوش مصنوعی', 'تنظیمات', 'کاربران', 'فایل‌ها', 'CRM', 'نظرسنجی', 'محتوای سایت'];
+foreach ($modules as &$module) {
+    $meta = $moduleMeta[$module['module_key']] ?? ['group' => 'سایر', 'route' => '-', 'description' => 'دسترسی ماژول'];
+    $module['group_title'] = $meta['group'];
+    $module['route'] = $meta['route'];
+    $module['description'] = $meta['description'];
+}
+unset($module);
+$modulesByGroup = [];
+foreach ($groupOrder as $groupTitle) $modulesByGroup[$groupTitle] = [];
+foreach ($modules as $module) {
+    $modulesByGroup[$module['group_title']][] = $module;
+}
+$modulesByGroup = array_filter($modulesByGroup);
 $selectedEmployees = $edit ? array_map('intval', array_column(Database::fetchAll('SELECT employee_id FROM manager_employees WHERE manager_id = ?', [$edit['id']]), 'employee_id')) : [];
 $permissionRows = $edit ? Database::fetchAll('SELECT * FROM user_permissions WHERE user_id = ?', [$edit['id']]) : [];
 $selectedPermissions = [];
 foreach ($permissionRows as $row) {
     $selectedPermissions[$row['module_key']] = $row;
+}
+$allPermissionRows = Database::fetchAll('SELECT user_id,module_key,can_view,can_create,can_edit,can_delete FROM user_permissions');
+$permissionCopyMap = [];
+foreach ($allPermissionRows as $row) {
+    $permissionCopyMap[(int)$row['user_id']][$row['module_key']] = [
+        'view' => (int)$row['can_view'],
+        'create' => (int)$row['can_create'],
+        'edit' => (int)$row['can_edit'],
+        'delete' => (int)$row['can_delete'],
+    ];
 }
 
 require __DIR__ . '/../views/partials/admin-header.php';
@@ -153,22 +200,73 @@ require __DIR__ . '/../views/partials/admin-header.php';
         </div>
     </div>
 
-    <h3>دسترسی ماژول‌ها</h3>
-    <div class="table-wrap permissions-table">
-        <table>
-            <thead><tr><th>ماژول</th><th>مشاهده</th><th>ایجاد</th><th>ویرایش</th><th>حذف</th></tr></thead>
-            <tbody>
-            <?php foreach ($modules as $module): $p = $selectedPermissions[$module['module_key']] ?? []; ?>
-                <tr>
-                    <td><?= e($module['module_title']) ?></td>
-                    <?php foreach (['view' => 'can_view', 'create' => 'can_create', 'edit' => 'can_edit', 'delete' => 'can_delete'] as $short => $column): ?>
-                        <td><input type="checkbox" name="permissions[<?= e($module['module_key']) ?>][<?= e($short) ?>]" value="1" <?= !empty($p[$column]) ? 'checked' : '' ?>></td>
+    <section class="permission-manager">
+        <div class="section-heading-row">
+            <div>
+                <h3>مدیریت دسترسی‌ها</h3>
+                <p class="muted">دسترسی‌ها بر اساس ماژول گروه‌بندی شده‌اند و کلیدهای فنی قبلی همچنان پشتیبانی می‌شوند.</p>
+            </div>
+            <div class="permission-tools">
+                <input type="search" id="permissionSearch" placeholder="جستجو در عنوان، مسیر یا کلید">
+                <button class="btn btn-small" type="button" data-permission-action="all">انتخاب همه</button>
+                <button class="btn btn-small" type="button" data-permission-action="none">حذف همه</button>
+                <button class="btn btn-small" type="button" data-permission-action="view">فقط مشاهده</button>
+                <button class="btn btn-small" type="button" data-permission-action="admin">دسترسی کامل مدیر</button>
+                <select id="copyPermissionUser">
+                    <option value="">کپی دسترسی از نقش دیگر</option>
+                    <?php foreach ($users as $copyUser): ?>
+                        <?php if (!$edit || (int)$copyUser['id'] !== (int)$edit['id']): ?>
+                            <option value="<?= e($copyUser['id']) ?>"><?= e(($roleLabels[$copyUser['role']] ?? $copyUser['role']) . ' - ' . $copyUser['name']) ?></option>
+                        <?php endif; ?>
                     <?php endforeach; ?>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
+                </select>
+            </div>
+        </div>
+        <?php foreach ($modulesByGroup as $groupTitle => $groupModules): ?>
+            <details class="permission-group" open>
+                <summary><?= e($groupTitle) ?></summary>
+                <div class="table-wrap permissions-table">
+                    <table>
+                        <thead><tr><th>مجوز</th><th>مشاهده</th><th>ایجاد</th><th>ویرایش</th><th>حذف</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($groupModules as $module): $p = $selectedPermissions[$module['module_key']] ?? []; ?>
+                            <tr data-permission-row data-search="<?= e($module['module_title'] . ' ' . $module['module_key'] . ' ' . $module['route'] . ' ' . $module['description']) ?>">
+                                <td>
+                                    <strong><?= e($module['module_title']) ?></strong>
+                                    <small><code><?= e($module['module_key']) ?></code> | <?= e($module['route']) ?></small>
+                                    <em><?= e($module['description']) ?></em>
+                                </td>
+                                <?php foreach (['view' => 'can_view', 'create' => 'can_create', 'edit' => 'can_edit', 'delete' => 'can_delete'] as $short => $column): ?>
+                                    <td><input type="checkbox" data-module="<?= e($module['module_key']) ?>" data-action="<?= e($short) ?>" name="permissions[<?= e($module['module_key']) ?>][<?= e($short) ?>]" value="1" <?= !empty($p[$column]) ? 'checked' : '' ?>></td>
+                                <?php endforeach; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        <?php endforeach; ?>
+    </section>
+
+    <section class="card page-access-matrix">
+        <h3>ماتریس دسترسی صفحات</h3>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>صفحه</th><th>مدیر</th><th>مدیر میانی</th><th>کارمند</th></tr></thead>
+                <tbody>
+                <?php foreach ($modules as $module): ?>
+                    <tr>
+                        <td><strong><?= e($module['route']) ?></strong><small><?= e($module['module_title']) ?></small></td>
+                        <td><input type="checkbox" checked disabled></td>
+                        <td><input type="checkbox" disabled <?= in_array($module['module_key'], ['dashboard', 'files', 'survey_results'], true) ? 'checked' : '' ?>></td>
+                        <td><input type="checkbox" disabled <?= in_array($module['module_key'], ['dashboard', 'files'], true) ? 'checked' : '' ?>></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <p class="muted">این ماتریس نمای سریع رفتار پیش‌فرض نقش‌هاست؛ دسترسی دقیق هر کاربر از چک‌باکس‌های بالا ذخیره می‌شود.</p>
+    </section>
     <div class="form-actions"><button class="btn btn-primary">ذخیره</button><a class="btn" href="/admin/users.php">کاربر جدید</a></div>
 </form>
 
@@ -196,5 +294,38 @@ const managerBox = document.getElementById('managerEmployeesBox');
 function syncManagerBox(){ managerBox.style.display = roleSelect.value === 'manager' ? 'block' : 'none'; }
 roleSelect?.addEventListener('change', syncManagerBox);
 syncManagerBox();
+
+const permissionCopyMap = <?= json_encode($permissionCopyMap, JSON_UNESCAPED_UNICODE | JSON_NUMERIC_CHECK) ?>;
+const currentUserId = <?= (int)$currentUser['id'] ?>;
+const editingUserId = <?= (int)($edit['id'] ?? 0) ?>;
+const permissionRows = [...document.querySelectorAll('[data-permission-row]')];
+const permissionInputs = [...document.querySelectorAll('.permission-manager input[type="checkbox"][data-module]')];
+document.getElementById('permissionSearch')?.addEventListener('input', event => {
+    const term = event.target.value.trim().toLowerCase();
+    permissionRows.forEach(row => row.hidden = term !== '' && !row.dataset.search.toLowerCase().includes(term));
+});
+document.querySelectorAll('[data-permission-action]').forEach(button => {
+    button.addEventListener('click', () => {
+        const action = button.dataset.permissionAction;
+        permissionInputs.forEach(input => {
+            input.checked = action === 'all' || action === 'admin' || (action === 'view' && input.dataset.action === 'view');
+            if (action === 'none') input.checked = false;
+        });
+    });
+});
+document.getElementById('copyPermissionUser')?.addEventListener('change', event => {
+    const map = permissionCopyMap[event.target.value] || {};
+    permissionInputs.forEach(input => {
+        input.checked = !!(map[input.dataset.module] && map[input.dataset.module][input.dataset.action]);
+    });
+});
+document.querySelector('form.admin-form')?.addEventListener('submit', event => {
+    if (editingUserId && editingUserId === currentUserId) {
+        const usersView = document.querySelector('input[data-module="users"][data-action="view"]');
+        if (usersView && !usersView.checked && !confirm('با حذف دسترسی کاربران ممکن است دسترسی خودتان محدود شود. ادامه می‌دهید؟')) {
+            event.preventDefault();
+        }
+    }
+});
 </script>
 </section></main></div><script src="/assets/js/app.js"></script></body></html>

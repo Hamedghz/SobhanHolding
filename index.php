@@ -13,8 +13,8 @@ if (!$items) {
         'title' => setting('company_name', 'هلدینگ سبحان'),
         'description' => setting('hero_subtitle', 'سامانه هلدینگ سبحان و بخش های وابسته.'),
         'image_path' => '',
-        'button_text' => 'ورود به سامانه',
-        'button_link' => '/login.php',
+        'button_text' => '',
+        'button_link' => '',
     ]];
 }
 
@@ -51,7 +51,6 @@ require __DIR__ . '/views/partials/header.php';
                         <?php if (!empty($item['button_text'])): ?>
                             <a class="glass-button" href="<?= e($item['button_link'] ?: '/login.php') ?>"><?= e($item['button_text']) ?></a>
                         <?php endif; ?>
-                        <a class="ghost-button" href="/login.php">ورود به پنل</a>
                     </div>
                 </div>
             </article>

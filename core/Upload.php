@@ -2,7 +2,7 @@
 class Upload
 {
     public const FILE_EXTENSIONS = [];
-    public const IMAGE_EXTENSIONS = ['jpg','jpeg','png'];
+    public const IMAGE_EXTENSIONS = ['jpg','jpeg','png','webp'];
 
     public static function save(array $file, string $directory, ?array $allowedExtensions = null, ?int $maxSizeBytes = null): array
     {
@@ -37,6 +37,19 @@ class Upload
             }
         } elseif (function_exists('mime_content_type')) {
             $mime = mime_content_type($path) ?: $mime;
+        }
+        $imageMimes = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+        ];
+        if ($allowedExtensions !== null && isset($imageMimes[$extension])) {
+            $allowedMimes = array_values(array_intersect_key($imageMimes, array_flip($allowedExtensions)));
+            if (!in_array($mime, $allowedMimes, true)) {
+                @unlink($path);
+                return ['ok' => false, 'error' => 'نوع فایل تصویری معتبر نیست.'];
+            }
         }
         return [
             'ok' => true,

@@ -3,6 +3,7 @@ require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/Upload.php';
+require_once __DIR__ . '/../core/JalaliDate.php';
 
 Auth::requirePermission('files', 'view');
 $pageTitle = 'فایل‌ها';
@@ -120,7 +121,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
                 <td><?= e(number_format((int)$f['file_size'] / 1024, 1)) ?> KB</td>
                 <td><?= $f['visibility'] === 'shared' ? 'اشتراکی' : 'خصوصی' ?></td>
                 <td><?= e($f['shared_names'] ?: '-') ?></td>
-                <td><?= e($f['created_at']) ?></td>
+                <td><?= e(format_jalali_datetime($f['created_at'])) ?></td>
                 <td><?php if (Auth::isAdmin() || (int)$f['user_id'] === (int)$user['id']): ?><a class="btn btn-small btn-danger" onclick="return confirm('حذف شود؟')" href="?delete=<?= e($f['id']) ?>&csrf_token=<?= e(Auth::csrfToken()) ?>">حذف</a><?php endif; ?></td>
             </tr>
         <?php endforeach; ?>
