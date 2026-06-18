@@ -400,6 +400,7 @@ $chartData['sobhanDailySales'] = array_map(static fn($row) => sobhan_number((arr
 
 $aiDashboardAnswer = '';
 $aiDashboardQuestion = '';
+$aiDashboardKnowledgeSources = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['dashboard_action'] ?? '') === 'ai_ask') {
     if (!Auth::can('use_ai_assistant')) {
         flash('برای استفاده از دستیار هوش مصنوعی دسترسی ندارید.', 'danger');
@@ -414,12 +415,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['dashboard_action'] ?? '') 
         flash('متن پرسش باید بین ۱ تا ۱۰۰۰ کاراکتر باشد.', 'danger');
         redirect('/admin/ceo-dashboard.php');
     }
-    $askResult = $sobhanClient->post('/ai/ask', ['question' => $aiDashboardQuestion]);
-    if ($askResult['ok']) {
-        $data = is_array($askResult['data']) ? $askResult['data'] : [];
-        $aiDashboardAnswer = (string)($data['answer'] ?? $data['message'] ?? $data['result'] ?? json_encode($data, JSON_UNESCAPED_UNICODE));
+    if (sobhan_is_visitor_list_question($aiDashboardQuestion)) {
+        $visitorsResult = $sobhanClient->get('/sales/by-visitor');
+        if ($visitorsResult['ok']) {
+            $visitorRows = sobhan_rows_from_api_result($visitorsResult);
+            if (sobhan_wants_three_visitors($aiDashboardQuestion)) {
+                $visitorRows = array_slice($visitorRows, 0, 3);
+            }
+            $aiDashboardAnswer = sobhan_format_visitor_list($visitorRows, sobhan_wants_all_visitors($aiDashboardQuestion) || sobhan_wants_three_visitors($aiDashboardQuestion));
+            if ($aiDashboardAnswer === '') {
+                $aiDashboardAnswer = 'اطلاعاتی برای ویزیتورها یافت نشد.';
+            }
+        } else {
+            $aiDashboardAnswer = $visitorsResult['error']['message_fa'] ?? 'دستیار هوش مصنوعی در حال حاضر در دسترس نیست.';
+        }
     } else {
-        $aiDashboardAnswer = $askResult['error']['message_fa'] ?? 'دستیار هوش مصنوعی در حال حاضر در دسترس نیست.';
+        $askResult = $sobhanClient->post('/ai/ask', ['question' => $aiDashboardQuestion]);
+        $answerPayload = ai_answer_payload_from_result($askResult, $aiDashboardQuestion);
+        $aiDashboardAnswer = $answerPayload['answer'];
+        $aiDashboardKnowledgeSources = $answerPayload['knowledge_sources'];
     }
 }
 
@@ -829,7 +843,10 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <button class="btn btn-primary">تحلیل کن</button>
     </form>
     <?php if ($aiDashboardAnswer !== ''): ?>
-        <div class="sobhan-ai-answer"><?= nl2br(e($aiDashboardAnswer)) ?></div>
+        <div class="sobhan-ai-answer">
+            <?= nl2br(e($aiDashboardAnswer)) ?>
+            <?= render_ai_knowledge_sources($aiDashboardKnowledgeSources) ?>
+        </div>
         <?php if ($aiAutofillEnabled): ?>
             <div class="sobhan-ai-preview">
                 <strong>پیش‌نمایش پیشنهاد هوش مصنوعی</strong>

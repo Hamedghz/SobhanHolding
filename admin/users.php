@@ -130,6 +130,7 @@ $moduleMeta = [
     'use_ai_assistant' => ['group' => 'هوش مصنوعی', 'route' => '/admin/ceo-dashboard.php', 'description' => 'استفاده از کادر تحلیل هوش مصنوعی در داشبورد'],
     'view_ai_chat' => ['group' => 'هوش مصنوعی', 'route' => '/admin/ai-chat.php', 'description' => 'مشاهده صفحه گفتگوی هوش مصنوعی'],
     'manage_ai_chat_settings' => ['group' => 'هوش مصنوعی', 'route' => '/admin/ai-chat.php', 'description' => 'مدیریت تنظیمات مربوط به گفتگوی هوش مصنوعی'],
+    'manage_knowledge' => ['group' => 'هوش مصنوعی', 'route' => '/admin/knowledge.php', 'description' => 'آپلود منابع دانش و بازسازی ایندکس جستجوی هوش مصنوعی'],
     'settings' => ['group' => 'تنظیمات', 'route' => '/admin/settings.php', 'description' => 'تنظیمات عمومی سایت و PWA'],
     'view_sobhan_api_settings' => ['group' => 'تنظیمات', 'route' => '/admin/sobhan-api-settings.php', 'description' => 'مشاهده تنظیمات اتصال API سبحان'],
     'manage_sobhan_api_settings' => ['group' => 'تنظیمات', 'route' => '/admin/sobhan-api-settings.php', 'description' => 'ذخیره و تست اتصال API سبحان'],

@@ -38,7 +38,8 @@ INSERT INTO site_settings (setting_key, setting_value, setting_type) VALUES
 ('sobhan_distribution_data_mode','import_file','select'),
 ('sobhan_ai_autofill_enabled','0','boolean'),
 ('sobhan_ai_overwrite_manual_data','0','boolean'),
-('sobhan_static_pharmacy_mode','1','boolean')
+('sobhan_static_pharmacy_mode','1','boolean'),
+('knowledge_upload_max_mb','10','number')
 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), setting_type = VALUES(setting_type);
 
 INSERT INTO site_settings (setting_key, setting_value, setting_type) VALUES
@@ -60,6 +61,7 @@ INSERT INTO modules (module_key, module_title, sort_order, status) VALUES
 ('use_ai_assistant','استفاده از دستیار هوش مصنوعی',684,'active'),
 ('view_ai_chat','مشاهده گفتگوی هوش مصنوعی',685,'active'),
 ('manage_ai_chat_settings','مدیریت تنظیمات گفتگوی هوش مصنوعی',686,'active'),
+('manage_knowledge','مدیریت منابع دانش هوش مصنوعی',6865,'active'),
 ('view_data_source_settings','مشاهده تنظیمات منبع داده',687,'active'),
 ('manage_data_source_settings','مدیریت تنظیمات منبع داده',688,'active'),
 ('toggle_ai_autofill','فعال‌سازی تکمیل خودکار هوش مصنوعی',689,'active'),
