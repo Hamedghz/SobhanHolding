@@ -45,19 +45,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $_SESSION['sobhan_ai_last_ask_at'] = $now;
 
     $answer = 'دستیار هوش مصنوعی در حال حاضر در دسترس نیست.';
+    $knowledgeSources = [];
     if ($client->isEnabled()) {
-        $askResult = $client->post('/ai/ask', ['question' => $question]);
-        if ($askResult['ok']) {
-            $data = is_array($askResult['data']) ? $askResult['data'] : [];
-            $answer = (string)($data['answer'] ?? $data['message'] ?? $data['result'] ?? json_encode($data, JSON_UNESCAPED_UNICODE));
+        if (sobhan_is_visitor_list_question($question)) {
+            $visitorsResult = $client->get('/sales/by-visitor');
+            if ($visitorsResult['ok']) {
+                $visitorRows = sobhan_rows_from_api_result($visitorsResult);
+                if (sobhan_wants_three_visitors($question)) {
+                    $visitorRows = array_slice($visitorRows, 0, 3);
+                }
+                $answer = sobhan_format_visitor_list($visitorRows, sobhan_wants_all_visitors($question) || sobhan_wants_three_visitors($question));
+                if ($answer === '') {
+                    $answer = 'اطلاعاتی برای ویزیتورها یافت نشد.';
+                }
+            } else {
+                $answer = $visitorsResult['error']['message_fa'] ?? $answer;
+            }
         } else {
-            $answer = $askResult['error']['message_fa'] ?? $answer;
+            $askResult = $client->post('/ai/ask', ['question' => $question]);
+            $answerPayload = ai_answer_payload_from_result($askResult, $question, $answer);
+            $answer = $answerPayload['answer'];
+            $knowledgeSources = $answerPayload['knowledge_sources'];
         }
     }
 
     $_SESSION['sobhan_ai_chat'][] = [
         'question' => $question,
         'answer' => $answer,
+        'knowledge_sources' => $knowledgeSources,
         'at' => date('Y-m-d H:i:s'),
     ];
     $_SESSION['sobhan_ai_chat'] = array_slice($_SESSION['sobhan_ai_chat'], -20);
@@ -104,7 +119,10 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <?php endif; ?>
         <?php foreach ($history as $item): ?>
             <div class="chat-bubble chat-user"><?= e($item['question']) ?></div>
-            <div class="chat-bubble chat-ai"><?= nl2br(e($item['answer'])) ?></div>
+            <div class="chat-bubble chat-ai">
+                <?= nl2br(e($item['answer'])) ?>
+                <?= render_ai_knowledge_sources(is_array($item['knowledge_sources'] ?? null) ? $item['knowledge_sources'] : []) ?>
+            </div>
         <?php endforeach; ?>
     </div>
 

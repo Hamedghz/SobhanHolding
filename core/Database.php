@@ -211,6 +211,21 @@ class Database
                 INDEX idx_pharmacy_metrics_active (active),
                 CONSTRAINT fk_pharmacy_metrics_pharmacy FOREIGN KEY (pharmacy_id) REFERENCES pharmacies(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS knowledge_documents (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                uploaded_by INT UNSIGNED NULL,
+                original_name VARCHAR(255) NOT NULL,
+                stored_name VARCHAR(255) NOT NULL,
+                file_path VARCHAR(255) NOT NULL,
+                extension VARCHAR(10) NOT NULL,
+                mime_type VARCHAR(120) NOT NULL,
+                file_size INT UNSIGNED NOT NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_knowledge_documents_uploaded_by (uploaded_by),
+                INDEX idx_knowledge_documents_created_at (created_at),
+                CONSTRAINT fk_knowledge_documents_uploaded_by FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         ];
         foreach ($statements as $statement) {
             $pdo->exec($statement);
@@ -345,6 +360,7 @@ class Database
             ['use_ai_assistant', 'استفاده از دستیار هوش مصنوعی', 684],
             ['view_ai_chat', 'مشاهده گفتگوی هوش مصنوعی', 685],
             ['manage_ai_chat_settings', 'مدیریت تنظیمات گفتگوی هوش مصنوعی', 686],
+            ['manage_knowledge', 'مدیریت منابع دانش هوش مصنوعی', 6865],
             ['view_data_source_settings', 'مشاهده تنظیمات منبع داده', 687],
             ['manage_data_source_settings', 'مدیریت تنظیمات منبع داده', 688],
             ['toggle_ai_autofill', 'فعال‌سازی تکمیل خودکار هوش مصنوعی', 689],
@@ -410,6 +426,7 @@ class Database
                 ['sobhan_ai_autofill_enabled', '0', 'boolean'],
                 ['sobhan_ai_overwrite_manual_data', '0', 'boolean'],
                 ['sobhan_static_pharmacy_mode', '1', 'boolean'],
+                ['knowledge_upload_max_mb', '10', 'number'],
             ];
             $stmt = $pdo->prepare('INSERT INTO site_settings (setting_key,setting_value,setting_type,updated_at) VALUES (?,?,?,NOW()) ON DUPLICATE KEY UPDATE setting_type=VALUES(setting_type)');
             foreach ($settings as $setting) {

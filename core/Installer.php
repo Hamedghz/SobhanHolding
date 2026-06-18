@@ -3,7 +3,7 @@ class Installer
 {
     public static function requirements(): array
     {
-        $uploadDirs = ['uploads/carousel', 'uploads/files', 'uploads/logo', 'uploads/accounting'];
+        $uploadDirs = ['uploads/carousel', 'uploads/files', 'uploads/logo', 'uploads/accounting', 'uploads/knowledge'];
         foreach ($uploadDirs as $dir) {
             if (!is_dir(__DIR__ . '/../' . $dir)) {
                 @mkdir(__DIR__ . '/../' . $dir, 0755, true);
