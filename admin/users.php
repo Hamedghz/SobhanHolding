@@ -159,6 +159,8 @@ $moduleMeta = [
     'hr_assessments.recalculate' => ['group' => 'منابع انسانی', 'route' => '/admin/hr-assessment-results.php', 'description' => 'محاسبه مجدد و ثبت نسخه تاریخی نتیجه'],
     'hr_tests.own' => ['group' => 'منابع انسانی', 'route' => '/employee/tests.php', 'description' => 'مشاهده و انجام آزمون‌های تخصیص‌یافته خود'],
     'ai_insights' => ['group' => 'هوش مصنوعی', 'route' => '/admin/ai-insights.php', 'description' => 'مدیریت منابع گزارشی خواندنی AI'],
+    'ai_updates' => ['group' => 'هوش مصنوعی', 'route' => '/admin/sobhan-api-settings.php#ai-update-runner', 'description' => 'اجرای jobهای کنترل‌شده بروزرسانی AI و داشبورد'],
+    'system_maintenance' => ['group' => 'تنظیمات', 'route' => '/admin/system-maintenance.php', 'description' => 'اجرای امن migration و Seed بدون phpMyAdmin'],
     'carousel' => ['group' => 'محتوای سایت', 'route' => '/admin/carousel.php', 'description' => 'مدیریت اسلایدر صفحه اصلی'],
 ];
 $groupOrder = ['داشبوردها', 'گزارش‌ها', 'منابع انسانی', 'هوش مصنوعی', 'تنظیمات', 'کاربران', 'فایل‌ها', 'CRM', 'نظرسنجی', 'محتوای سایت'];

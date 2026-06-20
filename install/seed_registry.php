@@ -1,0 +1,11 @@
+<?php
+return [
+    'core_settings' => ['title' => 'تنظیمات پایه', 'description' => 'تنظیمات ضروری مفقود را بدون تغییر مقادیر فعلی اضافه می‌کند.', 'file' => 'seeds/001_core_settings_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
+    'admin_menu' => ['title' => 'منوی مدیریت', 'description' => 'رجیستری منوی کدنویسی‌شده را بررسی می‌کند.', 'file' => 'seeds/002_menu_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
+    'hr_kpi' => ['title' => 'KPI منابع انسانی', 'description' => 'دوره‌ها، قالب‌ها، معیارها و فرم‌های فایل‌های KPI را اضافه می‌کند.', 'file' => 'seeds/003_hr_kpi_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
+    'hr_assessment' => ['title' => 'آزمون‌های سازمانی', 'description' => 'آزمون‌ها، ابعاد، سؤال‌ها و بسته‌های نقش را اضافه می‌کند.', 'file' => 'seeds/004_hr_assessment_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
+    'ai_sources' => ['title' => 'منابع AI', 'description' => 'Reporting Viewهای خواندنی موردنیاز AI را اضافه می‌کند.', 'file' => 'seeds/005_ai_sources_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
+    'dashboard_defaults' => ['title' => 'پیش‌فرض‌های داشبورد', 'description' => 'در حالت امن داده عملیاتی یا سفارشی داشبورد را تغییر نمی‌دهد.', 'file' => 'seeds/006_dashboard_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
+    'permissions' => ['title' => 'دسترسی‌ها', 'description' => 'کلیدهای مجوز مفقود را بدون تغییر دسترسی کاربران اضافه می‌کند.', 'file' => 'seeds/007_permissions_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
+    'survey_templates' => ['title' => 'قالب‌های نظرسنجی', 'description' => 'قالب‌های سیستمی مفقود را بررسی می‌کند.', 'file' => 'seeds/008_survey_templates_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
+];

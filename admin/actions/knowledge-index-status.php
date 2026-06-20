@@ -1,0 +1,2 @@
+<?php
+require_once __DIR__.'/../../core/Auth.php';require_once __DIR__.'/../../core/Response.php';require_once __DIR__.'/../../core/KnowledgeIndexService.php';header('Content-Type: application/json; charset=utf-8');Auth::requirePermission('manage_knowledge','view');try{$job=KnowledgeIndexService::refresh((int)($_GET['id']??0));echo json_encode(['ok'=>(bool)$job,'job'=>$job],JSON_UNESCAPED_UNICODE);}catch(Throwable $e){error_log('Knowledge status: '.$e->getMessage());echo json_encode(['ok'=>false,'message'=>'بررسی وضعیت ایندکس ناموفق بود.'],JSON_UNESCAPED_UNICODE);}

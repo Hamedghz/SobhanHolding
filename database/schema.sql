@@ -155,6 +155,8 @@ CREATE TABLE IF NOT EXISTS accounting_collections (
   mime_type VARCHAR(120) NOT NULL,
   file_size INT UNSIGNED NOT NULL,
   status ENUM('sent','registered','needs_followup') NOT NULL DEFAULT 'sent',
+  deleted_at DATETIME NULL,
+  deleted_by INT UNSIGNED NULL,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_accounting_status (status),
@@ -302,32 +304,6 @@ CREATE TABLE IF NOT EXISTS site_settings (
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO modules (module_key,module_title,sort_order,status,created_at) VALUES
-('view_ceo_dashboard','مشاهده داشبورد مدیرعامل',681,'active',NOW()),
-('view_sobhan_api_settings','مشاهده تنظیمات API سبحان',682,'active',NOW()),
-('manage_sobhan_api_settings','مدیریت تنظیمات API سبحان',683,'active',NOW()),
-('use_ai_assistant','استفاده از دستیار هوش مصنوعی',684,'active',NOW()),
-('view_ai_chat','مشاهده گفتگوی هوش مصنوعی',685,'active',NOW()),
-('manage_ai_chat_settings','مدیریت تنظیمات گفتگوی هوش مصنوعی',686,'active',NOW()),
-('manage_knowledge','مدیریت منابع دانش هوش مصنوعی',6865,'active',NOW()),
-('view_data_source_settings','مشاهده تنظیمات منبع داده',687,'active',NOW()),
-('manage_data_source_settings','مدیریت تنظیمات منبع داده',688,'active',NOW()),
-('toggle_ai_autofill','فعال‌سازی تکمیل خودکار هوش مصنوعی',689,'active',NOW()),
-('allow_ai_overwrite_manual_data','اجازه بازنویسی داده دستی با هوش مصنوعی',690,'active',NOW())
-ON DUPLICATE KEY UPDATE module_title=VALUES(module_title), sort_order=VALUES(sort_order), status=VALUES(status);
-
-INSERT INTO site_settings (setting_key,setting_value,setting_type,updated_at) VALUES
-('sobhan_api_base_url','http://178.131.83.26:18000','text',NOW()),
-('sobhan_api_key','','password',NOW()),
-('sobhan_api_timeout','10','number',NOW()),
-('sobhan_api_enabled','0','boolean',NOW()),
-('sobhan_distribution_data_mode','import_file','select',NOW()),
-('sobhan_ai_autofill_enabled','0','boolean',NOW()),
-('sobhan_ai_overwrite_manual_data','0','boolean',NOW()),
-('sobhan_static_pharmacy_mode','1','boolean',NOW()),
-('knowledge_upload_max_mb','10','number',NOW())
-ON DUPLICATE KEY UPDATE setting_type=VALUES(setting_type);
-
 CREATE TABLE IF NOT EXISTS activity_logs (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NULL,
@@ -339,4 +315,46 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_activity_user (user_id),
   CONSTRAINT fk_activity_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  migration_key VARCHAR(150) NOT NULL UNIQUE,
+  version VARCHAR(40) NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'completed',
+  message TEXT NULL,
+  applied_at DATETIME NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS seed_runs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  seed_group VARCHAR(100) NOT NULL,
+  mode VARCHAR(30) NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'pending',
+  requested_by INT UNSIGNED NULL,
+  started_at DATETIME NULL,
+  finished_at DATETIME NULL,
+  inserted_count INT NOT NULL DEFAULT 0,
+  updated_count INT NOT NULL DEFAULT 0,
+  skipped_count INT NOT NULL DEFAULT 0,
+  error_count INT NOT NULL DEFAULT 0,
+  message TEXT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_seed_runs_group(seed_group),
+  INDEX idx_seed_runs_status(status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS seed_run_items (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  seed_run_id BIGINT UNSIGNED NOT NULL,
+  seed_key VARCHAR(150) NOT NULL,
+  action VARCHAR(40) NOT NULL,
+  status VARCHAR(30) NOT NULL,
+  table_name VARCHAR(150) NULL,
+  record_key VARCHAR(190) NULL,
+  message TEXT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_seed_items_run(seed_run_id),
+  CONSTRAINT fk_seed_items_run FOREIGN KEY(seed_run_id) REFERENCES seed_runs(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

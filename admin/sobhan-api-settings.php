@@ -60,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $baseUrl = rtrim(trim((string)($_POST['sobhan_api_base_url'] ?? '')), '/');
     $timeout = (string)max(1, min(60, (int)($_POST['sobhan_api_timeout'] ?? 10)));
+    $model = trim((string)($_POST['sobhan_api_model'] ?? 'qwen2.5:1.5b'));
     $enabled = !empty($_POST['sobhan_api_enabled']) ? '1' : '0';
     $newKey = trim((string)($_POST['sobhan_api_key'] ?? ''));
 
@@ -70,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     sobhan_save_setting('sobhan_api_base_url', $baseUrl, 'text');
     sobhan_save_setting('sobhan_api_timeout', $timeout, 'number');
+    sobhan_save_setting('sobhan_api_model', $model, 'text');
     sobhan_save_setting('sobhan_api_enabled', $enabled, 'boolean');
     if ($newKey !== '') {
         sobhan_save_setting('sobhan_api_key', $newKey, 'password');
@@ -94,6 +96,7 @@ $distributionMode = setting('sobhan_distribution_data_mode', 'import_file');
 $aiAutofillEnabled = setting('sobhan_ai_autofill_enabled', '0') === '1';
 $aiOverwriteManual = setting('sobhan_ai_overwrite_manual_data', '0') === '1';
 $canManageApi = Auth::can('manage_sobhan_api_settings', 'edit');
+$aiJobs = Database::fetchAll('SELECT id,job_type,status,progress,message,created_at,finished_at FROM ai_update_jobs ORDER BY id DESC LIMIT 10');
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
 <form class="card admin-form" method="post" autocomplete="off">
@@ -117,6 +120,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
             <input type="checkbox" name="sobhan_api_enabled" value="1" <?= setting('sobhan_api_enabled', '0') === '1' ? 'checked' : '' ?> <?= $canManageApi ? '' : 'disabled' ?>>
             <span>SOBHAN_API_ENABLED</span>
         </label>
+        <label class="form-field"><span>مدل AI</span><input dir="ltr" name="sobhan_api_model" value="<?=e(setting('sobhan_api_model','qwen2.5:1.5b'))?>" <?=$canManageApi?'':'disabled'?>></label>
     </div>
     <div class="form-actions">
         <?php if ($canManageApi): ?>
@@ -164,6 +168,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <p class="muted">شما فقط می‌توانید وضعیت منبع داده را مشاهده کنید.</p>
     <?php endif; ?>
 </form>
+<?php if(Auth::isAdmin()||Auth::can('ai_updates')):?><section class="card" id="ai-update-runner"><div class="section-heading-row"><div><h2>اجرای بروزرسانی هوش مصنوعی</h2><p class="muted">درخواست‌ها سمت سرور ثبت و فقط از PHP به Windows Server API ارسال می‌شوند.</p></div></div><input type="hidden" id="aiJobCsrf" value="<?=e(Auth::csrfToken())?>"><div class="actions"><button type="button" class="btn" data-ai-job="test_connection">تست اتصال هوش مصنوعی</button><button type="button" class="btn btn-primary" data-ai-job="full_update">اجرای بروزرسانی هوش مصنوعی</button><button type="button" class="btn" data-ai-job="dashboard_ceo_update">بروزرسانی داشبورد مدیرعامل</button><button type="button" class="btn" data-ai-job="dashboard_manager_update">بروزرسانی داشبورد مدیران</button><button type="button" class="btn" data-ai-job="hr_kpi_update">بروزرسانی داده‌های HR/KPI</button></div><div class="ai-job-status" id="aiJobStatus" hidden><strong id="aiJobMessage">در حال اجرا</strong><div class="progress"><span id="aiJobProgress" style="width:0"></span></div><small id="aiJobPercent">۰٪</small></div><details class="manager-history"><summary>مشاهده لاگ اجرا</summary><div class="table-wrap"><table><thead><tr><th>#</th><th>نوع</th><th>وضعیت</th><th>پیشرفت</th><th>پیام</th><th>زمان</th></tr></thead><tbody><?php foreach($aiJobs as $job):?><tr><td><?=e($job['id'])?></td><td><?=e($job['job_type'])?></td><td><?=e($job['status'])?></td><td><?=e($job['progress'])?>٪</td><td><?=e($job['message'])?></td><td><?=e($job['created_at'])?></td></tr><?php endforeach?></tbody></table></div></details></section><?php endif?>
 <section class="card">
     <h2>نکات امنیتی</h2>
     <p class="muted">کلید API پس از ذخیره نمایش داده نمی‌شود و فقط درخواست‌های PHP سرور از آن استفاده می‌کنند.</p>
@@ -174,5 +179,8 @@ const overwriteWarning = document.querySelector('[data-overwrite-warning]');
 overwriteToggle?.addEventListener('change', () => {
     if (overwriteWarning) overwriteWarning.hidden = !overwriteToggle.checked;
 });
+const jobStatus=document.getElementById('aiJobStatus'),jobMessage=document.getElementById('aiJobMessage'),jobProgress=document.getElementById('aiJobProgress'),jobPercent=document.getElementById('aiJobPercent');
+async function pollAiJob(id){const response=await fetch('/admin/actions/ai-update-status.php?id='+encodeURIComponent(id),{credentials:'same-origin'});const data=await response.json();if(!data.ok)return;const job=data.job;jobStatus.hidden=false;jobMessage.textContent=job.message||'در حال اجرا';jobProgress.style.width=(job.progress||0)+'%';jobPercent.textContent=(job.progress||0)+'٪';if(job.status==='running'||job.status==='pending')setTimeout(()=>pollAiJob(id),2500);}
+document.querySelectorAll('[data-ai-job]').forEach(button=>button.addEventListener('click',async()=>{jobStatus.hidden=false;jobMessage.textContent='در حال ثبت و اجرا';jobProgress.style.width='5%';jobPercent.textContent='۵٪';const body=new FormData();body.append('csrf_token',document.getElementById('aiJobCsrf').value);body.append('job_type',button.dataset.aiJob);button.disabled=true;try{const endpoint=button.dataset.aiJob==='test_connection'?'/admin/actions/ai-test-connection.php':'/admin/actions/ai-run-update.php';const response=await fetch(endpoint,{method:'POST',body,credentials:'same-origin'});const data=await response.json();if(!data.job)throw new Error(data.message||'اجرای بروزرسانی ناموفق بود.');pollAiJob(data.job.id);}catch(error){jobMessage.textContent=error.message||'اجرای بروزرسانی ناموفق بود.';jobProgress.style.width='100%';}finally{button.disabled=false;}}));
 </script>
 </section></main></div><script src="/assets/js/app.js"></script></body></html>

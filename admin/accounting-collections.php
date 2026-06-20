@@ -20,6 +20,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('درخواست نامعتبر است.', 'danger');
         redirect('/admin/accounting-collections.php');
     }
+    $postAction=(string)($_POST['action']??'status');
+    if($postAction==='delete'){
+        if(!Auth::isAdmin()){flash('شما دسترسی حذف این رکورد را ندارید.','danger');redirect('/admin/accounting-collections.php');}
+        try{$id=(int)($_POST['id']??0);Database::execute('UPDATE accounting_collections SET deleted_at=NOW(),deleted_by=?,updated_at=NOW() WHERE id=? AND deleted_at IS NULL',[(int)Auth::user()['id'],$id]);Auth::log((int)Auth::user()['id'],'soft_delete','accounting_collections',$id);flash('رکورد با موفقیت حذف شد.');}catch(Throwable $e){error_log('Accounting soft delete: '.$e->getMessage());flash('خطا در حذف رکورد. لطفاً مجدد تلاش کنید.','danger');}redirect('/admin/accounting-collections.php');
+    }
     if (!Auth::can('accounting', 'edit')) {
         flash('برای تغییر وضعیت دسترسی ندارید.', 'danger');
         redirect('/admin/accounting-collections.php');
@@ -44,7 +49,7 @@ $filters = [
     'to_date' => trim($_GET['to_date'] ?? ''),
 ];
 
-$where = [];
+$where = ['deleted_at IS NULL'];
 $params = [];
 if ($filters['collector_role'] !== '') {
     $where[] = 'collector_role = ?';
@@ -117,7 +122,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
             <th>شهرستان</th>
             <th>توضیحات</th>
             <th>وضعیت</th>
-            <th>تاریخ</th>
+            <th>تاریخ</th><th>عملیات</th>
         </tr>
         </thead>
         <tbody>
@@ -138,7 +143,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
                         <?php endforeach; ?>
                     </form>
                 </td>
-                <td><?= e(format_jalali_datetime($item['created_at'])) ?></td>
+                <td><?= e(format_jalali_datetime($item['created_at'])) ?></td><td><?php if(Auth::isAdmin()):?><form method="post" onsubmit="return confirm('این رکورد حذف شود؟')"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="id" value="<?=e($item['id'])?>"><button class="btn btn-small btn-danger" name="action" value="delete">حذف</button></form><?php else:?>-<?php endif?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

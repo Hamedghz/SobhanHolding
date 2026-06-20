@@ -29,6 +29,7 @@ $showCharts = setting('ceo_dashboard_show_charts', '1') === '1';
 $showLineTable = setting('ceo_dashboard_show_line_table', '1') === '1';
 $showVisitorTable = setting('ceo_dashboard_show_visitor_table', '1') === '1';
 $pageTitle = $labels['page_title'];
+$aiDashboardEnabled=setting('sobhan_api_enabled','0')==='1'&&setting('sobhan_ai_autofill_enabled','0')==='1';$dashboardCache=Database::fetch('SELECT source,updated_at FROM dashboard_data_cache WHERE dashboard_key="ceo_dashboard" AND scope_key="all" LIMIT 1');$dashboardSource=$aiDashboardEnabled?($dashboardCache['source']??'Windows Server API - در انتظار بروزرسانی'):'دستی / دیتابیس';
 
 $latestDateRow = Database::fetch(
     'SELECT MAX(report_date) latest_date FROM (
@@ -439,6 +440,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['dashboard_action'] ?? '') 
 
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
+<div class="dashboard-source-bar"><span>منبع بروزرسانی: <strong><?=e($dashboardSource)?></strong></span><span>آخرین بروزرسانی: <?=e($dashboardCache['updated_at']??'ثبت نشده')?></span><?php if(Auth::isAdmin()||Auth::can('ai_updates')):?><form data-dashboard-refresh><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="dashboard_key" value="ceo_dashboard"><button class="btn btn-small">بروزرسانی داشبورد</button></form><?php endif?></div>
 <section class="ceo-mobile-shell">
     <header class="ceo-mobile-page-head">
         <div>

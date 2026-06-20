@@ -45,3 +45,21 @@ document.querySelectorAll('.jalali-date-input').forEach(input => {
     input.value = value;
   });
 });
+
+document.querySelectorAll('[data-dashboard-refresh]').forEach(form => {
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = form.querySelector('button');
+    if (button) button.disabled = true;
+    try {
+      const response = await fetch('/admin/actions/dashboard-refresh.php', {method: 'POST', body: new FormData(form), credentials: 'same-origin'});
+      const data = await response.json();
+      alert(data.ok ? (data.job?.message || 'بروزرسانی ثبت شد.') : (data.message || 'بروزرسانی داشبورد ناموفق بود.'));
+      if (data.ok && data.job?.status === 'completed') location.reload();
+    } catch (error) {
+      alert('اتصال به سرویس بروزرسانی برقرار نشد.');
+    } finally {
+      if (button) button.disabled = false;
+    }
+  });
+});
