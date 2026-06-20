@@ -17,7 +17,7 @@ class Auth
         if (empty($_SESSION['user_id'])) return null;
         static $user = null;
         if ($user === null) {
-            $user = Database::fetch('SELECT id, name, email, username, role, status, description, upload_quota_mb FROM users WHERE id = ? AND status = "active"', [$_SESSION['user_id']]);
+            $user = Database::fetch('SELECT id, name, email, username, role, status, description, upload_quota_mb, department, role_key, sales_line, supervisor_id, organization_manager_id FROM users WHERE id = ? AND status = "active"', [$_SESSION['user_id']]);
         }
         return $user ?: null;
     }
@@ -109,6 +109,8 @@ class Auth
             'ai_chat' => ['view_ai_chat'],
             'ai_assistant' => ['use_ai_assistant'],
             'use_ai_assistant' => ['ai_assistant'],
+            'manager_dashboard.ai' => ['manager_dashboard.ai_run'],
+            'manager_dashboard.ai_run' => ['manager_dashboard.ai'],
         ];
 
         $column = match ($action) {

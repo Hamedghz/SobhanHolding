@@ -20,6 +20,7 @@ $pwaAppleIcon = Pwa::asset('pwa_icon_192');
     <?php if ($pwaAppleIcon): ?><link rel="apple-touch-icon" href="<?= e($pwaAppleIcon) ?>"><?php endif; ?>
     <link rel="stylesheet" href="/assets/css/app.css">
     <link rel="stylesheet" href="/assets/css/admin.css">
+    <link rel="stylesheet" href="/assets/css/hr.css">
 </head>
 <body class="admin-body">
 <div class="admin-shell">
