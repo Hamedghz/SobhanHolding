@@ -44,7 +44,7 @@ class Database
     private static function migrate(): void
     {
         // Runtime bootstrap: normal admin/page requests reach this method through Database::connection().
-        // install.php separately executes database/schema.sql and database/seed.sql only during fresh install.
+        // install.php executes structure-only schema.sql. Seed data is run explicitly through SeedManager.
         if (self::$migrated) return;
         self::$migrated = true;
         $pdo = self::$pdo;
@@ -235,6 +235,8 @@ class Database
         ManagerDashboard::repair($pdo);
         require_once __DIR__ . '/HrModule.php';
         HrModule::repair($pdo);
+        require_once __DIR__ . '/SystemMaintenance.php';
+        SystemMaintenance::repair($pdo);
 
         if (self::tableExists('users')) {
             if (!self::columnExists('users', 'description')) {
@@ -346,10 +348,6 @@ class Database
                 $pdo->exec("ALTER TABLE pharmacy_dashboard_metrics {$alter}");
             }
         }
-        if (self::tableExists('pharmacy_dashboard_metrics') && self::columnExists('pharmacy_dashboard_metrics', 'supplier_sales_amount') && self::columnExists('pharmacy_dashboard_metrics', 'open_invoice_amount')) {
-            $pdo->exec('UPDATE pharmacy_dashboard_metrics SET open_invoice_amount = supplier_sales_amount WHERE open_invoice_amount = 0 AND supplier_sales_amount > 0');
-        }
-
         $modules = [
             ['dashboard', 'داشبورد', 10],
             ['users', 'کاربران', 20],
@@ -378,6 +376,8 @@ class Database
             ['hr_assessments.recalculate', 'محاسبه مجدد نتیجه آزمون', 706],
             ['hr_tests.own', 'مشاهده و انجام آزمون‌های خود', 707],
             ['ai_insights', 'مدیریت منابع گزارشی AI', 708],
+            ['system_maintenance', 'بروزرسانی SQL و Seed', 709],
+            ['ai_updates', 'اجرای بروزرسانی هوش مصنوعی', 710],
             ['view_sobhan_api_settings', 'مشاهده تنظیمات API سبحان', 682],
             ['manage_sobhan_api_settings', 'مدیریت تنظیمات API سبحان', 683],
             ['use_ai_assistant', 'استفاده از دستیار هوش مصنوعی', 684],
@@ -392,7 +392,7 @@ class Database
             ['carousel', 'اسلایدر صفحه اصلی', 70],
             ['settings', 'تنظیمات سایت', 80],
         ];
-        $stmt = $pdo->prepare('INSERT INTO modules (module_key,module_title,sort_order,status,created_at) VALUES (?,?,?,"active",NOW()) ON DUPLICATE KEY UPDATE module_title=VALUES(module_title), sort_order=VALUES(sort_order), status=VALUES(status)');
+        $stmt = $pdo->prepare('INSERT IGNORE INTO modules (module_key,module_title,sort_order,status,created_at) VALUES (?,?,?,"active",NOW())');
         foreach ($modules as $module) {
             $stmt->execute($module);
         }
@@ -407,7 +407,7 @@ class Database
             $stmt->execute([$title, ($index + 1) * 10]);
         }
 
-        $stmt = $pdo->prepare('INSERT INTO pharmacies (title,slug,sort_order,active,created_at,updated_at) VALUES (?,?,?,1,NOW(),NOW()) ON DUPLICATE KEY UPDATE title=VALUES(title), sort_order=VALUES(sort_order), active=VALUES(active)');
+        $stmt = $pdo->prepare('INSERT IGNORE INTO pharmacies (title,slug,sort_order,active,created_at,updated_at) VALUES (?,?,?,1,NOW(),NOW())');
         foreach ([['داروخانه سبحان', 'sobhan', 10], ['داروخانه سنجری', 'sanjari', 20], ['داروخانه اعلایی', 'alaei', 30]] as $pharmacy) {
             $stmt->execute($pharmacy);
         }
@@ -451,7 +451,7 @@ class Database
                 ['sobhan_static_pharmacy_mode', '1', 'boolean'],
                 ['knowledge_upload_max_mb', '10', 'number'],
             ];
-            $stmt = $pdo->prepare('INSERT INTO site_settings (setting_key,setting_value,setting_type,updated_at) VALUES (?,?,?,NOW()) ON DUPLICATE KEY UPDATE setting_type=VALUES(setting_type)');
+            $stmt = $pdo->prepare('INSERT IGNORE INTO site_settings (setting_key,setting_value,setting_type,updated_at) VALUES (?,?,?,NOW())');
             foreach ($settings as $setting) {
                 $stmt->execute($setting);
             }

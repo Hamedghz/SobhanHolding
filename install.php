@@ -89,11 +89,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $pdo->beginTransaction();
-            $seed = file_get_contents(__DIR__ . '/database/seed.sql');
-            foreach (array_filter(array_map('trim', explode(';', $seed))) as $statement) {
-                $pdo->exec($statement);
-            }
-
             $stmt = $pdo->prepare('INSERT INTO users (name, email, username, password_hash, role, status, created_at, updated_at) VALUES (?, ?, ?, ?, "admin", "active", NOW(), NOW())');
             $stmt->execute([$adminName, $adminEmail, $adminUsername, password_hash($adminPassword, PASSWORD_DEFAULT)]);
             $pdo->commit();
@@ -138,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h1>نصب سامانه</h1>
 
     <?php if ($success): ?>
-        <div class="alert alert-success">نصب با موفقیت انجام شد. اطلاعات دیتابیس در فایل config/config.php ذخیره شد و تمام صفحات از همین تنظیمات استفاده می‌کنند.</div>
+        <div class="alert alert-success">ساختار دیتابیس و حساب مدیر ایجاد شد. پس از ورود، Seedهای موردنیاز را از بخش «بروزرسانی SQL و Seed» به‌صورت انتخابی اجرا کنید.</div>
         <a class="btn btn-primary" href="/login.php">ورود</a>
     <?php else: ?>
         <h3>پیش‌نیازها</h3>

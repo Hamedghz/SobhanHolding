@@ -6,6 +6,7 @@ require_once __DIR__ . '/../core/ManagerDashboard.php';
 
 Auth::requirePermission('manager_dashboard.view');
 $pageTitle = ManagerDashboard::setting('dashboard_title');
+$aiDashboardEnabled=setting('sobhan_api_enabled','0')==='1'&&setting('sobhan_ai_autofill_enabled','0')==='1';$dashboardCache=Database::fetch('SELECT source,updated_at FROM dashboard_data_cache WHERE dashboard_key="manager_dashboard" AND scope_key="all" LIMIT 1');$dashboardSource=$aiDashboardEnabled?($dashboardCache['source']??'Windows Server API - در انتظار بروزرسانی'):'دستی / دیتابیس';
 $definitions = ManagerDashboard::definitions();
 $requestedReportId = (int)($_GET['report_id'] ?? 0);
 if ($requestedReportId) $report = ManagerDashboard::latestReport($requestedReportId);
@@ -112,6 +113,7 @@ function md_input(array $field,$value=''): string {
 }
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
+<div class="dashboard-source-bar"><span>منبع بروزرسانی: <strong><?=e($dashboardSource)?></strong></span><span>آخرین بروزرسانی: <?=e($dashboardCache['updated_at']??'ثبت نشده')?></span><?php if(Auth::isAdmin()||Auth::can('ai_updates')):?><form data-dashboard-refresh><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="dashboard_key" value="manager_dashboard"><button class="btn btn-small">بروزرسانی داشبورد</button></form><?php endif?></div>
 <div class="manager-hero">
  <div><span>پنل مستقل مدیران فروش</span><h1><?= e($pageTitle) ?></h1><p><?= $report ? e($report['report_title']).' · '.e(md_date_label($report['report_date'])) : 'برای شروع یک فایل گزارش وارد کنید.' ?></p></div>
  <form method="get"><label>دوره گزارش<select name="report_id" onchange="this.form.submit()"><option value="">آخرین گزارش</option><?php foreach($reports as $r):?><option value="<?=$r['id']?>" <?=$reportId===$r['id']?'selected':''?>><?=e($r['report_title'].' - '.md_date_label($r['report_date']))?></option><?php endforeach?></select></label></form>

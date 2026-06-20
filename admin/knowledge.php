@@ -4,6 +4,7 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/JalaliDate.php';
 require_once __DIR__ . '/../core/SobhanApiClient.php';
+require_once __DIR__ . '/../core/KnowledgeIndexService.php';
 
 Auth::requirePermission('manage_knowledge', 'view');
 
@@ -152,38 +153,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('/admin/knowledge.php');
     }
 
-    if ($action === 'rebuild_index') {
+    if (in_array($action, ['run_index','rebuild_index'], true)) {
         if (!Auth::can('manage_knowledge', 'edit')) {
             flash('برای بازسازی ایندکس دسترسی ندارید.', 'danger');
             redirect('/admin/knowledge.php');
         }
 
-        $client = new SobhanApiClient(null, null, 60);
-        $result = $client->post('/kb/reindex');
-        Auth::log((int)($user['id'] ?? 0), $result['ok'] ? 'rebuild_index' : 'rebuild_index_failed', 'knowledge');
-        if ($result['ok'] && (bool)($result['data']['ok'] ?? true)) {
-            flash('بازسازی ایندکس منابع دانش انجام شد.');
-        } else {
-            $message = 'امکان اجرای ایندکس از هاست فعال نیست. باید endpoint ایندکس روی Windows Server API اضافه شود.';
-            $errorMessage = (string)($result['error']['message_fa'] ?? '');
-            $technical = strtolower((string)($result['error']['technical'] ?? ''));
-            if (!$result['ok']) {
-                if ((int)($result['status'] ?? 0) === 404) {
-                    $message = 'امکان اجرای ایندکس از هاست فعال نیست. باید endpoint ایندکس روی Windows Server API اضافه شود.';
-                } elseif (str_contains($errorMessage, 'بیش از حد') || str_contains($technical, 'timed out')) {
-                    $message = 'ایندکس دانش سازمانی بیش از حد طول کشید. وضعیت لاگ را بررسی کنید.';
-                } elseif (str_contains($errorMessage, 'اتصال') || str_contains($technical, 'couldn')) {
-                    $message = 'اتصال به سرویس ویندوز سرور برقرار نشد.';
-                }
-            } elseif (isset($result['data']['ok']) && !$result['data']['ok']) {
-                $message = (string)($result['data']['message_fa'] ?? $result['data']['message'] ?? $message);
-            }
-            flash($message, 'danger');
-        }
+        $job=KnowledgeIndexService::start($_POST['source_type']??'all',null,$action==='rebuild_index',(int)($user['id']??0));
+        Auth::log((int)($user['id']??0),$job['status']==='failed'?'knowledge_index_failed':'knowledge_index_started','knowledge',(int)$job['id']);
+        flash($job['status']==='failed'?($job['message']?:'اتصال به سرویس ویندوز سرور برقرار نشد.'):'درخواست ایندکس روی Windows Server ثبت شد.',$job['status']==='failed'?'danger':'success');
         redirect('/admin/knowledge.php');
     }
 }
 
+$indexJobs=Database::fetchAll('SELECT * FROM knowledge_index_jobs ORDER BY id DESC LIMIT 20');
 $documents = Database::fetchAll(
     'SELECT d.*, u.name uploaded_by_name
      FROM knowledge_documents d
@@ -199,9 +182,10 @@ require __DIR__ . '/../views/partials/admin-header.php';
             <p class="muted">فایل‌های متنی و اداری مجاز را بارگذاری کنید و سپس ایندکس دانش را بازسازی کنید.</p>
         </div>
         <?php if (Auth::can('manage_knowledge', 'edit')): ?>
-            <form method="post">
+            <form method="post" class="actions">
                 <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
-                <button class="btn" name="action" value="rebuild_index">بازسازی ایندکس</button>
+                <select name="source_type"><option value="all">همه منابع</option><option value="files">فایل‌ها</option><option value="site">سایت</option><option value="database">دیتابیس</option></select>
+                <button class="btn" name="action" value="run_index">اجرای ایندکس روی Windows Server</button><button class="btn" name="action" value="rebuild_index">بازسازی کامل ایندکس</button>
             </form>
         <?php endif; ?>
     </div>
@@ -220,6 +204,8 @@ require __DIR__ . '/../views/partials/admin-header.php';
         </form>
     <?php endif; ?>
 </section>
+
+<section class="card"><h2>وضعیت و لاگ ایندکس</h2><div class="table-wrap"><table><thead><tr><th>#</th><th>منبع</th><th>وضعیت</th><th>پیشرفت</th><th>پیام</th><th>زمان</th><th></th></tr></thead><tbody><?php foreach($indexJobs as $job):?><tr><td><?=e($job['id'])?></td><td><?=e($job['source_type'])?></td><td><?=e(['pending'=>'در صف اجرا','running'=>'در حال ایندکس','completed'=>'تکمیل شده','failed'=>'ناموفق'][$job['status']]??$job['status'])?></td><td><?=e($job['progress'])?>٪</td><td><?=e($job['message'])?></td><td><?=e($job['created_at'])?></td><td><button type="button" class="btn btn-small" data-index-status="<?=$job['id']?>">بررسی وضعیت ایندکس</button></td></tr><?php endforeach?></tbody></table></div></section>
 
 <div class="table-wrap">
     <table>
@@ -245,4 +231,5 @@ require __DIR__ . '/../views/partials/admin-header.php';
         </tbody>
     </table>
 </div>
+<script>document.querySelectorAll('[data-index-status]').forEach(button=>button.addEventListener('click',async()=>{button.disabled=true;try{const response=await fetch('/admin/actions/knowledge-index-status.php?id='+encodeURIComponent(button.dataset.indexStatus));const data=await response.json();alert(data.ok?(data.job.message||'وضعیت بروزرسانی شد.'):(data.message||'بررسی وضعیت ناموفق بود.'));if(data.ok)location.reload();}catch(error){alert('اتصال به سرویس وضعیت برقرار نشد.');}finally{button.disabled=false;}}));</script>
 </section></main></div><script src="/assets/js/app.js"></script></body></html>

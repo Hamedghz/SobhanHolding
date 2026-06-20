@@ -1,0 +1,15 @@
+<?php
+require_once __DIR__.'/Database.php';require_once __DIR__.'/SobhanApiClient.php';
+class KnowledgeIndexService
+{
+    public static function start(string $sourceType,?int $sourceId,bool $rebuild,int $userId):array
+    {
+        if(!in_array($sourceType,['site','files','database','all'],true))$sourceType='all';Database::execute('INSERT INTO knowledge_index_jobs(source_type,source_id,status,progress,message,requested_by,started_at,created_at,updated_at) VALUES (?,? ,"pending",0,"در صف اجرا",?,NOW(),NOW(),NOW())',[$sourceType,$sourceId,$userId]);$id=(int)Database::lastInsertId();$payload=['source_type'=>$sourceType,'source_id'=>$sourceId,'requested_by'=>(string)$userId,'callback_url'=>null,'options'=>['rebuild'=>$rebuild,'chunk_size'=>800,'language'=>'fa']];Database::execute('UPDATE knowledge_index_jobs SET status="running",progress=10,message="در حال ارسال به Windows Server API" WHERE id=?',[$id]);$response=(new SobhanApiClient(null,null,60))->post('/api/knowledge/index',$payload);
+        if(!$response['ok']){$message=$response['error']['message_fa']??'اتصال به سرویس ویندوز سرور برقرار نشد.';Database::execute('UPDATE knowledge_index_jobs SET status="failed",progress=100,message=?,error_message=?,finished_at=NOW() WHERE id=?',[$message,$message,$id]);return self::find($id);}$data=is_array($response['data']??null)?$response['data']:[];$remote=(string)($data['job_id']??$data['id']??'');$status=(string)($data['status']??'queued');$done=in_array($status,['completed','success','done'],true);Database::execute('UPDATE knowledge_index_jobs SET remote_job_id=?,status=?,progress=?,message=?,result_json=?,finished_at='.($done?'NOW()':'NULL').' WHERE id=?',[$remote,$done?'completed':'running',$done?100:max(10,(int)($data['progress']??20)),$done?'ایندکس تکمیل شد.':'در حال ایندکس',json_encode($data,JSON_UNESCAPED_UNICODE),$id]);return self::find($id);
+    }
+    public static function refresh(int $id):array
+    {
+        $job=self::find($id);if(!$job||$job['status']!=='running'||!$job['remote_job_id'])return $job;$response=(new SobhanApiClient(null,null,30))->get('/api/knowledge/index/status/'.rawurlencode($job['remote_job_id']));if(!$response['ok'])return $job;$data=is_array($response['data']??null)?$response['data']:[];$remoteStatus=(string)($data['status']??'running');$done=in_array($remoteStatus,['completed','success','done'],true);$failed=in_array($remoteStatus,['failed','error'],true);Database::execute('UPDATE knowledge_index_jobs SET status=?,progress=?,message=?,result_json=?,error_message=?,finished_at='.($done||$failed?'NOW()':'NULL').' WHERE id=?',[$failed?'failed':($done?'completed':'running'),$done||$failed?100:max(10,(int)($data['progress']??$job['progress'])),$failed?'ایندکس ناموفق بود.':($done?'ایندکس تکمیل شد.':'در حال ایندکس'),json_encode($data,JSON_UNESCAPED_UNICODE),$failed?'خطای سرویس Windows Server':null,$id]);return self::find($id);
+    }
+    public static function find(int $id):array{return Database::fetch('SELECT id,remote_job_id,source_type,status,progress,message,started_at,finished_at,created_at,updated_at FROM knowledge_index_jobs WHERE id=?',[$id])?:[];}
+}

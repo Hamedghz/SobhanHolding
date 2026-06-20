@@ -1,0 +1,2 @@
+<?php
+return ['seed_key'=>'hr_assessment','run'=>static function(PDO $pdo,array $options):array{$expected=10+233;if(($options['mode']??'safe')==='dry_run'){$existing=(int)$pdo->query('SELECT COUNT(*) FROM hr_assessment_tests')->fetchColumn()+(int)$pdo->query('SELECT COUNT(*) FROM hr_assessment_questions')->fetchColumn();return ['inserted'=>max(0,$expected-$existing),'updated'=>0,'skipped'=>min($expected,$existing),'errors'=>0,'details'=>['would_insert'=>max(0,$expected-$existing)]];}$counts=HrModule::seed($pdo,['assessment']);return sobhan_seed_result($counts,$expected);}];

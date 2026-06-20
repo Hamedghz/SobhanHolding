@@ -1,0 +1,2 @@
+<?php
+return ['seed_key'=>'ai_sources','run'=>static function(PDO $pdo,array $options):array{$expected=count(HrModule::reportingViews());if(($options['mode']??'safe')==='dry_run'){$existing=(int)$pdo->query('SELECT COUNT(*) FROM ai_reporting_sources')->fetchColumn();return ['inserted'=>max(0,$expected-$existing),'updated'=>0,'skipped'=>min($expected,$existing),'errors'=>0,'details'=>['would_insert'=>max(0,$expected-$existing)]];}$counts=HrModule::seed($pdo,['ai']);return sobhan_seed_result($counts,$expected);}];

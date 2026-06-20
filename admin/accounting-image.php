@@ -4,7 +4,7 @@ require_once __DIR__ . '/../core/Database.php';
 
 Auth::requirePermission('accounting', 'view');
 $id = (int)($_GET['id'] ?? 0);
-$item = Database::fetch('SELECT image_path,mime_type,original_name FROM accounting_collections WHERE id = ?', [$id]);
+$item = Database::fetch('SELECT image_path,mime_type,original_name FROM accounting_collections WHERE id = ? AND deleted_at IS NULL', [$id]);
 if (!$item) {
     http_response_code(404);
     exit('تصویر پیدا نشد.');
