@@ -231,6 +231,11 @@ class Database
             $pdo->exec($statement);
         }
 
+        require_once __DIR__ . '/ManagerDashboard.php';
+        ManagerDashboard::repair($pdo);
+        require_once __DIR__ . '/HrModule.php';
+        HrModule::repair($pdo);
+
         if (self::tableExists('users')) {
             if (!self::columnExists('users', 'description')) {
                 $pdo->exec('ALTER TABLE users ADD description TEXT NULL AFTER status');
@@ -355,6 +360,24 @@ class Database
             ['accounting', 'حسابداری', 65],
             ['ceo_dashboard', 'داشبورد مدیرعامل', 68],
             ['view_ceo_dashboard', 'مشاهده داشبورد مدیرعامل', 681],
+            ['manager_dashboard.view', 'مشاهده پنل مدیران فروش', 691],
+            ['manager_dashboard.edit', 'ویرایش پنل مدیران فروش', 692],
+            ['manager_dashboard.import', 'ورود اکسل پنل مدیران فروش', 693],
+            ['manager_dashboard.export', 'خروجی اکسل پنل مدیران فروش', 694],
+            ['manager_dashboard.settings', 'تنظیمات پنل مدیران فروش', 695],
+            ['manager_dashboard.ai', 'بینش هوشمند پنل مدیران فروش', 696],
+            ['manager_dashboard.image_export', 'خروجی تصویری داشبورد مدیران', 697],
+            ['manager_dashboard.ai_settings', 'تنظیمات هوش مصنوعی داشبورد مدیران', 698],
+            ['manager_dashboard.ai_run', 'اجرای تحلیل هوش مصنوعی داشبورد مدیران', 699],
+            ['hr_kpi.view', 'مشاهده داشبورد KPI منابع انسانی', 700],
+            ['hr_kpi.manage', 'مدیریت قالب‌ها و دوره‌های KPI', 701],
+            ['hr_kpi.score', 'ثبت امتیاز KPI پرسنل', 702],
+            ['hr_kpi.results', 'مشاهده نتایج KPI', 703],
+            ['hr_assessments.manage', 'مدیریت آزمون‌های سازمانی', 704],
+            ['hr_assessments.results', 'مشاهده نتایج آزمون‌های سازمانی', 705],
+            ['hr_assessments.recalculate', 'محاسبه مجدد نتیجه آزمون', 706],
+            ['hr_tests.own', 'مشاهده و انجام آزمون‌های خود', 707],
+            ['ai_insights', 'مدیریت منابع گزارشی AI', 708],
             ['view_sobhan_api_settings', 'مشاهده تنظیمات API سبحان', 682],
             ['manage_sobhan_api_settings', 'مدیریت تنظیمات API سبحان', 683],
             ['use_ai_assistant', 'استفاده از دستیار هوش مصنوعی', 684],

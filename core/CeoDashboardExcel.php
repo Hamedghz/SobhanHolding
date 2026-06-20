@@ -150,7 +150,7 @@ class CeoDashboardExcel
     private static function sheetXml(array $rows): string
     {
         $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
-        $xml .= '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+        $xml .= '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0" rightToLeft="1"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><sheetData>';
         foreach (array_values($rows) as $rowIndex => $row) {
             $r = $rowIndex + 1;
             $xml .= '<row r="' . $r . '">';
@@ -158,9 +158,9 @@ class CeoDashboardExcel
                 $cell = self::columnName($colIndex) . $r;
                 $value = (string)$value;
                 if ($value !== '' && is_numeric($value) && !preg_match('/^0\d+$/', $value)) {
-                    $xml .= '<c r="' . $cell . '"><v>' . self::xml($value) . '</v></c>';
+                    $xml .= '<c r="' . $cell . '"' . ($r === 1 ? ' s="1"' : '') . '><v>' . self::xml($value) . '</v></c>';
                 } else {
-                    $xml .= '<c r="' . $cell . '" t="inlineStr"><is><t>' . self::xml($value) . '</t></is></c>';
+                    $xml .= '<c r="' . $cell . '" t="inlineStr"' . ($r === 1 ? ' s="1"' : '') . '><is><t>' . self::xml($value) . '</t></is></c>';
                 }
             }
             $xml .= '</row>';
@@ -215,7 +215,7 @@ class CeoDashboardExcel
 
     private static function stylesXml(): string
     {
-        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font><sz val="11"/><name val="Tahoma"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellXfs></styleSheet>';
+        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Tahoma"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Tahoma"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F766E"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="1" borderId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs></styleSheet>';
     }
 
     private static function columnName(int $index): string

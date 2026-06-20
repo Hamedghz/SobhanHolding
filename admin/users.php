@@ -41,6 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role = in_array($_POST['role'] ?? '', ['admin', 'manager', 'employee'], true) ? $_POST['role'] : 'employee';
     $status = in_array($_POST['status'] ?? '', ['active', 'disabled'], true) ? $_POST['status'] : 'active';
     $quota = trim((string)($_POST['upload_quota_mb'] ?? '')) === '' ? null : max(0, (int)$_POST['upload_quota_mb']);
+    $department = trim((string)($_POST['department'] ?? ''));
+    $roleKey = trim((string)($_POST['role_key'] ?? ''));
+    $salesLine = trim((string)($_POST['sales_line'] ?? ''));
+    $supervisorId = (int)($_POST['supervisor_id'] ?? 0) ?: null;
+    $organizationManagerId = (int)($_POST['organization_manager_id'] ?? 0) ?: null;
 
     if (!$id && trim((string)($_POST['password'] ?? '')) === '') {
         $errors['password'] = 'رمز عبور برای کاربر جدید ضروری است.';
@@ -63,11 +68,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $status,
                 trim($_POST['description'] ?? ''),
                 $quota,
+                $department, $roleKey, $salesLine, $supervisorId, $organizationManagerId,
                 $id,
             ];
-            $sql = 'UPDATE users SET name=?, email=?, username=?, role=?, status=?, description=?, upload_quota_mb=?, updated_at=NOW() WHERE id=?';
+            $sql = 'UPDATE users SET name=?, email=?, username=?, role=?, status=?, description=?, upload_quota_mb=?, department=?, role_key=?, sales_line=?, supervisor_id=?, organization_manager_id=?, updated_at=NOW() WHERE id=?';
             if (trim((string)($_POST['password'] ?? '')) !== '') {
-                $sql = 'UPDATE users SET name=?, email=?, username=?, role=?, status=?, description=?, upload_quota_mb=?, password_hash=?, updated_at=NOW() WHERE id=?';
+                $sql = 'UPDATE users SET name=?, email=?, username=?, role=?, status=?, description=?, upload_quota_mb=?, department=?, role_key=?, sales_line=?, supervisor_id=?, organization_manager_id=?, password_hash=?, updated_at=NOW() WHERE id=?';
                 $params = [
                     trim($_POST['name']),
                     trim($_POST['email']),
@@ -76,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $status,
                     trim($_POST['description'] ?? ''),
                     $quota,
+                    $department, $roleKey, $salesLine, $supervisorId, $organizationManagerId,
                     password_hash($_POST['password'], PASSWORD_DEFAULT),
                     $id,
                 ];
@@ -83,8 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Database::execute($sql, $params);
         } else {
             Database::execute(
-                'INSERT INTO users (name,email,username,password_hash,role,status,description,upload_quota_mb,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,NOW(),NOW())',
-                [trim($_POST['name']), trim($_POST['email']), trim($_POST['username']), password_hash($_POST['password'], PASSWORD_DEFAULT), $role, $status, trim($_POST['description'] ?? ''), $quota]
+                'INSERT INTO users (name,email,username,password_hash,role,status,description,upload_quota_mb,department,role_key,sales_line,supervisor_id,organization_manager_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',
+                [trim($_POST['name']), trim($_POST['email']), trim($_POST['username']), password_hash($_POST['password'], PASSWORD_DEFAULT), $role, $status, trim($_POST['description'] ?? ''), $quota, $department, $roleKey, $salesLine, $supervisorId, $organizationManagerId]
             );
             $id = (int)Database::lastInsertId();
         }
@@ -143,9 +150,18 @@ $moduleMeta = [
     'files' => ['group' => 'فایل‌ها', 'route' => '/admin/files.php', 'description' => 'مدیریت فایل‌ها و اشتراک‌گذاری'],
     'surveys' => ['group' => 'نظرسنجی', 'route' => '/admin/surveys.php', 'description' => 'تعریف و مدیریت نظرسنجی‌ها'],
     'survey_results' => ['group' => 'نظرسنجی', 'route' => '/admin/survey-results.php', 'description' => 'مشاهده نتایج ارزیابی'],
+    'hr_kpi.view' => ['group' => 'منابع انسانی', 'route' => '/admin/hr-kpi.php', 'description' => 'مشاهده داشبورد KPI در دامنه مجاز'],
+    'hr_kpi.manage' => ['group' => 'منابع انسانی', 'route' => '/admin/hr-kpi-templates.php', 'description' => 'مدیریت قالب‌ها و دوره‌های KPI'],
+    'hr_kpi.score' => ['group' => 'منابع انسانی', 'route' => '/admin/hr-kpi-scores.php', 'description' => 'ثبت و ویرایش امتیاز KPI'],
+    'hr_kpi.results' => ['group' => 'منابع انسانی', 'route' => '/admin/hr-kpi-results.php', 'description' => 'مشاهده و خروجی نتایج KPI'],
+    'hr_assessments.manage' => ['group' => 'منابع انسانی', 'route' => '/admin/employee-assessments.php', 'description' => 'مدیریت و تخصیص آزمون سازمانی'],
+    'hr_assessments.results' => ['group' => 'منابع انسانی', 'route' => '/admin/hr-assessment-results.php', 'description' => 'مشاهده نتایج آزمون در دامنه مجاز'],
+    'hr_assessments.recalculate' => ['group' => 'منابع انسانی', 'route' => '/admin/hr-assessment-results.php', 'description' => 'محاسبه مجدد و ثبت نسخه تاریخی نتیجه'],
+    'hr_tests.own' => ['group' => 'منابع انسانی', 'route' => '/employee/tests.php', 'description' => 'مشاهده و انجام آزمون‌های تخصیص‌یافته خود'],
+    'ai_insights' => ['group' => 'هوش مصنوعی', 'route' => '/admin/ai-insights.php', 'description' => 'مدیریت منابع گزارشی خواندنی AI'],
     'carousel' => ['group' => 'محتوای سایت', 'route' => '/admin/carousel.php', 'description' => 'مدیریت اسلایدر صفحه اصلی'],
 ];
-$groupOrder = ['داشبوردها', 'گزارش‌ها', 'هوش مصنوعی', 'تنظیمات', 'کاربران', 'فایل‌ها', 'CRM', 'نظرسنجی', 'محتوای سایت'];
+$groupOrder = ['داشبوردها', 'گزارش‌ها', 'منابع انسانی', 'هوش مصنوعی', 'تنظیمات', 'کاربران', 'فایل‌ها', 'CRM', 'نظرسنجی', 'محتوای سایت'];
 foreach ($modules as &$module) {
     $meta = $moduleMeta[$module['module_key']] ?? ['group' => 'سایر', 'route' => '-', 'description' => 'دسترسی ماژول'];
     $module['group_title'] = $meta['group'];
@@ -189,6 +205,11 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <label class="form-field"><span>نقش</span><select name="role" id="roleSelect"><?php foreach ($roleLabels as $value => $label): ?><option value="<?= e($value) ?>" <?= ($edit['role'] ?? 'employee') === $value ? 'selected' : '' ?>><?= e($label) ?></option><?php endforeach; ?></select></label>
         <label class="form-field"><span>وضعیت</span><select name="status"><option value="active" <?= ($edit['status'] ?? 'active') === 'active' ? 'selected' : '' ?>>فعال</option><option value="disabled" <?= ($edit['status'] ?? '') === 'disabled' ? 'selected' : '' ?>>غیرفعال</option></select></label>
         <label class="form-field"><span>سهمیه آپلود (MB)</span><input type="number" min="0" name="upload_quota_mb" value="<?= e($edit['upload_quota_mb'] ?? '') ?>" placeholder="خالی یعنی بدون محدودیت نرم‌افزاری"></label>
+        <label class="form-field"><span>واحد سازمانی</span><input name="department" value="<?= e($edit['department'] ?? '') ?>"></label>
+        <label class="form-field"><span>کلید نقش سازمانی</span><input dir="ltr" name="role_key" value="<?= e($edit['role_key'] ?? '') ?>" placeholder="VISITOR"></label>
+        <label class="form-field"><span>لاین فروش</span><input name="sales_line" value="<?= e($edit['sales_line'] ?? '') ?>"></label>
+        <label class="form-field"><span>شناسه سرپرست</span><input type="number" min="1" name="supervisor_id" value="<?= e($edit['supervisor_id'] ?? '') ?>"></label>
+        <label class="form-field"><span>شناسه مدیر سازمانی</span><input type="number" min="1" name="organization_manager_id" value="<?= e($edit['organization_manager_id'] ?? '') ?>"></label>
         <label class="form-field grid-span-2"><span>توضیحات</span><textarea name="description"><?= e($edit['description'] ?? '') ?></textarea></label>
     </div>
 

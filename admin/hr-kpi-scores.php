@@ -1,0 +1,33 @@
+<?php
+require_once __DIR__.'/../core/Auth.php';
+require_once __DIR__.'/../core/Database.php';
+require_once __DIR__.'/../core/Response.php';
+require_once __DIR__.'/../core/HrModule.php';
+Auth::requirePermission('hr_kpi.score');
+$pageTitle='ثبت امتیاز KPI';$user=Auth::user();$ids=HrModule::accessibleEmployeeIds($user);if(!$ids)$ids=[-1];$ph=implode(',',array_fill(0,count($ids),'?'));
+$employeeId=(int)($_REQUEST['employee_id']??0);$templateId=(int)($_REQUEST['template_id']??0);$periodId=(int)($_REQUEST['period_id']??0);
+if($employeeId&&!in_array($employeeId,$ids,true)){http_response_code(403);exit('دسترسی غیرمجاز است.');}
+if($_SERVER['REQUEST_METHOD']==='POST'){
+    if(!Auth::verifyCsrf($_POST['csrf_token']??'')){http_response_code(419);exit('درخواست نامعتبر است.');}
+    $criteria=Database::fetchAll('SELECT * FROM hr_kpi_criteria WHERE template_id=? AND active=1',[$templateId]);$pdo=Database::connection();
+    try{
+        $pdo->beginTransaction();
+        foreach($criteria as $c){
+            $score=(float)($_POST['score'][$c['id']]??-1);if($score<0||$score>(float)$c['max_score'])throw new RuntimeException('invalid_score');
+            $notes=trim($_POST['notes'][$c['id']]??'');$old=Database::fetch('SELECT * FROM hr_kpi_scores WHERE employee_id=? AND criteria_id=? AND period_id=?',[$employeeId,$c['id'],$periodId]);
+            if($old){Database::execute('UPDATE hr_kpi_scores SET score=?,notes=?,scored_by=?,scored_at=NOW(),updated_at=NOW() WHERE id=?',[$score,$notes,(int)$user['id'],$old['id']]);Database::execute('INSERT INTO hr_kpi_score_logs(score_id,action,old_value,new_value,performed_by,created_at) VALUES (?,"update",?,?,?,NOW())',[$old['id'],json_encode(['score'=>$old['score'],'notes'=>$old['notes']],JSON_UNESCAPED_UNICODE),json_encode(['score'=>$score,'notes'=>$notes],JSON_UNESCAPED_UNICODE),(int)$user['id']]);}
+            else{Database::execute('INSERT INTO hr_kpi_scores(employee_id,template_id,criteria_id,period_id,score,notes,scored_by,scored_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,NOW(),NOW(),NOW())',[$employeeId,$templateId,$c['id'],$periodId,$score,$notes,(int)$user['id']]);$sid=(int)Database::lastInsertId();Database::execute('INSERT INTO hr_kpi_score_logs(score_id,action,new_value,performed_by,created_at) VALUES (?,"create",?,?,NOW())',[$sid,json_encode(['score'=>$score],JSON_UNESCAPED_UNICODE),(int)$user['id']]);}
+        }
+        Database::execute('INSERT INTO hr_kpi_employee_assignments(employee_id,template_id,department,role_key,sales_line,supervisor_id,manager_id,assigned_by,active,created_at,updated_at) SELECT id,?,?,?,sales_line,supervisor_id,organization_manager_id,?,1,NOW(),NOW() FROM users WHERE id=? ON DUPLICATE KEY UPDATE active=1,updated_at=NOW()',[$templateId,trim($_POST['department']??''),trim($_POST['role_key']??''),(int)$user['id'],$employeeId]);
+        $pdo->commit();flash('عملیات با موفقیت انجام شد.');
+    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();error_log('KPI score save: '.$e->getMessage());flash($e->getMessage()==='invalid_score'?'امتیاز باید در بازه مجاز باشد.':'خطا در ذخیره‌سازی اطلاعات. لطفاً مجدد تلاش کنید.','danger');}
+    redirect('/admin/hr-kpi-scores.php?employee_id='.$employeeId.'&template_id='.$templateId.'&period_id='.$periodId);
+}
+$employees=Database::fetchAll("SELECT id,name,department,role_key FROM users WHERE id IN ($ph) AND status='active' ORDER BY name",$ids);$selectedEmployee=null;foreach($employees as $employee)if((int)$employee['id']===$employeeId)$selectedEmployee=$employee;
+$templates=Database::fetchAll('SELECT * FROM hr_kpi_templates WHERE active=1 ORDER BY sort_order');$periods=Database::fetchAll('SELECT * FROM hr_kpi_periods WHERE active=1 ORDER BY sort_order');
+$criteria=$templateId?Database::fetchAll('SELECT c.*,s.score,s.notes FROM hr_kpi_criteria c LEFT JOIN hr_kpi_scores s ON s.criteria_id=c.id AND s.employee_id=? AND s.period_id=? WHERE c.template_id=? AND c.active=1 ORDER BY c.sort_order',[$employeeId,$periodId,$templateId]):[];
+$previous=[];if($employeeId&&$templateId&&$periodId){$prev=Database::fetch('SELECT id FROM hr_kpi_periods WHERE id<? ORDER BY sort_order DESC,id DESC LIMIT 1',[$periodId]);if($prev)$previous=Database::fetchAll('SELECT criteria_id,score FROM hr_kpi_scores WHERE employee_id=? AND template_id=? AND period_id=?',[$employeeId,$templateId,$prev['id']]);}$previous=array_column($previous,'score','criteria_id');
+require __DIR__.'/../views/partials/admin-header.php';?>
+<form class="card admin-form" method="get"><h2>انتخاب ارزیابی</h2><div class="grid grid-3"><label class="form-field"><span>پرسنل</span><select name="employee_id" required><option value="">انتخاب کنید</option><?php foreach($employees as $e):?><option value="<?=$e['id']?>" <?=$employeeId===(int)$e['id']?'selected':''?>><?=e($e['name'])?></option><?php endforeach?></select></label><label class="form-field"><span>قالب</span><select name="template_id" required><option value="">انتخاب کنید</option><?php foreach($templates as $t):?><option value="<?=$t['id']?>" <?=$templateId===(int)$t['id']?'selected':''?>><?=e($t['title'])?></option><?php endforeach?></select></label><label class="form-field"><span>دوره</span><select name="period_id" required><option value="">انتخاب کنید</option><?php foreach($periods as $p):?><option value="<?=$p['id']?>" <?=$periodId===(int)$p['id']?'selected':''?>><?=e($p['title'])?></option><?php endforeach?></select></label></div><button class="btn btn-primary">نمایش معیارها</button></form>
+<?php if($criteria):?><form class="card admin-form" method="post"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="employee_id" value="<?=$employeeId?>"><input type="hidden" name="template_id" value="<?=$templateId?>"><input type="hidden" name="period_id" value="<?=$periodId?>"><input type="hidden" name="department" value="<?=e($selectedEmployee['department']??'')?>"><input type="hidden" name="role_key" value="<?=e($selectedEmployee['role_key']??'')?>"><div class="table-wrap"><table><thead><tr><th>معیار</th><th>وزن</th><th>قبلی</th><th>امتیاز</th><th>یادداشت</th></tr></thead><tbody><?php foreach($criteria as $c):?><tr><td><?=e($c['criteria_text'])?></td><td><?=e($c['weight'])?></td><td><?=e($previous[$c['id']]??'-')?></td><td><input type="number" min="0" max="<?=e($c['max_score'])?>" step=".01" name="score[<?=$c['id']?>]" value="<?=e($c['score']??0)?>" required></td><td><input name="notes[<?=$c['id']?>]" value="<?=e($c['notes']??'')?>"></td></tr><?php endforeach?></tbody></table></div><button class="btn btn-primary">ذخیره امتیازها</button></form><?php endif?>
+</section></main></div><script src="/assets/js/app.js"></script></body></html>
