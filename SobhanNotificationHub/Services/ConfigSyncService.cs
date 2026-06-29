@@ -1,0 +1,1 @@
+using SobhanNotificationHub.Models;namespace SobhanNotificationHub.Services;public sealed class ConfigSyncService(SobhanApiClient api){public ClientConfig? Current{get;private set;}public async Task<ClientConfig> SyncAsync(CancellationToken ct){Current=await api.GetClientConfigAsync(ct);LoggingService.Info("config_sync");return Current;}}

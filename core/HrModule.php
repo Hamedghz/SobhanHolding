@@ -148,8 +148,7 @@ class HrModule
 
     public static function accessibleEmployeeIds(array $user): array
     {
-        if (($user['role']??'')==='admin') return array_map('intval',array_column(Database::fetchAll('SELECT id FROM users WHERE status="active"'),'id'));
-        if (($user['role']??'')==='manager') return Auth::assignedEmployeeIds((int)$user['id']);
-        return [(int)$user['id']];
+        require_once __DIR__ . '/../lib/OrgAccess.php';
+        return OrgAccess::accessibleUserIds($user);
     }
 }

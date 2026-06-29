@@ -1,0 +1,1 @@
+<?php require __DIR__.'/bootstrap.php';try{$in=internal_input();$uid=(int)($in['user_id']??0);$cid=(int)($in['conversation_id']??0);$p=MessengerSecurity::participant($cid,$uid);internal_json(['ok'=>true,'can_send'=>(bool)$p['can_send'],'role'=>$p['participant_role']]);}catch(Throwable $e){internal_json(['ok'=>false],403);}

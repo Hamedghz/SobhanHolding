@@ -68,3 +68,12 @@ class Config
         ];
     }
 }
+
+// Production must never expose PHP warnings or stack traces to end users.
+// Keep full diagnostics in the configured PHP error log; debug mode remains opt-in.
+$appConfig = Config::app();
+$debugMode = (bool)($appConfig['debug'] ?? false);
+error_reporting(E_ALL);
+ini_set('log_errors', '1');
+ini_set('display_errors', $debugMode ? '1' : '0');
+ini_set('display_startup_errors', $debugMode ? '1' : '0');

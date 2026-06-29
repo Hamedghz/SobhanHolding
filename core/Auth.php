@@ -17,7 +17,7 @@ class Auth
         if (empty($_SESSION['user_id'])) return null;
         static $user = null;
         if ($user === null) {
-            $user = Database::fetch('SELECT id, name, email, username, role, status, description, upload_quota_mb, department, role_key, sales_line, supervisor_id, organization_manager_id FROM users WHERE id = ? AND status = "active"', [$_SESSION['user_id']]);
+            $user = Database::fetch('SELECT id,name,email,username,employee_no,mobile,force_password_change,role,status,description,upload_quota_mb,department,role_key,sales_line,supervisor_id,organization_manager_id,org_unit_id,org_role_id,parent_user_id,access_scope,employee_panel_enabled,admin_panel_enabled,display_order,last_login_at FROM users WHERE id = ? AND status = "active"', [$_SESSION['user_id']]);
         }
         return $user ?: null;
     }
@@ -30,6 +30,13 @@ class Auth
             session_regenerate_id(true);
             $_SESSION['user_id'] = (int)$user['id'];
             $_SESSION['role'] = $user['role'];
+            Database::execute('UPDATE users SET last_login_at=NOW() WHERE id=?', [(int)$user['id']]);
+            try {
+                require_once __DIR__ . '/../services/WorkPlannerService.php';
+                WorkPlannerService::generateDailyTasksForUser((int)$user['id']);
+            } catch (Throwable $e) {
+                error_log('Work planner login generation: ' . $e->getMessage());
+            }
             self::log((int)$user['id'], 'login', 'auth');
             return true;
         }
@@ -59,7 +66,7 @@ class Auth
     {
         self::requireLogin();
         $user = self::user();
-        if (($user['role'] ?? '') !== $role) {
+        if (($user['role'] ?? '') !== $role && !(($user['role'] ?? '') === 'super_admin' && $role === 'admin')) {
             http_response_code(403);
             echo 'دسترسی غیرمجاز';
             exit;
@@ -70,7 +77,7 @@ class Auth
     {
         self::requireLogin();
         $user = self::user();
-        if (!in_array($user['role'] ?? '', $roles, true)) {
+        if (!in_array($user['role'] ?? '', $roles, true) && !(($user['role'] ?? '') === 'super_admin' && in_array('admin', $roles, true))) {
             http_response_code(403);
             echo 'دسترسی غیرمجاز';
             exit;
@@ -80,7 +87,17 @@ class Auth
     public static function isAdmin(): bool
     {
         $user = self::user();
-        return ($user['role'] ?? '') === 'admin';
+        return in_array($user['role'] ?? '', ['admin', 'super_admin'], true);
+    }
+
+    public static function isSuperAdmin(): bool
+    {
+        return (self::user()['role'] ?? '') === 'super_admin';
+    }
+
+    public static function canManageSystemTools(): bool
+    {
+        return self::isAdmin() && self::can('system_maintenance');
     }
 
     public static function isManager(): bool
@@ -99,7 +116,7 @@ class Auth
     {
         $user = self::user();
         if (!$user) return false;
-        if (($user['role'] ?? '') === 'admin') return true;
+        if (in_array($user['role'] ?? '', ['admin', 'super_admin'], true)) return true;
 
         $aliases = [
             'view_ceo_dashboard' => ['ceo_dashboard'],
@@ -111,6 +128,10 @@ class Auth
             'use_ai_assistant' => ['ai_assistant'],
             'manager_dashboard.ai' => ['manager_dashboard.ai_run'],
             'manager_dashboard.ai_run' => ['manager_dashboard.ai'],
+            'messenger.live_location.send' => ['messenger.location.live'],
+            'messenger.location.live' => ['messenger.live_location.send'],
+            'messenger.message.moderate' => ['messenger.moderate'],
+            'messenger.moderate' => ['messenger.message.moderate'],
         ];
 
         $column = match ($action) {
@@ -159,12 +180,8 @@ class Auth
     {
         $user = self::user();
         if (!$user) return false;
-        if (self::isAdmin()) return true;
-        if (self::isEmployee()) return (int)$user['id'] === $employeeId;
-        if (self::isManager()) {
-            return (bool)Database::fetch('SELECT id FROM manager_employees WHERE manager_id = ? AND employee_id = ? LIMIT 1', [(int)$user['id'], $employeeId]);
-        }
-        return false;
+        require_once __DIR__ . '/../lib/OrgAccess.php';
+        return OrgAccess::canAccessUser($user, $employeeId);
     }
 
     public static function csrfToken(): string

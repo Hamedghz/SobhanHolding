@@ -4,6 +4,7 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/CeoDashboardExcel.php';
 require_once __DIR__ . '/../core/JalaliDate.php';
+require_once __DIR__ . '/../core/CeoDashboardManualMetrics.php';
 
 Auth::requirePermission('ceo_dashboard', 'view');
 $pageTitle = 'تنظیمات داشبورد مدیرعامل';
@@ -42,6 +43,32 @@ function ceo_setting_rows(array $settingFields): array
         $rows[] = [$key, $meta['label'], setting($key, $meta['default'])];
     }
     return $rows;
+}
+
+function ceo_summary_period_options(?bool &$hadError = null): array
+{
+    $hadError = false;
+    $queries = [
+        'SELECT period_key FROM ceo_dashboard_manual_metrics',
+        'SELECT CAST(report_date AS CHAR) period_key FROM ceo_dashboard_lines WHERE report_date IS NOT NULL',
+        'SELECT CAST(report_date AS CHAR) period_key FROM ceo_dashboard_visitors WHERE report_date IS NOT NULL',
+        'SELECT CAST(report_date AS CHAR) period_key FROM pharmacy_dashboard_metrics WHERE report_date IS NOT NULL',
+    ];
+    $periods = [];
+    foreach ($queries as $query) {
+        try {
+            foreach (Database::fetchAll($query) as $row) {
+                $key = trim((string)($row['period_key'] ?? ''));
+                if ($key !== '') $periods[$key] = $key;
+            }
+        } catch (Throwable $e) {
+            $hadError = true;
+            error_log('CEO dashboard period source: ' . $e->getMessage());
+        }
+    }
+    $periods = array_values($periods);
+    rsort($periods, SORT_STRING);
+    return $periods;
 }
 
 function ceo_line_rows(bool $template = false): array
@@ -101,6 +128,88 @@ function ceo_export_file(array $sheets): void
 {
     $fileName = 'ceo-dashboard-export-' . date('Y-m-d-H-i') . '.xlsx';
     CeoDashboardExcel::output($sheets, $fileName);
+}
+
+function ceo_summary_rows(bool $template = false, string $selectedPeriod = ''): array
+{
+    if ($template) {
+        $period = CeoDashboardManualMetrics::normalizePeriodKey($selectedPeriod);
+        if ($period === '') $period = date('Y-m-d');
+        return [
+            ['period_key', 'gross_sales', 'discounts', 'net_sales'],
+            [$period, '1000000', '100000', '900000'],
+        ];
+    }
+
+    $rows = [['دوره گزارش', 'فروش ناخالص', 'تخفیفات', 'فروش خالص', 'منبع داده']];
+    $periods = [];
+    if ($selectedPeriod !== '') {
+        $periods[] = CeoDashboardManualMetrics::normalizePeriodKey($selectedPeriod);
+    } else {
+        $periods = ceo_summary_period_options();
+    }
+    foreach (array_unique(array_filter($periods)) as $period) {
+        $metrics = CeoDashboardManualMetrics::exportForPeriod($period);
+        $rows[] = [$metrics['period_key'], $metrics['gross_sales'], $metrics['discounts'], $metrics['net_sales'], $metrics['data_source']];
+    }
+    return $rows;
+}
+
+function ceo_read_csv(string $path): array
+{
+    $handle = fopen($path, 'rb');
+    if ($handle === false) throw new RuntimeException('فایل CSV قابل خواندن نیست.');
+    $sample = (string)fgets($handle);
+    rewind($handle);
+    $delimiters = [',' => substr_count($sample, ','), ';' => substr_count($sample, ';'), "\t" => substr_count($sample, "\t")];
+    arsort($delimiters);
+    $delimiter = (string)array_key_first($delimiters);
+    if (($delimiters[$delimiter] ?? 0) === 0) $delimiter = ',';
+    $rows = [];
+    while (($row = fgetcsv($handle, 0, $delimiter)) !== false) $rows[] = $row;
+    fclose($handle);
+    return $rows;
+}
+
+function ceo_summary_import_rows(array $rows, string $selectedPeriod): array
+{
+    if (!$rows) throw new InvalidArgumentException('فایل انتخاب‌شده خالی است.');
+    $aliases = [
+        'period_key' => ['period_key', 'دوره گزارش'],
+        'gross_sales' => ['gross_sales', 'فروش ناخالص'],
+        'discounts' => ['discounts', 'تخفیفات'],
+        'net_sales' => ['net_sales', 'فروش خالص'],
+    ];
+    $headers = [];
+    foreach ($rows[0] as $index => $header) {
+        $header = trim((string)$header);
+        if ($index === 0) $header = preg_replace('/^\xEF\xBB\xBF/', '', $header) ?? $header;
+        foreach ($aliases as $field => $names) {
+            if (in_array($header, $names, true)) $headers[$field] = $index;
+        }
+    }
+    foreach (['gross_sales', 'discounts', 'net_sales'] as $required) {
+        if (!array_key_exists($required, $headers)) throw new InvalidArgumentException('ستون‌های فروش ناخالص، تخفیفات و فروش خالص در فایل پیدا نشد.');
+    }
+
+    $selectedPeriod = CeoDashboardManualMetrics::normalizePeriodKey($selectedPeriod);
+    $items = [];
+    $warnings = [];
+    foreach (array_slice($rows, 1) as $offset => $row) {
+        if (!array_filter($row, static fn($value) => trim((string)$value) !== '')) continue;
+        $period = array_key_exists('period_key', $headers) ? CeoDashboardManualMetrics::normalizePeriodKey($row[$headers['period_key']] ?? '') : '';
+        if ($period === '') $period = $selectedPeriod;
+        if ($period === '') throw new InvalidArgumentException('دوره گزارش در ردیف ' . ($offset + 2) . ' مشخص نشده است.');
+        $gross = CeoDashboardManualMetrics::normalizeMoneyValue($row[$headers['gross_sales']] ?? '');
+        $discounts = CeoDashboardManualMetrics::normalizeMoneyValue($row[$headers['discounts']] ?? '');
+        $net = CeoDashboardManualMetrics::normalizeMoneyValue($row[$headers['net_sales']] ?? '');
+        if (abs($net - ($gross - $discounts)) > 0.009) {
+            $warnings[] = 'مبلغ فروش خالص با فروش ناخالص منهای تخفیفات برابر نیست. مقدار واردشده به‌صورت دستی ثبت شد.';
+        }
+        $items[$period] = ['period_key' => $period, 'gross_sales' => $gross, 'discounts' => $discounts, 'net_sales' => $net];
+    }
+    if (!$items) throw new InvalidArgumentException('هیچ ردیف معتبری برای ثبت در فایل وجود ندارد.');
+    return ['items' => array_values($items), 'warnings' => array_values(array_unique($warnings))];
 }
 
 function ceo_valid_date(?string $value): bool
@@ -194,12 +303,26 @@ function ceo_validate_import(array $workbook, array $settingFields): array
 {
     $errors = [];
     $settings = [];
+    $summaryMetrics = [];
+    $summaryWarnings = [];
     $lineHeaders = ['تاریخ گزارش', 'کد لاین', 'عنوان لاین', 'مبلغ فروش لاین', 'قطعه', 'تارگت', 'تارگت مبلغی لاین', 'نام سرپرست', 'نام مدیر فروش', 'اتصال سرپرست به کاربر', 'اتصال مدیر فروش به کاربر', 'ترتیب نمایش', 'فعال'];
     $visitorHeaders = ['تاریخ گزارش', 'کد لاین', 'نام ویزیتور', 'مبلغ فروش ویزیتور', 'قطعه', 'تارگت', 'تارگت مبلغی ویزیتور', 'اتصال ویزیتور به کاربر', 'درصد تحقق', 'ترتیب نمایش', 'فعال'];
     $lines = array_key_exists('Lines', $workbook) ? ceo_rows_to_assoc($workbook['Lines'], $lineHeaders, 'Lines', $errors) : [];
     $visitors = array_key_exists('Visitors', $workbook) ? ceo_rows_to_assoc($workbook['Visitors'], $visitorHeaders, 'Visitors', $errors) : [];
     if (!array_key_exists('Lines', $workbook) && !array_key_exists('Visitors', $workbook)) {
-        $errors[] = ['sheet' => '-', 'row' => 1, 'column' => '-', 'error' => 'حداقل یکی از شیت‌های Lines یا Visitors باید در فایل وجود داشته باشد.'];
+        if (!array_key_exists('dashboard_summary', $workbook) && !array_key_exists('summary', $workbook)) {
+            $errors[] = ['sheet' => '-', 'row' => 1, 'column' => '-', 'error' => 'حداقل یکی از شیت‌های Lines، Visitors یا dashboard_summary باید در فایل وجود داشته باشد.'];
+        }
+    }
+    $summaryRows = $workbook['dashboard_summary'] ?? $workbook['summary'] ?? [];
+    if ($summaryRows) {
+        try {
+            $summaryImport = ceo_summary_import_rows($summaryRows, '');
+            $summaryMetrics = $summaryImport['items'];
+            $summaryWarnings = $summaryImport['warnings'];
+        } catch (InvalidArgumentException $e) {
+            $errors[] = ['sheet' => 'dashboard_summary', 'row' => 1, 'column' => '-', 'error' => $e->getMessage()];
+        }
     }
 
     $settingRows = $workbook['Settings'] ?? [];
@@ -296,7 +419,7 @@ function ceo_validate_import(array $workbook, array $settingFields): array
         }
     }
 
-    return ['settings' => $settings, 'lines' => $lines, 'visitors' => $visitors, 'errors' => $errors];
+    return ['settings' => $settings, 'lines' => $lines, 'visitors' => $visitors, 'summary_metrics' => $summaryMetrics, 'summary_warnings' => $summaryWarnings, 'errors' => $errors];
 }
 
 function ceo_preserve_blank(array $row, array $existing, string $field, string $column)
@@ -316,6 +439,13 @@ function ceo_apply_import(array $preview): array
             if ($type === 'number') $value = (string)max(0, (int)$value);
             if ($type === 'boolean') $value = $value === '1' ? '1' : '0';
             Database::execute('INSERT INTO site_settings (setting_key,setting_value,setting_type,updated_at) VALUES (?,?,?,NOW()) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value), setting_type=VALUES(setting_type), updated_at=NOW()', [$key, $value, $type]);
+        }
+        foreach ($preview['summary_metrics'] ?? [] as $metrics) {
+            $existing = CeoDashboardManualMetrics::get($metrics['period_key']);
+            $user = Auth::user();
+            CeoDashboardManualMetrics::save($metrics['period_key'], $metrics['gross_sales'], $metrics['discounts'], $metrics['net_sales'], $preview['uploaded_file_name'] ?? null, (int)($user['id'] ?? 0));
+            if ($existing) $result['updated']++;
+            else $result['inserted']++;
         }
         $mode = $preview['mode'];
         if ($mode === 'truncate_and_insert') {
@@ -388,7 +518,8 @@ function ceo_apply_import(array $preview): array
         return $result;
     } catch (Throwable $e) {
         $pdo->rollBack();
-        $result['errors'][] = $e->getMessage();
+        error_log('CEO dashboard workbook import: ' . $e->getMessage());
+        $result['errors'][] = 'ثبت اطلاعات با خطا روبه‌رو شد. لطفاً دوباره تلاش کنید.';
         return $result;
     }
 }
@@ -397,14 +528,18 @@ try {
     if (isset($_GET['export'])) {
         if (!$canExport) throw new RuntimeException('برای خروجی اکسل دسترسی ندارید.');
         $type = $_GET['export'];
-        if ($type === 'full') ceo_export_file(['Settings' => ceo_setting_rows($settingFields), 'Lines' => ceo_line_rows(), 'Visitors' => ceo_visitor_rows()]);
+        $selectedPeriod = CeoDashboardManualMetrics::normalizePeriodKey($_GET['period_key'] ?? '');
+        if ($type === 'full') ceo_export_file(['Settings' => ceo_setting_rows($settingFields), 'Lines' => ceo_line_rows(), 'Visitors' => ceo_visitor_rows(), 'dashboard_summary' => ceo_summary_rows(false, $selectedPeriod)]);
         if ($type === 'lines') ceo_export_file(['Lines' => ceo_line_rows()]);
         if ($type === 'visitors') ceo_export_file(['Visitors' => ceo_visitor_rows()]);
-        if ($type === 'template') ceo_export_file(['Settings' => ceo_setting_rows($settingFields), 'Lines' => ceo_line_rows(true), 'Visitors' => ceo_visitor_rows(true)]);
+        if ($type === 'summary') ceo_export_file(['dashboard_summary' => ceo_summary_rows(false, $selectedPeriod)]);
+        if ($type === 'summary_template') ceo_export_file(['dashboard_summary' => ceo_summary_rows(true, $selectedPeriod)]);
+        if ($type === 'template') ceo_export_file(['Settings' => ceo_setting_rows($settingFields), 'Lines' => ceo_line_rows(true), 'Visitors' => ceo_visitor_rows(true), 'dashboard_summary' => ceo_summary_rows(true, $selectedPeriod)]);
         throw new RuntimeException('نوع خروجی معتبر نیست.');
     }
 } catch (Throwable $e) {
-    flash($e->getMessage(), 'danger');
+    error_log('CEO dashboard export: ' . $e->getMessage());
+    flash('ساخت فایل خروجی انجام نشد. لطفاً دوباره تلاش کنید.', 'danger');
     redirect('/admin/ceo-dashboard-settings.php#export');
 }
 
@@ -417,6 +552,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$canManage) {
         flash('برای این عملیات دسترسی ندارید.', 'danger');
         redirect('/admin/ceo-dashboard-settings.php');
+    }
+
+    if ($action === 'import_summary_metrics') {
+        if (!$canImport) {
+            flash('برای ورود اکسل دسترسی ندارید.', 'danger');
+            redirect('/admin/ceo-dashboard-settings.php#summary-import');
+        }
+        $file = $_FILES['summary_file'] ?? [];
+        $size = (int)($file['size'] ?? 0);
+        $extension = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+        if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name']) || $size <= 0 || $size > 5 * 1024 * 1024 || !in_array($extension, ['csv', 'xlsx'], true)) {
+            flash('فقط فایل معتبر CSV یا XLSX تا حجم ۵ مگابایت پذیرفته می‌شود.', 'danger');
+            redirect('/admin/ceo-dashboard-settings.php#summary-import');
+        }
+        try {
+            if ($extension === 'csv') {
+                $rows = ceo_read_csv($file['tmp_name']);
+            } else {
+                $workbook = CeoDashboardExcel::read($file['tmp_name']);
+                $rows = $workbook['dashboard_summary'] ?? $workbook['summary'] ?? [];
+                if (!$rows && $workbook) $rows = reset($workbook);
+            }
+            $import = ceo_summary_import_rows($rows, (string)($_POST['period_key'] ?? ''));
+            $pdo = Database::connection();
+            $pdo->beginTransaction();
+            try {
+                $user = Auth::user();
+                foreach ($import['items'] as $item) {
+                    CeoDashboardManualMetrics::save($item['period_key'], $item['gross_sales'], $item['discounts'], $item['net_sales'], (string)$file['name'], (int)($user['id'] ?? 0));
+                }
+                $pdo->commit();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                throw $e;
+            }
+            Auth::start();
+            $_SESSION['ceo_dashboard_summary_warnings'] = $import['warnings'];
+            flash('اطلاعات فروش ناخالص، تخفیفات و فروش خالص با موفقیت از فایل اکسل ثبت شد.');
+        } catch (InvalidArgumentException $e) {
+            flash($e->getMessage(), 'danger');
+        } catch (Throwable $e) {
+            error_log('CEO dashboard summary import: ' . $e->getMessage());
+            flash('ثبت اطلاعات فایل انجام نشد. لطفاً ساختار فایل را بررسی و دوباره تلاش کنید.', 'danger');
+        }
+        redirect('/admin/ceo-dashboard-settings.php#summary-import');
     }
 
     if ($action === 'save_settings') {
@@ -524,19 +704,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('/admin/ceo-dashboard-settings.php#import');
         }
         $ext = strtolower(pathinfo($_FILES['excel_file']['name'] ?? '', PATHINFO_EXTENSION));
-        if (!in_array($ext, ['xlsx', 'xls'], true)) {
-            flash('فقط فایل xlsx یا xls پذیرفته می‌شود.', 'danger');
+        if ($ext !== 'xlsx') {
+            flash('فقط فایل XLSX پذیرفته می‌شود.', 'danger');
             redirect('/admin/ceo-dashboard-settings.php#import');
         }
         try {
             $workbook = CeoDashboardExcel::read($_FILES['excel_file']['tmp_name']);
             $preview = ceo_validate_import($workbook, $settingFields);
             $preview['mode'] = in_array($_POST['import_mode'] ?? '', ['update_existing', 'replace_same_report_date', 'append', 'truncate_and_insert'], true) ? $_POST['import_mode'] : 'update_existing';
+            $preview['uploaded_file_name'] = basename((string)($_FILES['excel_file']['name'] ?? ''));
             Auth::start();
             $_SESSION['ceo_dashboard_import_preview'] = $preview;
             flash('پیش‌نمایش ورود اکسل آماده شد.', $preview['errors'] ? 'danger' : 'success');
         } catch (Throwable $e) {
-            flash($e->getMessage(), 'danger');
+            error_log('CEO dashboard workbook preview: ' . $e->getMessage());
+            flash('خواندن فایل اکسل انجام نشد. لطفاً فایل و ساختار شیت‌ها را بررسی کنید.', 'danger');
         }
         redirect('/admin/ceo-dashboard-settings.php#import');
     }
@@ -551,26 +733,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $result = ceo_apply_import($preview);
             $_SESSION['ceo_dashboard_import_result'] = $result;
+            $_SESSION['ceo_dashboard_summary_warnings'] = $preview['summary_warnings'] ?? [];
             unset($_SESSION['ceo_dashboard_import_preview']);
             $message = 'نتیجه ورود اکسل - جدید: ' . $result['inserted'] . '، بروزرسانی: ' . $result['updated'] . '، خطا: ' . count($result['errors']);
             flash($message, empty($result['errors']) ? 'success' : 'danger');
         } catch (Throwable $e) {
-            flash('خطا در ثبت اطلاعات اکسل: ' . $e->getMessage(), 'danger');
+            error_log('CEO dashboard workbook confirmation: ' . $e->getMessage());
+            flash('خطا در ثبت اطلاعات اکسل. لطفاً دوباره تلاش کنید.', 'danger');
         }
         redirect('/admin/ceo-dashboard-settings.php#import');
     }
 }
 
-$lineEdit = isset($_GET['line_edit']) ? Database::fetch('SELECT * FROM ceo_dashboard_lines WHERE id = ?', [(int)$_GET['line_edit']]) : null;
-$visitorEdit = isset($_GET['visitor_edit']) ? Database::fetch('SELECT * FROM ceo_dashboard_visitors WHERE id = ?', [(int)$_GET['visitor_edit']]) : null;
-$lines = Database::fetchAll('SELECT l.*, su.name supervisor_user_name, su.username supervisor_username, su.email supervisor_email, mu.name sales_manager_user_name, mu.username sales_manager_username, mu.email sales_manager_email FROM ceo_dashboard_lines l LEFT JOIN users su ON su.id = l.supervisor_user_id LEFT JOIN users mu ON mu.id = l.sales_manager_user_id ORDER BY COALESCE(l.report_date, "0000-00-00") DESC, l.sort_order ASC, l.id DESC');
-$visitors = Database::fetchAll('SELECT v.*, u.name user_name, u.username user_username, u.email user_email FROM ceo_dashboard_visitors v LEFT JOIN users u ON u.id = v.user_id ORDER BY COALESCE(v.report_date, "0000-00-00") DESC, v.sort_order ASC, v.id DESC');
-$lineOptions = array_column(Database::fetchAll('SELECT DISTINCT line_code FROM ceo_dashboard_lines WHERE line_code <> "" ORDER BY line_code ASC'), 'line_code');
-$userOptions = Database::fetchAll('SELECT id,name,username FROM users ORDER BY name ASC, username ASC, id ASC');
+$lineEdit = null;$visitorEdit = null;$lines = [];$visitors = [];$lineOptions = [];$userOptions = [];
+try {
+    $lineEdit = isset($_GET['line_edit']) ? Database::fetch('SELECT * FROM ceo_dashboard_lines WHERE id = ?', [(int)$_GET['line_edit']]) : null;
+    $visitorEdit = isset($_GET['visitor_edit']) ? Database::fetch('SELECT * FROM ceo_dashboard_visitors WHERE id = ?', [(int)$_GET['visitor_edit']]) : null;
+    $lines = Database::fetchAll('SELECT l.*, su.name supervisor_user_name, su.username supervisor_username, su.email supervisor_email, mu.name sales_manager_user_name, mu.username sales_manager_username, mu.email sales_manager_email FROM ceo_dashboard_lines l LEFT JOIN users su ON su.id = l.supervisor_user_id LEFT JOIN users mu ON mu.id = l.sales_manager_user_id ORDER BY COALESCE(l.report_date, "0000-00-00") DESC, l.sort_order ASC, l.id DESC');
+    $visitors = Database::fetchAll('SELECT v.*, u.name user_name, u.username user_username, u.email user_email FROM ceo_dashboard_visitors v LEFT JOIN users u ON u.id = v.user_id ORDER BY COALESCE(v.report_date, "0000-00-00") DESC, v.sort_order ASC, v.id DESC');
+    $lineOptions = array_column(Database::fetchAll('SELECT DISTINCT line_code FROM ceo_dashboard_lines WHERE line_code <> "" ORDER BY line_code ASC'), 'line_code');
+    $userOptions = Database::fetchAll('SELECT id,name,username FROM users ORDER BY name ASC, username ASC, id ASC');
+} catch (Throwable $e) {
+    error_log('CEO dashboard settings data: ' . $e->getMessage());
+    flash('دریافت اطلاعات لاین‌ها و ویزیتورها با خطا مواجه شد. لطفاً دوباره تلاش کنید.', 'danger');
+}
+$periodLoadFailed = false;
+$summaryPeriodOptions = ceo_summary_period_options($periodLoadFailed);
+if ($periodLoadFailed) flash('دریافت بخشی از دوره‌های گزارش با خطا مواجه شد؛ سایر اطلاعات قابل استفاده است.', 'danger');
+$selectedSummaryPeriod = CeoDashboardManualMetrics::normalizePeriodKey($_GET['period_key'] ?? ($summaryPeriodOptions[0] ?? date('Y-m-d')));
 Auth::start();
 $importPreview = $_SESSION['ceo_dashboard_import_preview'] ?? null;
 $importResult = $_SESSION['ceo_dashboard_import_result'] ?? null;
 unset($_SESSION['ceo_dashboard_import_result']);
+$summaryWarnings = $_SESSION['ceo_dashboard_summary_warnings'] ?? [];
+unset($_SESSION['ceo_dashboard_summary_warnings']);
 
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
@@ -578,6 +774,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
     <a href="#general">تنظیمات عمومی</a>
     <a href="#lines">اطلاعات لاین‌ها</a>
     <a href="#visitors">اطلاعات ویزیتورها</a>
+    <a href="#summary-import">شاخص‌های اصلی</a>
     <a href="#export">خروجی اکسل</a>
     <a href="#import">ورودی اکسل</a>
 </div>
@@ -594,7 +791,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
                 <?php else: ?>
                     <label class="form-field">
                         <span><?= e($meta['label']) ?></span>
-                        <input <?= $meta['type'] === 'number' ? 'type="number" min="0" step="1"' : '' ?> name="<?= e($key) ?>" value="<?= e(setting($key, $meta['default'])) ?>">
+                        <input <?= $meta['type'] === 'number' ? 'type="number" min="0" step="1"' : ($meta['type'] === 'color' ? 'type="color"' : 'type="text"') ?> name="<?= e($key) ?>" value="<?= e(setting($key, $meta['default'])) ?>">
                     </label>
                 <?php endif; ?>
             <?php endforeach; ?>
@@ -677,6 +874,36 @@ require __DIR__ . '/../views/partials/admin-header.php';
     </div>
 </section>
 
+<section class="card ceo-settings-card" id="summary-import">
+    <h2>ورود دستی شاخص‌های اصلی مدیرعامل از اکسل</h2>
+    <?php foreach ($summaryWarnings as $warning): ?>
+        <div class="alert alert-warning"><?= e($warning) ?></div>
+    <?php endforeach; ?>
+    <form method="post" enctype="multipart/form-data" class="admin-form">
+        <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
+        <input type="hidden" name="action" value="import_summary_metrics">
+        <div class="grid grid-2">
+            <label class="form-field">
+                <span>دوره گزارش</span>
+                <select name="period_key" required>
+                    <?php if (!in_array($selectedSummaryPeriod, $summaryPeriodOptions, true)): ?><option value="<?= e($selectedSummaryPeriod) ?>"><?= e(format_jalali_date($selectedSummaryPeriod)) ?></option><?php endif; ?>
+                    <?php foreach ($summaryPeriodOptions as $period): ?><option value="<?= e($period) ?>" <?= $selectedSummaryPeriod === $period ? 'selected' : '' ?>><?= e(format_jalali_date($period)) ?></option><?php endforeach; ?>
+                </select>
+            </label>
+            <label class="form-field">
+                <span>فایل CSV یا XLSX</span>
+                <input type="file" name="summary_file" accept=".csv,.xlsx" required>
+            </label>
+        </div>
+        <div class="form-actions">
+            <a class="btn" href="?export=summary_template&amp;period_key=<?= e(urlencode($selectedSummaryPeriod)) ?>">دریافت قالب اکسل</a>
+            <button class="btn btn-primary">آپلود فایل اکسل</button>
+            <a class="btn" href="?export=summary&amp;period_key=<?= e(urlencode($selectedSummaryPeriod)) ?>">خروجی اکسل</a>
+        </div>
+    </form>
+    <p class="muted">در صورت ورود دستی این مقادیر، فروش ناخالص، تخفیفات و فروش خالص داشبورد مدیرعامل از فایل اکسل خوانده می‌شود و محاسبه خودکار فقط زمانی استفاده می‌شود که برای دوره انتخاب‌شده داده دستی وجود نداشته باشد.</p>
+</section>
+
 <section class="card ceo-settings-card" id="export">
     <h2>خروجی اکسل</h2>
     <div class="form-actions">
@@ -694,7 +921,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <input type="hidden" name="action" value="preview_import">
         <div class="grid grid-2">
             <label class="form-field"><span>حالت ورود اطلاعات</span><select name="import_mode"><option value="update_existing">بروزرسانی رکوردهای موجود و حفظ مقدار ستون‌های خالی</option><option value="replace_same_report_date">جایگزینی اطلاعات همان تاریخ گزارش</option><option value="append">افزودن به اطلاعات موجود</option><option value="truncate_and_insert">حذف همه و ثبت مجدد</option></select></label>
-            <label class="form-field"><span>فایل اکسل</span><input type="file" name="excel_file" accept=".xlsx,.xls" required></label>
+            <label class="form-field"><span>فایل اکسل</span><input type="file" name="excel_file" accept=".xlsx" required></label>
         </div>
         <button class="btn btn-primary">بررسی و پیش‌نمایش</button>
     </form>
@@ -713,6 +940,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
             <div class="stat-card"><span>تنظیمات</span><strong><?= e((string)count($importPreview['settings'])) ?></strong></div>
             <div class="stat-card"><span>ردیف لاین</span><strong><?= e((string)count($importPreview['lines'])) ?></strong></div>
             <div class="stat-card"><span>ردیف ویزیتور</span><strong><?= e((string)count($importPreview['visitors'])) ?></strong></div>
+            <div class="stat-card"><span>شاخص‌های اصلی</span><strong><?= e((string)count($importPreview['summary_metrics'] ?? [])) ?></strong></div>
             <div class="stat-card"><span>خطا</span><strong><?= e((string)count($importPreview['errors'])) ?></strong></div>
         </div>
         <?php if (!empty($importPreview['errors'])): ?>

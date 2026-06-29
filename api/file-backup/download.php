@@ -1,0 +1,3 @@
+<?php
+require __DIR__.'/_bootstrap.php';
+try{backup_require_method('GET');$id=(int)($_GET['file_id']??0);if($id<=0)throw new RuntimeException('file_not_registered');$file=FileBackupService::markDownloadAttempt($id);$path=FileBackupService::resolveExistingFile($file['relative_path']);header('Content-Type: '.($file['mime_type']?:'application/octet-stream'));header('Content-Length: '.filesize($path));header("Content-Disposition: attachment; filename*=UTF-8''".rawurlencode($file['original_name']));header('X-Backup-File-Id: '.$file['id']);header('X-Backup-File-SHA256: '.$file['file_hash']);readfile($path);exit;}catch(Throwable $e){backup_fail($e);}

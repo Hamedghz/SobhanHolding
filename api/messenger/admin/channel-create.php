@@ -1,0 +1,1 @@
+<?php require __DIR__.'/../bootstrap.php';messenger_run(function($u){$in=messenger_input();$in['type']='channel';$in['is_readonly']=1;$in['is_official']=1;return MessengerService::createConversation($in,$u);},true);

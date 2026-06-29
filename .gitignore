@@ -27,12 +27,33 @@ __pycache__/
 
 # Local JavaScript dependencies from previous scaffold
 node_modules/
+realtime-server/.env
+storage/private/messenger/*
+!storage/private/messenger/.htaccess
 
 # Runtime installer lock and uploaded content
 install.lock
+config/email.key
 uploads/carousel/*
 uploads/files/*
 uploads/logo/*
+uploads/email/*
+uploads/docs/*
+uploads/payroll/*
+uploads/management-reports/*
+uploads/management-meetings/*
+uploads/management-followups/*
 !uploads/carousel/.htaccess
 !uploads/files/.htaccess
 !uploads/logo/.htaccess
+!uploads/email/.htaccess
+!uploads/docs/.htaccess
+!uploads/docs/index.html
+!uploads/payroll/.htaccess
+!uploads/payroll/index.html
+!uploads/management-reports/.htaccess
+!uploads/management-reports/index.html
+!uploads/management-meetings/.htaccess
+!uploads/management-meetings/index.html
+!uploads/management-followups/.htaccess
+!uploads/management-followups/index.html

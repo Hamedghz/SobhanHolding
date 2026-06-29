@@ -1,0 +1,1 @@
+namespace SobhanNotificationHub.Data;public sealed class NotificationCacheRepository(LocalCacheDb db){public Task<List<CachedNotification>> GetAsync(string? module,bool unreadOnly)=>db.HistoryAsync(module,unreadOnly);public Task MarkActionAsync(long id,string action)=>db.MarkActionAsync(id,action);}

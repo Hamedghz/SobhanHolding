@@ -5,7 +5,7 @@ require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/SeedManager.php';
 
 Auth::requireLogin();
-if (!Auth::isAdmin()) { http_response_code(403); exit('دسترسی غیرمجاز است.'); }
+if (!Auth::canManageSystemTools()) { http_response_code(403); exit('برای این بخش مجوز مدیریت سیستم لازم است.'); }
 $pageTitle='راه‌اندازی ماژول منابع انسانی';$result=null;$error='';
 if($_SERVER['REQUEST_METHOD']==='POST'){
     if(!Auth::verifyCsrf($_POST['csrf_token']??'')){http_response_code(419);exit('درخواست نامعتبر است.');}

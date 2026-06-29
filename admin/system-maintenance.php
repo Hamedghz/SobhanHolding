@@ -3,9 +3,11 @@ require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/SeedManager.php';
+require_once __DIR__ . '/../core/PersonalPlannerModule.php';
+require_once __DIR__ . '/../core/WorkPlannerModule.php';
 
 Auth::requireLogin();
-if (!Auth::isAdmin()) { http_response_code(403); exit('دسترسی غیرمجاز است.'); }
+if (!Auth::canManageSystemTools()) { http_response_code(403); exit('برای این بخش مجوز مدیریت سیستم لازم است.'); }
 $pageTitle = 'بروزرسانی SQL و Seed';
 $user = Auth::user();
 $registry = SeedManager::registry();
@@ -28,13 +30,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'repair_schema') {
             $report = ['structure' => SystemMaintenance::repair(Database::connection())];
             HrModule::repair(Database::connection());
+            WorkPlannerModule::repair(Database::connection());
+            PersonalPlannerModule::repair(Database::connection());
             Database::execute('INSERT INTO maintenance_logs(action_key,status,requested_by,message,result_json,created_at) VALUES ("repair_schema","completed",?,?,?,NOW())', [(int)$user['id'],'تعمیر امن ساختار انجام شد.',json_encode($report,JSON_UNESCAPED_UNICODE)]);
         } elseif ($action === 'check_schema') {
             $missing=[];foreach(SystemMaintenance::requiredTables() as $table)if(!Database::tableExists($table))$missing[]=$table;
             $report=['missing_tables'=>$missing,'status'=>$missing?'needs_repair':'complete'];
-        } elseif ($action === 'clear_cache') {
-            Database::execute('DELETE FROM dashboard_data_cache');
-            $report=['cache'=>'cleared'];
         }
         if ($report !== null) flash('عملیات با موفقیت انجام شد.');
     } catch (Throwable $e) {
@@ -50,7 +51,7 @@ $latest = array_column(SeedManager::latestRuns(), null, 'seed_group');
 $logs = Database::fetchAll('SELECT * FROM seed_runs ORDER BY id DESC LIMIT 30');
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
-<section class="card admin-form"><div class="section-heading-row"><div><h1>بروزرسانی SQL و Seed</h1><p class="muted">اجرای امن و قابل تکرار، بدون DROP، TRUNCATE یا بازنویسی داده‌های عملیاتی.</p></div><form method="post"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><button class="btn" name="action" value="check_schema">بررسی ساختار دیتابیس</button><button class="btn" name="action" value="repair_schema">تعمیر امن ساختار</button><button class="btn" name="action" value="clear_cache">پاکسازی کش داشبورد</button></form></div></section>
+<section class="card admin-form"><div class="section-heading-row"><div><h1>بروزرسانی SQL و Seed</h1><p class="muted">اجرای امن و قابل تکرار، بدون DROP، TRUNCATE یا بازنویسی داده‌های عملیاتی.</p></div><form method="post"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><button class="btn" name="action" value="check_schema">بررسی ساختار دیتابیس</button><button class="btn" name="action" value="repair_schema">تعمیر امن ساختار</button></form></div></section>
 <?php if($report!==null):?><section class="card"><h2>گزارش آخرین اجرا</h2><pre class="maintenance-report"><?=e(json_encode($report,JSON_UNESCAPED_UNICODE|JSON_PRETTY_PRINT))?></pre></section><?php endif?>
 <section class="card"><div class="section-heading-row"><h2>Seedهای موجود</h2><form method="post"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="mode" value="safe"><button class="btn btn-primary" name="action" value="run_all">اجرای همه Seedها</button></form></div><div class="table-wrap"><table><thead><tr><th>نام Seed</th><th>توضیح</th><th>آخرین اجرا</th><th>Inserted</th><th>Updated</th><th>Skipped</th><th>Errors</th><th>عملیات</th></tr></thead><tbody><?php foreach($registry as $key=>$seed):$last=$latest[$key]??null;?><tr><td><strong><?=e($seed['title'])?></strong><small><code><?=e($key)?></code></small></td><td><?=e($seed['description'])?></td><td><?=e($last['status']??'اجرا نشده')?></td><td><?=e($last['inserted_count']??0)?></td><td><?=e($last['updated_count']??0)?></td><td><?=e($last['skipped_count']??0)?></td><td><?=e($last['error_count']??0)?></td><td><form method="post" class="row-actions"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="seed_key" value="<?=e($key)?>"><button class="btn btn-small" name="action" value="run_seed" formaction="?mode=dry_run" onclick="this.form.elements.mode.value='dry_run'">بررسی بدون اجرا</button><button class="btn btn-small" name="action" value="run_seed">اجرای امن</button><button class="btn btn-small" name="action" value="run_seed" onclick="this.form.elements.mode.value='repair'">تعمیر</button><input type="hidden" name="mode" value="safe"></form></td></tr><?php endforeach?></tbody></table></div></section>
 <section class="card admin-form"><h2>بروزرسانی اجباری رکوردهای سیستمی</h2><p class="alert alert-danger">این حالت فقط برای metadata سیستمی است و امتیازها، پاسخ‌ها، فروش، وصول و داده‌های دستی را تغییر نمی‌دهد.</p><form method="post" onsubmit="return confirm('بروزرسانی اجباری اجرا شود؟')"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="mode" value="force_update"><div class="grid grid-2"><label class="form-field"><span>Seed</span><select name="seed_key"><?php foreach($registry as $key=>$seed):?><option value="<?=e($key)?>"><?=e($seed['title'])?></option><?php endforeach?></select></label><label class="form-field"><span>عبارت تایید</span><input name="force_confirmation" required placeholder="تایید بروزرسانی اجباری"></label></div><button class="btn btn-danger" name="action" value="run_seed">بروزرسانی اجباری</button></form></section>

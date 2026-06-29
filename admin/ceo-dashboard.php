@@ -4,6 +4,7 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/JalaliDate.php';
 require_once __DIR__ . '/../core/SobhanApiClient.php';
+require_once __DIR__ . '/../core/CeoDashboardManualMetrics.php';
 
 Auth::requireLogin();
 if (!Auth::can('view_ceo_dashboard') && !Auth::can('ceo_dashboard')) {
@@ -36,6 +37,8 @@ $latestDateRow = Database::fetch(
         SELECT report_date FROM ceo_dashboard_lines WHERE active = 1 AND report_date IS NOT NULL
         UNION ALL
         SELECT report_date FROM ceo_dashboard_visitors WHERE active = 1 AND report_date IS NOT NULL
+        UNION ALL
+        SELECT period_key report_date FROM ceo_dashboard_manual_metrics WHERE period_key <> ""
     ) dates'
 );
 $requestedReportDate = trim($_GET['report_date'] ?? '');
@@ -54,6 +57,8 @@ $dateOptions = array_column(Database::fetchAll(
         SELECT report_date FROM ceo_dashboard_lines WHERE report_date IS NOT NULL
         UNION ALL
         SELECT report_date FROM ceo_dashboard_visitors WHERE report_date IS NOT NULL
+        UNION ALL
+        SELECT period_key report_date FROM ceo_dashboard_manual_metrics WHERE period_key <> ""
         UNION ALL
         SELECT m.report_date
         FROM pharmacy_dashboard_metrics m
@@ -391,6 +396,15 @@ $dashboardGrossSales = $dashboardUsesApiMetrics ? $sobhanMetrics['gross_sales'] 
 $dashboardDiscounts = $dashboardUsesApiMetrics ? $sobhanMetrics['discount_total'] : $discounts;
 $dashboardNetSales = $dashboardUsesApiMetrics ? $sobhanMetrics['net_sales'] : $netSales;
 $dashboardInvoiceCount = $dashboardUsesApiMetrics ? $sobhanMetrics['invoice_count'] : 0;
+$reportPeriodKey = CeoDashboardManualMetrics::normalizePeriodKey($filters['report_date']);
+$manualSummaryMetrics = $reportPeriodKey !== '' ? CeoDashboardManualMetrics::get($reportPeriodKey) : null;
+if ($manualSummaryMetrics) {
+    $dashboardGrossSales = (float)$manualSummaryMetrics['gross_sales'];
+    $dashboardDiscounts = (float)$manualSummaryMetrics['discounts'];
+    $dashboardNetSales = (float)$manualSummaryMetrics['net_sales'];
+    $hasData = true;
+}
+$summarySourceBadge = $manualSummaryMetrics ? 'ورودی دستی از اکسل' : 'محاسبه خودکار';
 $dashboardDiscountPercent = $dashboardGrossSales > 0 ? ($dashboardDiscounts / $dashboardGrossSales) * 100 : 0;
 $chartData['moneyValues'] = [$dashboardNetSales, $dashboardDiscounts];
 $sobhanDailyRows = sobhan_list_from_result($sobhanDailyResult);
@@ -461,7 +475,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <div class="ceo-section-title">
             <h2>داشبورد شرکت پخش سبحان</h2>
             <p>نمای خلاصه فروش، تخفیف، لاین‌ها و عملکرد ویزیتورها</p>
-            <span class="badge"><?= e($dashboardSourceBadge) ?></span>
+            <span class="badge"><?= e($summarySourceBadge) ?></span>
         </div>
         <?php if (!$hasData): ?>
             <div class="ceo-mobile-card"><p class="muted">هنوز اطلاعاتی برای شرکت پخش ثبت نشده است.</p></div>
@@ -654,7 +668,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <div class="form-actions ceo-filter-actions">
             <button class="btn btn-primary">اعمال فیلتر</button>
             <a class="btn" href="/admin/ceo-dashboard.php">پاکسازی</a>
-            <?php if (Auth::can('ceo_dashboard', 'edit')): ?><a class="btn" href="/admin/ceo-dashboard-settings.php">تنظیمات داشبورد مدیرعامل</a><?php endif; ?>
+            <?php if (Auth::can('ceo_dashboard', 'edit')): ?><a class="btn" href="/admin/ceo-dashboard-settings.php?period_key=<?= e(urlencode($reportPeriodKey)) ?>#summary-import">تنظیمات داشبورد مدیرعامل</a><?php endif; ?>
         </div>
     </div>
 </form>
@@ -729,7 +743,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
 <?php else: ?>
     <div class="ceo-dashboard-grid">
         <section class="card ceo-kpi-card">
-            <h2><?= e($labels['page_title']) ?> <span class="badge"><?= e($dashboardSourceBadge) ?></span></h2>
+            <h2><?= e($labels['page_title']) ?> <span class="badge"><?= e($summarySourceBadge) ?></span></h2>
             <div class="ceo-kpi-list">
                 <div><span><?= e($labels['gross_sales']) ?></span><strong><?= e(format_money($dashboardGrossSales)) ?></strong></div>
                 <div><span><?= e($labels['discounts']) ?></span><strong><?= e(format_money($dashboardDiscounts)) ?></strong></div>
@@ -941,36 +955,53 @@ const fullNumberLabel = ctx => {
     return (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + Number(value || 0).toLocaleString('en-US');
 };
 const chartFont = {family: 'Tahoma, Arial, sans-serif'};
+const ceoTheme = getComputedStyle(document.body);
+const ceoThemeColor = name => ceoTheme.getPropertyValue(name).trim();
+const ceoNeon = ceoThemeColor('--ceo-neon') || '#00D5FF';
+const ceoBlue = '#2563EB';
+const ceoEmerald = '#10B981';
+const ceoGold = '#F59E0B';
+const ceoGoldSoft = 'rgba(245,158,11,.12)';
+const ceoEmeraldSoft = 'rgba(16,185,129,.12)';
+const ceoOlive = '#0EA5E9';
+const ceoSage = '#8B5CF6';
+const ceoBronze = '#EC4899';
+const ceoDanger = '#EF4444';
+const ceoChartPalette = [ceoNeon, ceoBlue, ceoEmerald, ceoGold, ceoSage, ceoDanger, ceoBronze, ceoOlive];
 Chart.defaults.font.family = chartFont.family;
-Chart.defaults.color = '#475569';
+Chart.defaults.color = ceoThemeColor('--ceo-text-muted');
+Chart.defaults.borderColor = ceoThemeColor('--ceo-chart-grid');
+Chart.defaults.animation.duration = document.body.classList.contains('theme-effects-reduced') ? 0 : 260;
+Chart.defaults.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+Chart.defaults.resizeDelay = 100;
 
 if (document.getElementById('ceoMoneyDonut')) new Chart(document.getElementById('ceoMoneyDonut'), {
     type: 'doughnut',
-    data: {labels: ceoChartData.moneyLabels, datasets: [{data: ceoChartData.moneyValues, backgroundColor: ['#16a34a', '#ef4444'], borderWidth: 0}]},
+    data: {labels: ceoChartData.moneyLabels, datasets: [{data: ceoChartData.moneyValues, backgroundColor: [ceoBlue, ceoDanger], borderWidth: 0}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom'}}}
 });
 
 if (document.getElementById('sobhanDailySalesChart')) new Chart(document.getElementById('sobhanDailySalesChart'), {
     type: 'line',
-    data: {labels: ceoChartData.sobhanDailyLabels, datasets: [{label: 'فروش روزانه', data: ceoChartData.sobhanDailySales, borderColor: '#0f766e', backgroundColor: 'rgba(15,118,110,.12)', tension: .35, fill: true, pointRadius: 3}]},
+    data: {labels: ceoChartData.sobhanDailyLabels, datasets: [{label: 'فروش روزانه', data: ceoChartData.sobhanDailySales, borderColor: ceoBlue, backgroundColor: 'rgba(37,99,235,.11)', tension: .3, fill: true, pointRadius: 2}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}, tooltip: {rtl: true, callbacks: {label: fullNumberLabel}}}, scales: {y: {beginAtZero: true, ticks: {callback: compactMoneyTick}}}}
 });
 
 if (document.getElementById('mobileLineSalesChart')) new Chart(document.getElementById('mobileLineSalesChart'), {
     type: 'bar',
-    data: {labels: ceoChartData.lineLabels, datasets: [{label: 'فروش لاین‌ها', data: ceoChartData.lineSales, backgroundColor: '#0f766e', borderRadius: 8, maxBarThickness: 34}]},
+    data: {labels: ceoChartData.lineLabels, datasets: [{label: 'فروش لاین‌ها', data: ceoChartData.lineSales, backgroundColor: ceoBlue, borderRadius: 8, maxBarThickness: 34}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}, tooltip: {rtl: true, callbacks: {label: fullNumberLabel}}}, scales: {x: {grid: {display: false}}, y: {beginAtZero: true, ticks: {maxTicksLimit: 4, callback: compactMoneyTick}}}}
 });
 
 if (document.getElementById('mobileLineAchievementChart')) new Chart(document.getElementById('mobileLineAchievementChart'), {
     type: 'bar',
-    data: {labels: ceoChartData.lineLabels, datasets: [{label: 'درصد تحقق', data: ceoChartData.lineAchievement, backgroundColor: '#2563eb', borderRadius: 8, maxBarThickness: 30}]},
+    data: {labels: ceoChartData.lineLabels, datasets: [{label: 'درصد تحقق', data: ceoChartData.lineAchievement, backgroundColor: ceoGold, borderRadius: 8, maxBarThickness: 30}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom', labels: {boxWidth: 10, font: {size: 10}}}, tooltip: {rtl: true, callbacks: {label: ctx => ctx.parsed.y + '%'}}}, scales: {x: {grid: {display: false}}, y: {beginAtZero: true, ticks: {callback: percentTick, maxTicksLimit: 4}}}}
 });
 
 if (document.getElementById('mobileVisitorAchievementChart')) new Chart(document.getElementById('mobileVisitorAchievementChart'), {
     type: 'bar',
-    data: {labels: ceoChartData.visitorLabels, datasets: [{label: 'درصد تحقق ویزیتور', data: ceoChartData.visitorAchievement, backgroundColor: '#0f766e', borderRadius: 8, maxBarThickness: 24}]},
+    data: {labels: ceoChartData.visitorLabels, datasets: [{label: 'درصد تحقق ویزیتور', data: ceoChartData.visitorAchievement, backgroundColor: ceoEmerald, borderRadius: 8, maxBarThickness: 24}]},
     options: {indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom', labels: {boxWidth: 10, font: {size: 10}}}, tooltip: {rtl: true, callbacks: {label: ctx => {
         const index = ctx.dataIndex;
         const sales = Number(ceoChartData.visitorSales[index] || 0).toLocaleString('en-US');
@@ -982,84 +1013,84 @@ if (document.getElementById('mobileVisitorAchievementChart')) new Chart(document
 if (document.getElementById('mobilePharmacySalesChart')) new Chart(document.getElementById('mobilePharmacySalesChart'), {
     type: 'bar',
     data: {labels: ceoChartData.pharmacyLabelsTotal, datasets: [
-        {label: 'روزانه', data: ceoChartData.pharmacyDailySales, backgroundColor: '#0f766e', borderRadius: 8, maxBarThickness: 24},
-        {label: 'ماهانه', data: ceoChartData.pharmacyMonthlySales, backgroundColor: '#2563eb', borderRadius: 8, maxBarThickness: 24}
+        {label: 'روزانه', data: ceoChartData.pharmacyDailySales, backgroundColor: ceoEmerald, borderRadius: 8, maxBarThickness: 24},
+        {label: 'ماهانه', data: ceoChartData.pharmacyMonthlySales, backgroundColor: ceoGold, borderRadius: 8, maxBarThickness: 24}
     ]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom', labels: {boxWidth: 10, font: {size: 10}}}, tooltip: {rtl: true, callbacks: {label: fullNumberLabel}}}, scales: {x: {grid: {display: false}}, y: {beginAtZero: true, ticks: {maxTicksLimit: 4, callback: compactMoneyTick}}}}
 });
 
 if (document.getElementById('mobilePharmacyPurchaseChart')) new Chart(document.getElementById('mobilePharmacyPurchaseChart'), {
     type: 'doughnut',
-    data: {labels: ceoChartData.pharmacyLabels, datasets: [{data: ceoChartData.pharmacySupplierPurchase, backgroundColor: ['#0f766e', '#2563eb', '#f59e0b', '#7c3aed'], borderWidth: 0}]},
+    data: {labels: ceoChartData.pharmacyLabels, datasets: [{data: ceoChartData.pharmacySupplierPurchase, backgroundColor: ceoChartPalette, borderWidth: 0}]},
     options: {responsive: true, maintainAspectRatio: false, cutout: '58%', plugins: {legend: {position: 'bottom', labels: {boxWidth: 10, font: {size: 10}}}, tooltip: {rtl: true}}}
 });
 
 if (document.getElementById('mobilePharmacyExpensesChart')) new Chart(document.getElementById('mobilePharmacyExpensesChart'), {
     type: 'bar',
-    data: {labels: ceoChartData.pharmacyLabelsTotal, datasets: [{label: 'هزینه', data: ceoChartData.pharmacyExpenses, backgroundColor: '#dc2626', borderRadius: 8, maxBarThickness: 26}]},
+    data: {labels: ceoChartData.pharmacyLabelsTotal, datasets: [{label: 'هزینه', data: ceoChartData.pharmacyExpenses, backgroundColor: ceoDanger, borderRadius: 8, maxBarThickness: 26}]},
     options: {indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}, tooltip: {rtl: true, callbacks: {label: fullNumberLabel}}}, scales: {x: {beginAtZero: true, ticks: {maxTicksLimit: 4, callback: compactMoneyTick}}, y: {grid: {display: false}}}}
 });
 
 if (document.getElementById('mobilePharmacyChecksChart')) new Chart(document.getElementById('mobilePharmacyChecksChart'), {
     type: 'doughnut',
-    data: {labels: ceoChartData.pharmacyLabels, datasets: [{data: ceoChartData.pharmacyChecks, backgroundColor: ['#0f766e', '#2563eb', '#f59e0b', '#7c3aed'], borderWidth: 0}]},
+    data: {labels: ceoChartData.pharmacyLabels, datasets: [{data: ceoChartData.pharmacyChecks, backgroundColor: ceoChartPalette, borderWidth: 0}]},
     options: {responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: {legend: {position: 'bottom', labels: {boxWidth: 10, font: {size: 10}}}, tooltip: {rtl: true}}}
 });
 
 if (document.getElementById('mobilePharmacyOpenInvoiceChart')) new Chart(document.getElementById('mobilePharmacyOpenInvoiceChart'), {
     type: 'bar',
-    data: {labels: ceoChartData.pharmacyLabelsTotal, datasets: [{label: 'مبلغ فاکتور باز', data: ceoChartData.pharmacyOpenInvoice, backgroundColor: '#7c3aed', borderRadius: 8, maxBarThickness: 30}]},
+    data: {labels: ceoChartData.pharmacyLabelsTotal, datasets: [{label: 'مبلغ فاکتور باز', data: ceoChartData.pharmacyOpenInvoice, backgroundColor: ceoBronze, borderRadius: 8, maxBarThickness: 30}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom', labels: {boxWidth: 10, font: {size: 10}}}, tooltip: {rtl: true, callbacks: {label: fullNumberLabel}}}, scales: {x: {grid: {display: false}}, y: {beginAtZero: true, ticks: {maxTicksLimit: 4, callback: compactMoneyTick}}}}
 });
 
 if (document.getElementById('ceoLineSales')) new Chart(document.getElementById('ceoLineSales'), {
     type: 'bar',
-    data: {labels: ceoChartData.lineLabels, datasets: [{label: '<?= e($labels['line_sales_chart']) ?>', data: ceoChartData.lineSales, backgroundColor: '#2563eb', borderRadius: 6}]},
+    data: {labels: ceoChartData.lineLabels, datasets: [{label: '<?= e($labels['line_sales_chart']) ?>', data: ceoChartData.lineSales, backgroundColor: ceoGold, borderRadius: 6}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}, scales: {y: {beginAtZero: true}}}
 });
 
 if (document.getElementById('ceoLineAchievement')) new Chart(document.getElementById('ceoLineAchievement'), {
     type: 'doughnut',
-    data: {labels: ceoChartData.lineLabels, datasets: [{label: '<?= e($labels['line_share_chart']) ?>', data: ceoChartData.lineAchievement, backgroundColor: ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#14b8a6', '#8b5cf6'], borderWidth: 0}]},
+    data: {labels: ceoChartData.lineLabels, datasets: [{label: '<?= e($labels['line_share_chart']) ?>', data: ceoChartData.lineAchievement, backgroundColor: ceoChartPalette, borderWidth: 0}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom'}, tooltip: {callbacks: {label: ctx => ctx.label + ': ' + ctx.parsed + '%'}}}}
 });
 
 if (document.getElementById('ceoVisitorAchievement')) new Chart(document.getElementById('ceoVisitorAchievement'), {
     type: 'line',
-    data: {labels: ceoChartData.visitorLabels, datasets: [{label: '<?= e($labels['visitor_achievement_chart']) ?>', data: ceoChartData.visitorAchievement, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.12)', tension: .35, fill: true, pointRadius: 4, pointHoverRadius: 6}]},
+    data: {labels: ceoChartData.visitorLabels, datasets: [{label: '<?= e($labels['visitor_achievement_chart']) ?>', data: ceoChartData.visitorAchievement, borderColor: ceoGold, backgroundColor: ceoGoldSoft, tension: .35, fill: true, pointRadius: 4, pointHoverRadius: 6}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}, tooltip: {callbacks: {label: ctx => ctx.parsed.y + '%'}}}, scales: {y: {beginAtZero: true, ticks: {callback: percentTick}}}}
 });
 
 if (document.getElementById('pharmacySalesBar')) new Chart(document.getElementById('pharmacySalesBar'), {
     type: 'bar',
     data: {labels: ceoChartData.pharmacyLabelsTotal, datasets: [
-        {label: 'فروش روزانه', data: ceoChartData.pharmacyDailySales, backgroundColor: '#2563eb', borderRadius: 6},
-        {label: 'فروش ماهانه', data: ceoChartData.pharmacyMonthlySales, backgroundColor: '#16a34a', borderRadius: 6}
+        {label: 'فروش روزانه', data: ceoChartData.pharmacyDailySales, backgroundColor: ceoGold, borderRadius: 6},
+        {label: 'فروش ماهانه', data: ceoChartData.pharmacyMonthlySales, backgroundColor: ceoEmerald, borderRadius: 6}
     ]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom'}}, scales: {y: {beginAtZero: true}}}
 });
 
 if (document.getElementById('pharmacySupplierPie')) new Chart(document.getElementById('pharmacySupplierPie'), {
     type: 'pie',
-    data: {labels: ceoChartData.pharmacyLabels, datasets: [{data: ceoChartData.pharmacySupplierPurchase, backgroundColor: ['#f59e0b', '#14b8a6', '#2563eb', '#ef4444', '#8b5cf6'], borderWidth: 0}]},
+    data: {labels: ceoChartData.pharmacyLabels, datasets: [{data: ceoChartData.pharmacySupplierPurchase, backgroundColor: ceoChartPalette, borderWidth: 0}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom'}}}
 });
 
 if (document.getElementById('pharmacyOpenInvoiceBar')) new Chart(document.getElementById('pharmacyOpenInvoiceBar'), {
     type: 'bar',
-    data: {labels: ceoChartData.pharmacyLabelsTotal, datasets: [{label: 'مبلغ فاکتور باز', data: ceoChartData.pharmacyOpenInvoice, backgroundColor: '#8b5cf6', borderRadius: 6}]},
+    data: {labels: ceoChartData.pharmacyLabelsTotal, datasets: [{label: 'مبلغ فاکتور باز', data: ceoChartData.pharmacyOpenInvoice, backgroundColor: ceoBronze, borderRadius: 6}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}, scales: {y: {beginAtZero: true}}}
 });
 
 if (document.getElementById('pharmacyExpensesBar')) new Chart(document.getElementById('pharmacyExpensesBar'), {
     type: 'bar',
-    data: {labels: ceoChartData.pharmacyLabelsTotal, datasets: [{label: 'هزینه‌ها', data: ceoChartData.pharmacyExpenses, backgroundColor: '#ef4444', borderRadius: 6}]},
+    data: {labels: ceoChartData.pharmacyLabelsTotal, datasets: [{label: 'هزینه‌ها', data: ceoChartData.pharmacyExpenses, backgroundColor: ceoDanger, borderRadius: 6}]},
     options: {indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: {legend: {display: false}}, scales: {x: {beginAtZero: true}}}
 });
 
 if (document.getElementById('pharmacyChecksPie')) new Chart(document.getElementById('pharmacyChecksPie'), {
     type: 'doughnut',
-    data: {labels: ceoChartData.pharmacyLabels, datasets: [{data: ceoChartData.pharmacyChecks, backgroundColor: ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#14b8a6', '#8b5cf6'], borderWidth: 0}]},
+    data: {labels: ceoChartData.pharmacyLabels, datasets: [{data: ceoChartData.pharmacyChecks, backgroundColor: ceoChartPalette, borderWidth: 0}]},
     options: {responsive: true, maintainAspectRatio: false, plugins: {legend: {position: 'bottom'}}}
 });
 </script>

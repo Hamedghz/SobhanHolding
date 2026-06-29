@@ -1,0 +1,1 @@
+<?php require __DIR__.'/_bootstrap.php';notify_method('POST');try{$device=notify_device();NotificationHubService::updateDevice($device,notify_input());notify_json(true,['registered'=>true]);}catch(Throwable $e){notify_fail($e);}

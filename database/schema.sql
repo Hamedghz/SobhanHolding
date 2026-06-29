@@ -3,13 +3,103 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(150) NOT NULL,
   email VARCHAR(190) NOT NULL UNIQUE,
   username VARCHAR(100) NOT NULL UNIQUE,
+  employee_no VARCHAR(50) NULL,
+  mobile VARCHAR(30) NULL,
+  force_password_change TINYINT(1) NOT NULL DEFAULT 0,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin','manager','employee') NOT NULL DEFAULT 'employee',
+  role ENUM('super_admin','admin','manager','employee') NOT NULL DEFAULT 'employee',
   status ENUM('active','disabled') NOT NULL DEFAULT 'active',
   description TEXT NULL,
   upload_quota_mb INT NULL DEFAULT NULL,
+  department VARCHAR(150) NULL,
+  role_key VARCHAR(100) NULL,
+  sales_line VARCHAR(50) NULL,
+  supervisor_id INT UNSIGNED NULL,
+  organization_manager_id INT UNSIGNED NULL,
+  org_unit_id INT UNSIGNED NULL,
+  org_role_id INT UNSIGNED NULL,
+  parent_user_id INT UNSIGNED NULL,
+  access_scope VARCHAR(30) NOT NULL DEFAULT 'self',
+  employee_panel_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  admin_panel_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  display_order INT NOT NULL DEFAULT 0,
+  last_login_at DATETIME NULL,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_users_employee_no(employee_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_theme_preferences (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  profile_key VARCHAR(40) NOT NULL DEFAULT 'white_neon',
+  accent_color VARCHAR(7) NOT NULL DEFAULT '#00D5FF',
+  effects_mode ENUM('standard','reduced') NOT NULL DEFAULT 'standard',
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_theme_preference(user_id),
+  CONSTRAINT fk_user_theme_preference_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS org_units (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  parent_id INT UNSIGNED NULL,
+  title VARCHAR(190) NOT NULL,
+  code VARCHAR(100) NOT NULL UNIQUE,
+  unit_type VARCHAR(50) NOT NULL DEFAULT 'general',
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  description TEXT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_org_units_parent(parent_id),
+  INDEX idx_org_units_active(active),
+  CONSTRAINT fk_org_units_parent FOREIGN KEY(parent_id) REFERENCES org_units(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS org_roles (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(190) NOT NULL,
+  code VARCHAR(100) NOT NULL UNIQUE,
+  org_unit_id INT UNSIGNED NULL,
+  parent_role_id INT UNSIGNED NULL,
+  role_type VARCHAR(50) NOT NULL DEFAULT 'staff',
+  is_sales_role TINYINT(1) NOT NULL DEFAULT 0,
+  hierarchy_level INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  description TEXT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_org_roles_active(active),
+  INDEX idx_org_roles_unit(org_unit_id),
+  INDEX idx_org_roles_parent(parent_role_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_kpi_template_roles (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  template_id INT UNSIGNED NOT NULL,
+  role_id INT UNSIGNED NOT NULL,
+  is_default TINYINT(1) NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_hr_kpi_template_role(template_id, role_id),
+  INDEX idx_hr_kpi_template_roles_role(role_id),
+  INDEX idx_hr_kpi_template_roles_active(active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_assignment_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  assignment_id INT UNSIGNED NULL,
+  action VARCHAR(40) NOT NULL,
+  reason TEXT NULL,
+  performed_by INT UNSIGNED NULL,
+  old_status VARCHAR(30) NULL,
+  new_status VARCHAR(30) NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_assignment_logs_assignment (assignment_id),
+  INDEX idx_assignment_logs_actor (performed_by)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS manager_employees (
@@ -234,6 +324,20 @@ CREATE TABLE IF NOT EXISTS ceo_dashboard_periods (
   INDEX idx_ceo_periods_active (active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS ceo_dashboard_manual_metrics (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    period_key VARCHAR(50) NOT NULL,
+    gross_sales DECIMAL(18,2) DEFAULT 0,
+    discounts DECIMAL(18,2) DEFAULT 0,
+    net_sales DECIMAL(18,2) DEFAULT 0,
+    source VARCHAR(50) DEFAULT 'excel_import',
+    uploaded_file_name VARCHAR(255) NULL,
+    imported_by INT NULL,
+    imported_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_ceo_dashboard_manual_period (period_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS pharmacies (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(150) NOT NULL,
@@ -358,3 +462,787 @@ CREATE TABLE IF NOT EXISTS seed_run_items (
   INDEX idx_seed_items_run(seed_run_id),
   CONSTRAINT fk_seed_items_run FOREIGN KEY(seed_run_id) REFERENCES seed_runs(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS personal_planner_tasks (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  description TEXT NULL,
+  task_date DATE NOT NULL,
+  due_at DATETIME NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'todo',
+  priority VARCHAR(30) NOT NULL DEFAULT 'normal',
+  is_important TINYINT(1) NOT NULL DEFAULT 0,
+  is_recurring TINYINT(1) NOT NULL DEFAULT 0,
+  recurrence_type VARCHAR(30) NULL,
+  recurrence_interval INT NULL,
+  recurrence_days VARCHAR(100) NULL,
+  recurrence_month_day INT NULL,
+  recurrence_end_date DATE NULL,
+  parent_task_id BIGINT UNSIGNED NULL,
+  moved_from_date DATE NULL,
+  moved_to_date DATE NULL,
+  reminder_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  reminder_at DATETIME NULL,
+  notification_sent_at DATETIME NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL,
+  completed_at DATETIME NULL,
+  deleted_at DATETIME NULL,
+  INDEX idx_user_date(user_id,task_date), INDEX idx_user_status(user_id,status),
+  INDEX idx_reminder(reminder_enabled,reminder_at,notification_sent_at), INDEX idx_recurring(is_recurring,parent_task_id),
+  CONSTRAINT fk_personal_planner_tasks_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS personal_planner_notes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  note_date DATE NOT NULL,
+  note_text TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL,
+  UNIQUE KEY uniq_user_note_date(user_id,note_date),
+  CONSTRAINT fk_personal_planner_notes_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS personal_planner_checks (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  check_date DATE NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  is_checked TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL,
+  deleted_at DATETIME NULL,
+  INDEX idx_personal_planner_check_day(user_id,check_date,deleted_at),
+  CONSTRAINT fk_personal_planner_checks_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS personal_planner_notifications (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id INT UNSIGNED NOT NULL, task_id BIGINT UNSIGNED NULL,
+  notification_type VARCHAR(50) NOT NULL, title VARCHAR(255) NOT NULL, message TEXT NULL, scheduled_at DATETIME NOT NULL,
+  sent_at DATETIME NULL, status VARCHAR(30) NOT NULL DEFAULT 'pending', error_message TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_user_notification(user_id,scheduled_at), INDEX idx_status_schedule(status,scheduled_at),
+  UNIQUE KEY uq_planner_task_notification(task_id,notification_type,scheduled_at),
+  CONSTRAINT fk_planner_notification_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS personal_planner_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id INT UNSIGNED NOT NULL, task_id BIGINT UNSIGNED NULL,
+  action VARCHAR(50) NOT NULL, old_value_json LONGTEXT NULL, new_value_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_task_log(task_id), INDEX idx_user_log(user_id),
+  CONSTRAINT fk_planner_log_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS personal_planner_settings (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id INT UNSIGNED NOT NULL, widget_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  default_view VARCHAR(30) NOT NULL DEFAULT 'daily', notifications_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  default_reminder_minutes INT NULL, unfinished_behavior VARCHAR(30) NOT NULL DEFAULT 'keep_overdue',
+  compact_mode TINYINT(1) NOT NULL DEFAULT 0, show_done_tasks TINYINT(1) NOT NULL DEFAULT 1, seeded_suggestions_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL, UNIQUE KEY uniq_user_planner_settings(user_id),
+  CONSTRAINT fk_planner_settings_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sobhan_notifications (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  actor_user_id INT UNSIGNED NULL,
+  sender_user_id INT UNSIGNED NULL,
+  event_type VARCHAR(80) NOT NULL,
+  module VARCHAR(50) NOT NULL DEFAULT 'system',
+  type VARCHAR(80) NOT NULL DEFAULT 'general',
+  title VARCHAR(190) NOT NULL,
+  body TEXT NULL,
+  safe_body VARCHAR(255) NULL,
+  safe_push_body VARCHAR(255) NULL,
+  related_type VARCHAR(60) NULL,
+  related_module VARCHAR(60) NULL,
+  related_id BIGINT UNSIGNED NULL,
+  conversation_id BIGINT UNSIGNED NULL,
+  action_url VARCHAR(255) NULL,
+  actions_json LONGTEXT NULL,
+  priority ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
+  status ENUM('unread','read','archived') NOT NULL DEFAULT 'unread',
+  is_read TINYINT(1) NOT NULL DEFAULT 0,
+  channel_in_app TINYINT(1) NOT NULL DEFAULT 1,
+  channel_push_requested TINYINT(1) NOT NULL DEFAULT 0,
+  channel_push_sent TINYINT(1) NOT NULL DEFAULT 0,
+  channel_email_requested TINYINT(1) NOT NULL DEFAULT 0,
+  channel_sms_requested TINYINT(1) NOT NULL DEFAULT 0,
+  push_attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  push_sent_at DATETIME NULL,
+  read_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_sobhan_notifications_user_status(user_id,status,created_at),
+  INDEX idx_sobhan_notifications_event(event_type),
+  INDEX idx_sobhan_notifications_related(related_type,related_id),
+  CONSTRAINT fk_sobhan_notifications_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_sobhan_notifications_actor FOREIGN KEY(actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sobhan_push_subscriptions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  endpoint TEXT NOT NULL,
+  endpoint_hash CHAR(64) NOT NULL,
+  p256dh VARCHAR(255) NULL,
+  auth_key VARCHAR(255) NULL,
+  content_encoding VARCHAR(40) NOT NULL DEFAULT 'aes128gcm',
+  user_agent VARCHAR(255) NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  last_success_at DATETIME NULL,
+  last_error VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_sobhan_push_endpoint(endpoint_hash),
+  INDEX idx_sobhan_push_user(user_id,active),
+  CONSTRAINT fk_sobhan_push_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sobhan_user_notification_settings (
+  user_id INT UNSIGNED NOT NULL PRIMARY KEY,
+  in_app_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  push_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  email_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  sms_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  quiet_hours_start TIME NULL,
+  quiet_hours_end TIME NULL,
+  event_settings_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_sobhan_notification_settings_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS letter_letterheads (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, company_name VARCHAR(190) NULL,
+  contact_info TEXT NULL, logo_path VARCHAR(255) NULL, background_path VARCHAR(255) NULL, watermark_text VARCHAR(190) NULL,
+  header_html MEDIUMTEXT NULL, footer_html MEDIUMTEXT NULL, is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_letterheads_active(is_active), CONSTRAINT fk_letterheads_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS letter_signatures (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, signer_name VARCHAR(190) NOT NULL, signer_title VARCHAR(190) NULL,
+  signature_path VARCHAR(255) NULL, stamp_path VARCHAR(255) NULL, user_id INT UNSIGNED NULL, is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_signatures_active(is_active), CONSTRAINT fk_signatures_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_signatures_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS letter_templates (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, default_subject VARCHAR(255) NULL, default_body MEDIUMTEXT NULL,
+  letterhead_id INT UNSIGNED NULL, signature_id INT UNSIGNED NULL, paper_size ENUM('A4','A5') NOT NULL DEFAULT 'A4',
+  orientation ENUM('portrait','landscape') NOT NULL DEFAULT 'portrait', is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_templates_active(is_active), CONSTRAINT fk_templates_letterhead FOREIGN KEY(letterhead_id) REFERENCES letter_letterheads(id) ON DELETE SET NULL,
+  CONSTRAINT fk_templates_signature FOREIGN KEY(signature_id) REFERENCES letter_signatures(id) ON DELETE SET NULL,
+  CONSTRAINT fk_templates_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS organizational_letters (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, letter_number VARCHAR(100) NULL, letter_date DATE NOT NULL, subject VARCHAR(255) NOT NULL,
+  recipient_name VARCHAR(190) NOT NULL, recipient_title VARCHAR(190) NULL, recipient_organization VARCHAR(190) NULL, sender_unit VARCHAR(190) NULL,
+  template_id INT UNSIGNED NULL, letterhead_id INT UNSIGNED NULL, signature_id INT UNSIGNED NULL, body_html MEDIUMTEXT NOT NULL, final_html LONGTEXT NULL,
+  paper_size ENUM('A4','A5') NOT NULL DEFAULT 'A4', orientation ENUM('portrait','landscape') NOT NULL DEFAULT 'portrait',
+  importance ENUM('normal','important','urgent') NOT NULL DEFAULT 'normal', confidentiality ENUM('normal','confidential','secret') NOT NULL DEFAULT 'normal',
+  status ENUM('draft','pending_signature','signed','issued','archived','cancelled') NOT NULL DEFAULT 'draft', created_by INT UNSIGNED NOT NULL,
+  approved_by INT UNSIGNED NULL, issued_at DATETIME NULL, archived_at DATETIME NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, UNIQUE KEY uq_letter_number(letter_number),
+  INDEX idx_letters_date(letter_date), INDEX idx_letters_status(status), INDEX idx_letters_confidentiality(confidentiality), INDEX idx_letters_creator(created_by),
+  CONSTRAINT fk_letters_template FOREIGN KEY(template_id) REFERENCES letter_templates(id) ON DELETE SET NULL,
+  CONSTRAINT fk_letters_letterhead FOREIGN KEY(letterhead_id) REFERENCES letter_letterheads(id) ON DELETE SET NULL,
+  CONSTRAINT fk_letters_signature FOREIGN KEY(signature_id) REFERENCES letter_signatures(id) ON DELETE SET NULL,
+  CONSTRAINT fk_letters_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_letters_approver FOREIGN KEY(approved_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS organizational_letter_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, letter_id BIGINT UNSIGNED NOT NULL, user_id INT UNSIGNED NULL, action VARCHAR(60) NOT NULL,
+  from_status VARCHAR(40) NULL, to_status VARCHAR(40) NULL, description VARCHAR(500) NULL, ip_address VARCHAR(45) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_letter_logs_letter(letter_id,created_at),
+  CONSTRAINT fk_letter_logs_letter FOREIGN KEY(letter_id) REFERENCES organizational_letters(id) ON DELETE CASCADE,
+  CONSTRAINT fk_letter_logs_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS organizational_letter_attachments (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, letter_id BIGINT UNSIGNED NOT NULL, original_name VARCHAR(255) NOT NULL,
+  stored_name VARCHAR(255) NOT NULL, file_path VARCHAR(255) NOT NULL, mime_type VARCHAR(120) NOT NULL, file_size INT UNSIGNED NOT NULL,
+  uploaded_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_letter_attachments_letter(letter_id),
+  CONSTRAINT fk_letter_attachments_letter FOREIGN KEY(letter_id) REFERENCES organizational_letters(id) ON DELETE CASCADE,
+  CONSTRAINT fk_letter_attachments_user FOREIGN KEY(uploaded_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_providers (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, name VARCHAR(190) NOT NULL, code VARCHAR(100) NOT NULL UNIQUE,
+  provider_type VARCHAR(40) NOT NULL DEFAULT 'custom', imap_host VARCHAR(255) NULL, imap_port INT UNSIGNED NOT NULL DEFAULT 993,
+  imap_encryption ENUM('ssl','tls','none') NOT NULL DEFAULT 'ssl', smtp_host VARCHAR(255) NULL, smtp_port INT UNSIGNED NOT NULL DEFAULT 587,
+  smtp_encryption ENUM('ssl','tls','none') NOT NULL DEFAULT 'tls', auth_type ENUM('password','app_password','oauth2') NOT NULL DEFAULT 'password',
+  oauth_config_json LONGTEXT NULL, active TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_email_providers_active(active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_accounts (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, provider_id INT UNSIGNED NOT NULL, account_title VARCHAR(190) NOT NULL,
+  email_address VARCHAR(255) NOT NULL, display_name VARCHAR(190) NULL, username VARCHAR(255) NOT NULL,
+  encrypted_password LONGTEXT NULL, encrypted_access_token LONGTEXT NULL, encrypted_refresh_token LONGTEXT NULL,
+  auth_type ENUM('password','app_password','oauth2') NOT NULL DEFAULT 'password',
+  account_scope ENUM('personal','department','role','shared','system') NOT NULL DEFAULT 'personal', owner_user_id INT UNSIGNED NULL,
+  department_id INT UNSIGNED NULL, role_id INT UNSIGNED NULL, is_shared TINYINT(1) NOT NULL DEFAULT 0,
+  sync_enabled TINYINT(1) NOT NULL DEFAULT 1, send_enabled TINYINT(1) NOT NULL DEFAULT 1, last_sync_at DATETIME NULL,
+  sync_status ENUM('never','syncing','ok','error') NOT NULL DEFAULT 'never', last_error TEXT NULL, active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_email_accounts_scope(account_scope), INDEX idx_email_accounts_sync(active,sync_enabled),
+  CONSTRAINT fk_email_accounts_provider FOREIGN KEY(provider_id) REFERENCES email_providers(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_email_accounts_owner FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_email_accounts_department FOREIGN KEY(department_id) REFERENCES org_units(id) ON DELETE SET NULL,
+  CONSTRAINT fk_email_accounts_role FOREIGN KEY(role_id) REFERENCES org_roles(id) ON DELETE SET NULL,
+  CONSTRAINT fk_email_accounts_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_account_permissions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, account_id INT UNSIGNED NOT NULL, user_id INT UNSIGNED NULL,
+  role_id INT UNSIGNED NULL, department_id INT UNSIGNED NULL, can_read TINYINT(1) NOT NULL DEFAULT 0,
+  can_send TINYINT(1) NOT NULL DEFAULT 0, can_reply TINYINT(1) NOT NULL DEFAULT 0, can_forward TINYINT(1) NOT NULL DEFAULT 0,
+  can_delete TINYINT(1) NOT NULL DEFAULT 0, can_manage TINYINT(1) NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_email_permissions_account(account_id), INDEX idx_email_permissions_user(user_id),
+  CONSTRAINT fk_email_permissions_account FOREIGN KEY(account_id) REFERENCES email_accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_email_permissions_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_email_permissions_role FOREIGN KEY(role_id) REFERENCES org_roles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_email_permissions_department FOREIGN KEY(department_id) REFERENCES org_units(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_folders (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, account_id INT UNSIGNED NOT NULL, remote_folder_id VARCHAR(500) NULL,
+  folder_name VARCHAR(255) NOT NULL, folder_path VARCHAR(500) NOT NULL,
+  folder_type ENUM('inbox','sent','drafts','spam','trash','archive','custom') NOT NULL DEFAULT 'custom',
+  total_messages INT UNSIGNED NOT NULL DEFAULT 0, unread_count INT UNSIGNED NOT NULL DEFAULT 0, uid_validity BIGINT UNSIGNED NULL,
+  last_uid BIGINT UNSIGNED NOT NULL DEFAULT 0, sync_enabled TINYINT(1) NOT NULL DEFAULT 1, sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_email_folder_path(account_id,folder_path(190)), INDEX idx_email_folders_account(account_id),
+  CONSTRAINT fk_email_folders_account FOREIGN KEY(account_id) REFERENCES email_accounts(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_messages (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, account_id INT UNSIGNED NOT NULL, folder_id BIGINT UNSIGNED NOT NULL,
+  uid_validity BIGINT UNSIGNED NOT NULL DEFAULT 0, remote_uid BIGINT UNSIGNED NOT NULL, outbox_id BIGINT UNSIGNED NULL, message_id VARCHAR(500) NULL,
+  thread_id VARCHAR(500) NULL, subject VARCHAR(500) NULL, from_email VARCHAR(255) NULL, from_name VARCHAR(255) NULL,
+  to_json LONGTEXT NULL, cc_json LONGTEXT NULL, bcc_json LONGTEXT NULL, reply_to_json LONGTEXT NULL,
+  date_received DATETIME NULL, date_sent DATETIME NULL, body_text LONGTEXT NULL, body_html LONGTEXT NULL, snippet VARCHAR(500) NULL,
+  has_attachments TINYINT(1) NOT NULL DEFAULT 0, is_read TINYINT(1) NOT NULL DEFAULT 0, is_starred TINYINT(1) NOT NULL DEFAULT 0,
+  is_flagged TINYINT(1) NOT NULL DEFAULT 0, is_answered TINYINT(1) NOT NULL DEFAULT 0, is_forwarded TINYINT(1) NOT NULL DEFAULT 0,
+  importance ENUM('low','normal','high') NOT NULL DEFAULT 'normal',
+  status ENUM('new','read','pending_reply','replied','forwarded','archived','spam','deleted') NOT NULL DEFAULT 'new',
+  tags_json LONGTEXT NULL, raw_headers_json LONGTEXT NULL, assigned_user_id INT UNSIGNED NULL, assigned_group VARCHAR(190) NULL,
+  internal_note TEXT NULL, related_ticket_id BIGINT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_email_remote_uid(account_id,folder_id,uid_validity,remote_uid), UNIQUE KEY uq_email_message_outbox(outbox_id), INDEX idx_email_messages_folder(folder_id,date_received),
+  INDEX idx_email_messages_status(account_id,status), INDEX idx_email_messages_message_id(message_id(190)),
+  CONSTRAINT fk_email_messages_account FOREIGN KEY(account_id) REFERENCES email_accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_email_messages_folder FOREIGN KEY(folder_id) REFERENCES email_folders(id) ON DELETE CASCADE,
+  CONSTRAINT fk_email_messages_assignee FOREIGN KEY(assigned_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_outbox (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, account_id INT UNSIGNED NOT NULL, sender_user_id INT UNSIGNED NOT NULL,
+  to_json LONGTEXT NOT NULL, cc_json LONGTEXT NULL, bcc_json LONGTEXT NULL, subject VARCHAR(500) NULL,
+  body_html LONGTEXT NULL, body_text LONGTEXT NULL, attachments_json LONGTEXT NULL, related_message_id BIGINT UNSIGNED NULL,
+  send_type ENUM('compose','reply','reply_all','forward') NOT NULL DEFAULT 'compose',
+  status ENUM('draft','queued','sending','sent','failed','cancelled') NOT NULL DEFAULT 'draft', attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  last_error TEXT NULL, scheduled_at DATETIME NULL, sent_at DATETIME NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_email_outbox_queue(status,scheduled_at),
+  CONSTRAINT fk_email_outbox_account FOREIGN KEY(account_id) REFERENCES email_accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_email_outbox_sender FOREIGN KEY(sender_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_email_outbox_related FOREIGN KEY(related_message_id) REFERENCES email_messages(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_attachments (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, message_id BIGINT UNSIGNED NULL, account_id INT UNSIGNED NOT NULL,
+  outbox_id BIGINT UNSIGNED NULL, file_name VARCHAR(255) NOT NULL, mime_type VARCHAR(190) NOT NULL,
+  file_size INT UNSIGNED NOT NULL DEFAULT 0, storage_path VARCHAR(500) NOT NULL, content_id VARCHAR(500) NULL,
+  is_inline TINYINT(1) NOT NULL DEFAULT 0, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_email_attachments_message(message_id), INDEX idx_email_attachments_outbox(outbox_id),
+  CONSTRAINT fk_email_attachments_message FOREIGN KEY(message_id) REFERENCES email_messages(id) ON DELETE CASCADE,
+  CONSTRAINT fk_email_attachments_account FOREIGN KEY(account_id) REFERENCES email_accounts(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, account_id INT UNSIGNED NULL, message_id BIGINT UNSIGNED NULL,
+  user_id INT UNSIGNED NULL, action VARCHAR(60) NOT NULL, description VARCHAR(500) NULL, technical_details LONGTEXT NULL,
+  ip_address VARCHAR(45) NULL, user_agent VARCHAR(255) NULL, meta_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_email_logs_account(account_id,created_at), INDEX idx_email_logs_action(action),
+  CONSTRAINT fk_email_logs_account FOREIGN KEY(account_id) REFERENCES email_accounts(id) ON DELETE SET NULL,
+  CONSTRAINT fk_email_logs_message FOREIGN KEY(message_id) REFERENCES email_messages(id) ON DELETE SET NULL,
+  CONSTRAINT fk_email_logs_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_templates (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, category VARCHAR(100) NULL,
+  subject_template VARCHAR(500) NULL, body_template LONGTEXT NOT NULL, active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_email_templates_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_rules (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, account_id INT UNSIGNED NULL,
+  condition_field ENUM('from','subject','body','has_attachment','age_hours') NOT NULL,
+  condition_operator ENUM('contains','equals','domain','greater_than') NOT NULL DEFAULT 'contains', condition_value VARCHAR(500) NULL,
+  action_type ENUM('add_tag','assign_user','assign_group','create_ticket','set_pending_reply','mark_important') NOT NULL,
+  action_value VARCHAR(500) NULL, priority INT NOT NULL DEFAULT 100, active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_email_rules_active(active,priority),
+  CONSTRAINT fk_email_rules_account FOREIGN KEY(account_id) REFERENCES email_accounts(id) ON DELETE CASCADE,
+  CONSTRAINT fk_email_rules_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_integrations (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, message_id BIGINT UNSIGNED NOT NULL,
+  integration_type ENUM('ticket','cartable') NOT NULL, target_id BIGINT UNSIGNED NULL,
+  status ENUM('pending','completed','failed') NOT NULL DEFAULT 'pending', requested_by INT UNSIGNED NULL,
+  payload_json LONGTEXT NULL, last_error TEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_email_integrations_message(message_id),
+  CONSTRAINT fk_email_integrations_message FOREIGN KEY(message_id) REFERENCES email_messages(id) ON DELETE CASCADE,
+  CONSTRAINT fk_email_integrations_user FOREIGN KEY(requested_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_import_batches (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, file_name VARCHAR(255) NOT NULL, imported_by INT UNSIGNED NULL,
+  mode ENUM('create','update','upsert') NOT NULL DEFAULT 'create', allow_empty_employee_no TINYINT(1) NOT NULL DEFAULT 0,
+  total_rows INT UNSIGNED NOT NULL DEFAULT 0, success_count INT UNSIGNED NOT NULL DEFAULT 0, error_count INT UNSIGNED NOT NULL DEFAULT 0,
+  status ENUM('preview','committed','failed') NOT NULL DEFAULT 'preview', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, committed_at DATETIME NULL,
+  INDEX idx_user_import_batches_user(imported_by), CONSTRAINT fk_user_import_batches_user FOREIGN KEY(imported_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_import_rows (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, batch_id BIGINT UNSIGNED NOT NULL, source_row INT UNSIGNED NOT NULL,
+  employee_no VARCHAR(50) NULL, raw_data_json LONGTEXT NOT NULL, status ENUM('valid','error','created','updated','skipped') NOT NULL DEFAULT 'valid',
+  error_message TEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_user_import_rows_batch(batch_id,status),
+  CONSTRAINT fk_user_import_rows_batch FOREIGN KEY(batch_id) REFERENCES user_import_batches(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS docs_categories (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, slug VARCHAR(190) NOT NULL UNIQUE, parent_id INT UNSIGNED NULL,
+  sort_order INT NOT NULL DEFAULT 0, active TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_docs_categories_parent(parent_id),
+  CONSTRAINT fk_docs_categories_parent FOREIGN KEY(parent_id) REFERENCES docs_categories(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS docs_articles (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, category_id INT UNSIGNED NULL, title VARCHAR(255) NOT NULL, slug VARCHAR(255) NOT NULL UNIQUE,
+  summary TEXT NULL, content LONGTEXT NOT NULL, cover_image VARCHAR(500) NULL, attachment_path VARCHAR(500) NULL, attachment_name VARCHAR(255) NULL,
+  attachment_mime VARCHAR(190) NULL, visibility_scope ENUM('all','units','roles','users') NOT NULL DEFAULT 'all', allowed_roles_json LONGTEXT NULL,
+  allowed_units_json LONGTEXT NULL, allowed_users_json LONGTEXT NULL, require_read_confirmation TINYINT(1) NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1, created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_docs_articles_category(category_id), INDEX idx_docs_articles_active(active),
+  CONSTRAINT fk_docs_articles_category FOREIGN KEY(category_id) REFERENCES docs_categories(id) ON DELETE SET NULL,
+  CONSTRAINT fk_docs_articles_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS docs_read_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, doc_id BIGINT UNSIGNED NOT NULL, user_id INT UNSIGNED NOT NULL,
+  read_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, confirmed_at DATETIME NULL, ip_address VARCHAR(45) NULL, user_agent VARCHAR(255) NULL,
+  UNIQUE KEY uq_docs_read_user(doc_id,user_id), INDEX idx_docs_read_logs_doc(doc_id),
+  CONSTRAINT fk_docs_read_logs_doc FOREIGN KEY(doc_id) REFERENCES docs_articles(id) ON DELETE CASCADE,
+  CONSTRAINT fk_docs_read_logs_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payroll_periods (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, period_key VARCHAR(80) NOT NULL UNIQUE, year INT NOT NULL,
+  month TINYINT UNSIGNED NOT NULL, start_date DATE NULL, end_date DATE NULL, status ENUM('draft','imported','published','locked','cancelled') NOT NULL DEFAULT 'draft',
+  created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_payroll_periods_status(status), CONSTRAINT fk_payroll_periods_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payroll_fields (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, field_key VARCHAR(100) NOT NULL UNIQUE, label VARCHAR(190) NOT NULL,
+  field_type ENUM('earning','deduction','info','calculated','employer_cost') NOT NULL, data_type ENUM('text','number','money','date','percent') NOT NULL DEFAULT 'money',
+  calculation_type ENUM('manual','formula','system') NOT NULL DEFAULT 'manual', formula VARCHAR(1000) NULL, default_value VARCHAR(500) NULL,
+  visible_to_employee TINYINT(1) NOT NULL DEFAULT 1, visible_in_pdf TINYINT(1) NOT NULL DEFAULT 1, sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_payroll_fields_active(active,sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payroll_import_batches (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, period_id INT UNSIGNED NOT NULL, file_name VARCHAR(255) NOT NULL, imported_by INT UNSIGNED NULL,
+  total_rows INT UNSIGNED NOT NULL DEFAULT 0, success_count INT UNSIGNED NOT NULL DEFAULT 0, error_count INT UNSIGNED NOT NULL DEFAULT 0,
+  status ENUM('preview','committed','failed') NOT NULL DEFAULT 'preview', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, committed_at DATETIME NULL,
+  INDEX idx_payroll_batches_period(period_id), CONSTRAINT fk_payroll_batches_period FOREIGN KEY(period_id) REFERENCES payroll_periods(id) ON DELETE CASCADE,
+  CONSTRAINT fk_payroll_batches_user FOREIGN KEY(imported_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payroll_import_rows (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, batch_id BIGINT UNSIGNED NOT NULL, source_row INT UNSIGNED NOT NULL, employee_no VARCHAR(50) NULL,
+  raw_data_json LONGTEXT NOT NULL, status ENUM('valid','error','committed','skipped') NOT NULL DEFAULT 'valid', error_message TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_payroll_rows_batch(batch_id,status),
+  CONSTRAINT fk_payroll_rows_batch FOREIGN KEY(batch_id) REFERENCES payroll_import_batches(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payroll_slips (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, period_id INT UNSIGNED NOT NULL, user_id INT UNSIGNED NOT NULL, employee_no VARCHAR(50) NOT NULL,
+  gross_amount DECIMAL(18,2) NOT NULL DEFAULT 0, total_earnings DECIMAL(18,2) NOT NULL DEFAULT 0, total_deductions DECIMAL(18,2) NOT NULL DEFAULT 0,
+  net_pay DECIMAL(18,2) NOT NULL DEFAULT 0, status ENUM('draft','ready','published','cancelled') NOT NULL DEFAULT 'draft', published_at DATETIME NULL,
+  tracking_code VARCHAR(64) NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_payroll_period_user(period_id,user_id), UNIQUE KEY uq_payroll_tracking(tracking_code), INDEX idx_payroll_slips_status(status),
+  CONSTRAINT fk_payroll_slips_period FOREIGN KEY(period_id) REFERENCES payroll_periods(id) ON DELETE CASCADE,
+  CONSTRAINT fk_payroll_slips_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payroll_slip_values (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, slip_id BIGINT UNSIGNED NOT NULL, field_id INT UNSIGNED NULL, field_key VARCHAR(100) NOT NULL,
+  label VARCHAR(190) NOT NULL, value_text LONGTEXT NULL, value_number DECIMAL(18,4) NULL, sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_payroll_slip_field(slip_id,field_key), INDEX idx_payroll_values_slip(slip_id),
+  CONSTRAINT fk_payroll_values_slip FOREIGN KEY(slip_id) REFERENCES payroll_slips(id) ON DELETE CASCADE,
+  CONSTRAINT fk_payroll_values_field FOREIGN KEY(field_id) REFERENCES payroll_fields(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payroll_exports (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, slip_id BIGINT UNSIGNED NULL, period_id INT UNSIGNED NULL,
+  export_type ENUM('pdf','image','zip','group_pdf') NOT NULL, file_path VARCHAR(500) NULL, generated_by INT UNSIGNED NULL,
+  generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_payroll_exports_slip(slip_id),
+  CONSTRAINT fk_payroll_exports_slip FOREIGN KEY(slip_id) REFERENCES payroll_slips(id) ON DELETE CASCADE,
+  CONSTRAINT fk_payroll_exports_period FOREIGN KEY(period_id) REFERENCES payroll_periods(id) ON DELETE CASCADE,
+  CONSTRAINT fk_payroll_exports_user FOREIGN KEY(generated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_report_templates (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, report_type VARCHAR(40) NOT NULL, title VARCHAR(190) NOT NULL, description TEXT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1, created_by INT UNSIGNED NULL, updated_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_management_report_template_type(report_type), INDEX idx_management_report_templates_active(active),
+  CONSTRAINT fk_management_report_templates_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_management_report_templates_updater FOREIGN KEY(updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_report_sections (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, template_id INT UNSIGNED NOT NULL, section_key VARCHAR(100) NOT NULL, title VARCHAR(190) NOT NULL,
+  description TEXT NULL, sort_order INT NOT NULL DEFAULT 0, active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_management_report_section_key(template_id,section_key), INDEX idx_management_report_sections_template(template_id,active,sort_order),
+  CONSTRAINT fk_management_report_sections_template FOREIGN KEY(template_id) REFERENCES management_report_templates(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_report_fields (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, section_id INT UNSIGNED NOT NULL, field_key VARCHAR(100) NOT NULL, label VARCHAR(190) NOT NULL,
+  field_type ENUM('text','textarea','number','currency','percent','date','select','checkbox','table','repeater','file','readonly_metric') NOT NULL DEFAULT 'text',
+  placeholder VARCHAR(255) NULL, help_text TEXT NULL, options_json LONGTEXT NULL, validation_json LONGTEXT NULL, default_value LONGTEXT NULL,
+  linked_source_key VARCHAR(190) NULL, is_required TINYINT(1) NOT NULL DEFAULT 0, sort_order INT NOT NULL DEFAULT 0, active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_management_report_field_key(section_id,field_key), INDEX idx_management_report_fields_section(section_id,active,sort_order),
+  INDEX idx_management_report_fields_linked(linked_source_key), CONSTRAINT fk_management_report_fields_section FOREIGN KEY(section_id) REFERENCES management_report_sections(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_report_submissions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, template_id INT UNSIGNED NOT NULL, report_type VARCHAR(40) NOT NULL,
+  period_key VARCHAR(80) NOT NULL, period_title VARCHAR(190) NOT NULL, period_start DATE NULL, period_end DATE NULL,
+  submitter_id INT UNSIGNED NOT NULL, unit_id INT UNSIGNED NULL, status ENUM('draft','submitted','returned','approved','archived') NOT NULL DEFAULT 'draft',
+  submitted_at DATETIME NULL, returned_at DATETIME NULL, approved_at DATETIME NULL, approved_by INT UNSIGNED NULL, archived_at DATETIME NULL,
+  return_note TEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_management_report_period_user(template_id,period_key,submitter_id), INDEX idx_management_report_submissions_type(report_type),
+  INDEX idx_management_report_submissions_period(period_key), INDEX idx_management_report_submissions_status(status),
+  INDEX idx_management_report_submissions_submitter(submitter_id), INDEX idx_management_report_submissions_unit(unit_id),
+  CONSTRAINT fk_management_report_submissions_template FOREIGN KEY(template_id) REFERENCES management_report_templates(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_management_report_submissions_submitter FOREIGN KEY(submitter_id) REFERENCES users(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_management_report_submissions_unit FOREIGN KEY(unit_id) REFERENCES org_units(id) ON DELETE SET NULL,
+  CONSTRAINT fk_management_report_submissions_approver FOREIGN KEY(approved_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_report_values (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, submission_id BIGINT UNSIGNED NOT NULL, field_id INT UNSIGNED NOT NULL,
+  value_text LONGTEXT NULL, value_number DECIMAL(20,4) NULL, value_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_management_report_value(submission_id,field_id), INDEX idx_management_report_values_submission(submission_id),
+  CONSTRAINT fk_management_report_values_submission FOREIGN KEY(submission_id) REFERENCES management_report_submissions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_management_report_values_field FOREIGN KEY(field_id) REFERENCES management_report_fields(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_report_attachments (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, submission_id BIGINT UNSIGNED NOT NULL, field_id INT UNSIGNED NULL,
+  original_name VARCHAR(255) NOT NULL, storage_path VARCHAR(500) NOT NULL, mime_type VARCHAR(190) NOT NULL, file_size BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_management_report_attachments_submission(submission_id),
+  CONSTRAINT fk_management_report_attachments_submission FOREIGN KEY(submission_id) REFERENCES management_report_submissions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_management_report_attachments_field FOREIGN KEY(field_id) REFERENCES management_report_fields(id) ON DELETE SET NULL,
+  CONSTRAINT fk_management_report_attachments_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_report_reviews (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, submission_id BIGINT UNSIGNED NOT NULL,
+  action ENUM('created','draft_saved','submitted','returned','approved','archived','reopened') NOT NULL,
+  old_status VARCHAR(30) NULL, new_status VARCHAR(30) NULL, note TEXT NULL, created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_management_report_reviews_submission(submission_id,created_at),
+  CONSTRAINT fk_management_report_reviews_submission FOREIGN KEY(submission_id) REFERENCES management_report_submissions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_management_report_reviews_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS uploaded_files_backup (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, file_key CHAR(64) NOT NULL, original_name VARCHAR(255) NOT NULL,
+  relative_path VARCHAR(500) NOT NULL, file_size BIGINT UNSIGNED NOT NULL DEFAULT 0, file_hash CHAR(64) NULL,
+  mime_type VARCHAR(190) NOT NULL DEFAULT 'application/octet-stream', backup_status ENUM('pending','synced','error') NOT NULL DEFAULT 'pending',
+  backup_confirmed_at DATETIME NULL, deleted_from_host TINYINT(1) NOT NULL DEFAULT 0, deleted_from_host_at DATETIME NULL,
+  last_error TEXT NULL, download_attempts INT UNSIGNED NOT NULL DEFAULT 0, last_attempt_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_uploaded_files_backup_key(file_key), UNIQUE KEY uq_uploaded_files_backup_path(relative_path),
+  INDEX idx_uploaded_files_backup_queue(backup_status,deleted_from_host,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS uploaded_files_backup_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, file_id BIGINT UNSIGNED NULL, action VARCHAR(50) NOT NULL,
+  status VARCHAR(30) NOT NULL, message TEXT NULL, actor_type VARCHAR(30) NOT NULL DEFAULT 'system', actor_user_id INT UNSIGNED NULL,
+  ip_address VARCHAR(45) NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_uploaded_files_backup_logs_file(file_id,created_at), INDEX idx_uploaded_files_backup_logs_action(action,created_at),
+  CONSTRAINT fk_uploaded_files_backup_logs_file FOREIGN KEY(file_id) REFERENCES uploaded_files_backup(id) ON DELETE SET NULL,
+  CONSTRAINT fk_uploaded_files_backup_logs_user FOREIGN KEY(actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS messenger_groups (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, created_by INT UNSIGNED NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_messenger_groups_active(active),
+  CONSTRAINT fk_messenger_groups_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS messenger_group_members (
+  group_id INT UNSIGNED NOT NULL, user_id INT UNSIGNED NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(group_id,user_id), INDEX idx_messenger_group_members_user(user_id),
+  CONSTRAINT fk_messenger_group_members_group FOREIGN KEY(group_id) REFERENCES messenger_groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_messenger_group_members_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_report_shares (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, sender_user_id INT UNSIGNED NOT NULL, source_module VARCHAR(80) NOT NULL DEFAULT 'manager_dashboard',
+  source_page VARCHAR(190) NOT NULL, source_report_type VARCHAR(100) NOT NULL, source_record_id BIGINT UNSIGNED NULL,
+  report_title VARCHAR(190) NOT NULL, report_period VARCHAR(100) NULL, filters_json LONGTEXT NULL, snapshot_json LONGTEXT NOT NULL,
+  attachment_path VARCHAR(500) NULL, attachment_name VARCHAR(255) NULL, attachment_mime VARCHAR(120) NULL, snapshot_hash CHAR(64) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_sales_report_shares_sender(sender_user_id,created_at),
+  INDEX idx_sales_report_shares_source(source_module,source_record_id), INDEX idx_sales_report_shares_hash(snapshot_hash),
+  CONSTRAINT fk_sales_report_shares_sender FOREIGN KEY(sender_user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS messenger_messages (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, sender_user_id INT UNSIGNED NOT NULL, message_type VARCHAR(50) NOT NULL DEFAULT 'text',
+  title VARCHAR(190) NOT NULL, body TEXT NULL, payload_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_messenger_messages_sender(sender_user_id,created_at),
+  INDEX idx_messenger_messages_type(message_type,created_at), CONSTRAINT fk_messenger_messages_sender FOREIGN KEY(sender_user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS messenger_message_recipients (
+  message_id BIGINT UNSIGNED NOT NULL, user_id INT UNSIGNED NOT NULL, status ENUM('unread','read','archived') NOT NULL DEFAULT 'unread',
+  read_at DATETIME NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(message_id,user_id),
+  INDEX idx_messenger_recipient_inbox(user_id,status,created_at),
+  CONSTRAINT fk_messenger_recipients_message FOREIGN KEY(message_id) REFERENCES messenger_messages(id) ON DELETE CASCADE,
+  CONSTRAINT fk_messenger_recipients_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS messenger_forwarded_reports (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, message_id BIGINT UNSIGNED NOT NULL, share_id BIGINT UNSIGNED NOT NULL,
+  sender_user_id INT UNSIGNED NOT NULL, recipient_type VARCHAR(40) NOT NULL, recipient_id VARCHAR(190) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_messenger_forwarded_message(message_id), INDEX idx_messenger_forwarded_share(share_id),
+  CONSTRAINT fk_messenger_forwarded_message FOREIGN KEY(message_id) REFERENCES messenger_messages(id) ON DELETE CASCADE,
+  CONSTRAINT fk_messenger_forwarded_share FOREIGN KEY(share_id) REFERENCES sales_report_shares(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_messenger_forwarded_sender FOREIGN KEY(sender_user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS messenger_forward_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, share_id BIGINT UNSIGNED NULL, message_id BIGINT UNSIGNED NULL,
+  actor_user_id INT UNSIGNED NULL, action VARCHAR(60) NOT NULL, status VARCHAR(30) NOT NULL DEFAULT 'success', details_json LONGTEXT NULL,
+  ip_address VARCHAR(45) NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_messenger_forward_logs_share(share_id,created_at), INDEX idx_messenger_forward_logs_actor(actor_user_id,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sobhan_notification_devices (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,user_id INT UNSIGNED NOT NULL,device_uid CHAR(36) NOT NULL,
+  device_name VARCHAR(190) NOT NULL,device_type VARCHAR(30) NOT NULL DEFAULT 'windows',app_version VARCHAR(30) NOT NULL,
+  machine_fingerprint_hash CHAR(64) NOT NULL,token_hash CHAR(64) NOT NULL,last_seen_at DATETIME NULL,active TINYINT(1) NOT NULL DEFAULT 1,
+  revoked_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_notification_device_uid(device_uid),INDEX idx_notification_devices_user(user_id,active),INDEX idx_notification_devices_fingerprint(user_id,machine_fingerprint_hash),
+  CONSTRAINT fk_notification_devices_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sobhan_notification_delivery_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,notification_id BIGINT UNSIGNED NOT NULL,device_id BIGINT UNSIGNED NOT NULL,
+  status VARCHAR(30) NOT NULL,action VARCHAR(40) NULL,reply_text TEXT NULL,delivered_at DATETIME NULL,clicked_at DATETIME NULL,error_message VARCHAR(1000) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_notification_delivery(notification_id,device_id),INDEX idx_notification_delivery_device(device_id,status,created_at),
+  CONSTRAINT fk_notification_delivery_notification FOREIGN KEY(notification_id) REFERENCES sobhan_notifications(id) ON DELETE CASCADE,
+  CONSTRAINT fk_notification_delivery_device FOREIGN KEY(device_id) REFERENCES sobhan_notification_devices(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sobhan_user_notification_module_settings (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,user_id INT UNSIGNED NOT NULL,module VARCHAR(50) NOT NULL,enabled TINYINT(1) NOT NULL DEFAULT 1,
+  show_body TINYINT(1) NOT NULL DEFAULT 1,sound VARCHAR(50) NOT NULL DEFAULT 'default',priority VARCHAR(30) NOT NULL DEFAULT 'normal',
+  allow_quick_reply TINYINT(1) NOT NULL DEFAULT 0,direct_action_enabled TINYINT(1) NOT NULL DEFAULT 0,desktop_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  mobile_enabled TINYINT(1) NOT NULL DEFAULT 1,email_enabled TINYINT(1) NOT NULL DEFAULT 0,sms_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  silent_hours_enabled TINYINT(1) NOT NULL DEFAULT 0,silent_from TIME NULL,silent_to TIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_user_notification_module(user_id,module),
+  INDEX idx_user_notification_module_enabled(user_id,desktop_enabled,enabled),CONSTRAINT fk_user_notification_module_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sobhan_notification_pairing_codes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,user_id INT UNSIGNED NOT NULL,code_hash CHAR(64) NOT NULL,expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL,attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,created_ip VARCHAR(45) NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_notification_pair_code_hash(code_hash),INDEX idx_notification_pair_user(user_id,expires_at),
+  CONSTRAINT fk_notification_pair_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sobhan_notification_pairing_attempts (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,ip_hash CHAR(64) NOT NULL,success TINYINT(1) NOT NULL DEFAULT 0,
+  attempted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,INDEX idx_notification_pair_attempt(ip_hash,attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_meetings (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(255) NOT NULL,meeting_type VARCHAR(50) NOT NULL DEFAULT 'general',meeting_date DATE NOT NULL,
+ start_time TIME NULL,end_time TIME NULL,location VARCHAR(255) NULL,organizer_user_id INT UNSIGNED NULL,secretary_user_id INT UNSIGNED NULL,
+ attendees_json LONGTEXT NULL,absent_users_json LONGTEXT NULL,agenda TEXT NULL,meeting_summary LONGTEXT NULL,status VARCHAR(30) NOT NULL DEFAULT 'draft',
+ attachments_json LONGTEXT NULL,created_by INT UNSIGNED NOT NULL,updated_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+ INDEX idx_management_meeting_date(meeting_date),INDEX idx_management_meeting_status(status),INDEX idx_management_meeting_organizer(organizer_user_id),
+ CONSTRAINT fk_management_meeting_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_decisions (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,meeting_id BIGINT UNSIGNED NOT NULL,title VARCHAR(255) NOT NULL,description LONGTEXT NULL,
+ decision_type VARCHAR(50) NOT NULL DEFAULT 'decision',category VARCHAR(100) NULL,responsible_user_id INT UNSIGNED NULL,responsible_unit_id INT UNSIGNED NULL,
+ supervisor_user_id INT UNSIGNED NULL,priority VARCHAR(20) NOT NULL DEFAULT 'normal',due_date DATE NULL,followup_status VARCHAR(30) NOT NULL DEFAULT 'not_started',
+ progress_percent TINYINT UNSIGNED NOT NULL DEFAULT 0,latest_followup_note TEXT NULL,is_rule TINYINT(1) NOT NULL DEFAULT 0,rule_effective_date DATE NULL,
+ rule_expire_date DATE NULL,closed_at DATETIME NULL,closed_by INT UNSIGNED NULL,verified_by INT UNSIGNED NULL,verification_status VARCHAR(30) NULL,
+ created_by INT UNSIGNED NOT NULL,updated_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+ INDEX idx_decision_meeting(meeting_id),INDEX idx_decision_responsible(responsible_user_id),INDEX idx_decision_unit(responsible_unit_id),
+ INDEX idx_decision_status(followup_status),INDEX idx_decision_due(due_date),INDEX idx_decision_rule(is_rule),
+ CONSTRAINT fk_decision_meeting FOREIGN KEY(meeting_id) REFERENCES management_meetings(id) ON DELETE RESTRICT,
+ CONSTRAINT fk_decision_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_decision_followups (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,decision_id BIGINT UNSIGNED NOT NULL,old_status VARCHAR(30) NULL,new_status VARCHAR(30) NOT NULL,
+ progress_percent TINYINT UNSIGNED NOT NULL DEFAULT 0,followup_note TEXT NULL,next_followup_date DATE NULL,attachment_json LONGTEXT NULL,
+ created_by INT UNSIGNED NOT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,INDEX idx_followup_decision(decision_id),INDEX idx_followup_next(next_followup_date),
+ CONSTRAINT fk_followup_decision FOREIGN KEY(decision_id) REFERENCES management_decisions(id) ON DELETE RESTRICT,
+ CONSTRAINT fk_followup_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_rule_versions (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,decision_id BIGINT UNSIGNED NOT NULL,rule_code VARCHAR(100) NOT NULL,title VARCHAR(255) NOT NULL,
+ content LONGTEXT NOT NULL,version_number INT UNSIGNED NOT NULL DEFAULT 1,effective_date DATE NOT NULL,expire_date DATE NULL,
+ scope_type VARCHAR(30) NOT NULL DEFAULT 'company',scope_value VARCHAR(190) NULL,active TINYINT(1) NOT NULL DEFAULT 0,approved_by INT UNSIGNED NULL,
+ approved_at DATETIME NULL,created_by INT UNSIGNED NOT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_rule_version(rule_code,version_number),INDEX idx_rule_decision(decision_id),INDEX idx_rule_active(active),INDEX idx_rule_scope(scope_type,scope_value),
+ CONSTRAINT fk_rule_decision FOREIGN KEY(decision_id) REFERENCES management_decisions(id) ON DELETE RESTRICT,
+ CONSTRAINT fk_rule_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS hr_work_groups (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(190) NOT NULL,
+  code VARCHAR(60) NOT NULL UNIQUE,
+  description TEXT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_hr_work_groups_active(active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_attendance_settings (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  work_group_id INT UNSIGNED NOT NULL,
+  effective_from DATE NOT NULL,
+  default_start_time TIME NOT NULL,
+  default_end_time TIME NOT NULL,
+  late_tolerance_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  early_leave_tolerance_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  allow_before_shift_overtime TINYINT(1) NOT NULL DEFAULT 0,
+  allow_after_shift_overtime TINYINT(1) NOT NULL DEFAULT 1,
+  require_overtime_approval TINYINT(1) NOT NULL DEFAULT 1,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_hr_attendance_setting_version(work_group_id,effective_from),
+  INDEX idx_hr_attendance_setting_active(work_group_id,active,effective_from),
+  CONSTRAINT fk_hr_attendance_setting_group FOREIGN KEY(work_group_id) REFERENCES hr_work_groups(id),
+  CONSTRAINT fk_hr_attendance_setting_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_month_holidays (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  holiday_date DATE NOT NULL,
+  jalali_year SMALLINT UNSIGNED NOT NULL,
+  jalali_month TINYINT UNSIGNED NOT NULL,
+  title VARCHAR(190) NOT NULL,
+  holiday_type ENUM('official','company','internal','half_day') NOT NULL DEFAULT 'official',
+  applies_to_group ENUM('all','sales','admin_warehouse') NOT NULL DEFAULT 'all',
+  is_half_day TINYINT(1) NOT NULL DEFAULT 0,
+  description TEXT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_hr_holiday_date_group(holiday_date,applies_to_group),
+  INDEX idx_hr_holiday_jalali(jalali_year,jalali_month),
+  INDEX idx_hr_holiday_active(holiday_date,active),
+  CONSTRAINT fk_hr_holiday_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_attendance_entries (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  employee_id INT UNSIGNED NOT NULL,
+  work_group_id INT UNSIGNED NOT NULL,
+  attendance_date DATE NOT NULL,
+  is_holiday TINYINT(1) NOT NULL DEFAULT 0,
+  holiday_id INT UNSIGNED NULL,
+  approved_start_time TIME NULL,
+  approved_end_time TIME NULL,
+  actual_in_time TIME NULL,
+  actual_out_time TIME NULL,
+  break_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  late_minutes INT UNSIGNED NOT NULL DEFAULT 0,
+  early_leave_minutes INT UNSIGNED NOT NULL DEFAULT 0,
+  normal_overtime_minutes INT UNSIGNED NOT NULL DEFAULT 0,
+  holiday_overtime_minutes INT UNSIGNED NOT NULL DEFAULT 0,
+  work_minutes INT UNSIGNED NOT NULL DEFAULT 0,
+  day_status ENUM('present','absent','leave','mission','holiday','half_day') NOT NULL DEFAULT 'present',
+  overtime_status ENUM('none','pending','approved','rejected') NOT NULL DEFAULT 'none',
+  notes TEXT NULL,
+  attachment_path VARCHAR(500) NULL,
+  created_by INT UNSIGNED NULL,
+  approved_by INT UNSIGNED NULL,
+  approved_at DATETIME NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_hr_attendance_employee_date(employee_id,attendance_date),
+  INDEX idx_hr_attendance_date(attendance_date),
+  INDEX idx_hr_attendance_group(work_group_id,attendance_date),
+  INDEX idx_hr_attendance_status(day_status,overtime_status),
+  CONSTRAINT fk_hr_attendance_employee FOREIGN KEY(employee_id) REFERENCES users(id),
+  CONSTRAINT fk_hr_attendance_group FOREIGN KEY(work_group_id) REFERENCES hr_work_groups(id),
+  CONSTRAINT fk_hr_attendance_holiday FOREIGN KEY(holiday_id) REFERENCES hr_month_holidays(id) ON DELETE SET NULL,
+  CONSTRAINT fk_hr_attendance_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_hr_attendance_approver FOREIGN KEY(approved_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_attendance_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  attendance_entry_id BIGINT UNSIGNED NOT NULL,
+  action ENUM('create','update','approve_overtime','reject_overtime','delete_soft','manual_override') NOT NULL,
+  old_value_json LONGTEXT NULL,
+  new_value_json LONGTEXT NULL,
+  performed_by INT UNSIGNED NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_hr_attendance_log_entry(attendance_entry_id,created_at),
+  INDEX idx_hr_attendance_log_actor(performed_by,created_at),
+  CONSTRAINT fk_hr_attendance_log_entry FOREIGN KEY(attendance_entry_id) REFERENCES hr_attendance_entries(id),
+  CONSTRAINT fk_hr_attendance_log_actor FOREIGN KEY(performed_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE OR REPLACE VIEW vw_hr_attendance_monthly_summary AS
+SELECT employee_id,YEAR(attendance_date) AS `year`,MONTH(attendance_date) AS `month`,
+  SUM(late_minutes) AS total_late_minutes,
+  SUM(early_leave_minutes) AS total_early_leave_minutes,
+  SUM(CASE WHEN overtime_status='approved' THEN normal_overtime_minutes ELSE 0 END) AS total_normal_overtime_minutes,
+  SUM(CASE WHEN overtime_status='approved' THEN holiday_overtime_minutes ELSE 0 END) AS total_holiday_overtime_minutes,
+  SUM(day_status='absent') AS absent_days,
+  SUM(day_status='leave') AS leave_days,
+  SUM(day_status='mission') AS mission_days,
+  SUM(day_status IN ('present','half_day')) AS present_days,
+  ROUND(GREATEST(0,10-(((SUM(late_minutes)+SUM(early_leave_minutes))/30)*0.5)-(SUM(day_status='absent')*2)),2) AS attendance_score_suggestion
+FROM hr_attendance_entries
+GROUP BY employee_id,YEAR(attendance_date),MONTH(attendance_date);
