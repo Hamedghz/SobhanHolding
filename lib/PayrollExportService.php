@@ -1,0 +1,8 @@
+<?php
+require_once __DIR__.'/PayrollSlipRenderer.php';
+class PayrollExportService
+{
+    private static function autoload(): void{foreach([dirname(__DIR__).'/vendor/autoload.php',dirname(__DIR__).'/lib/vendor/autoload.php'] as $autoload)if(is_file($autoload)){require_once $autoload;break;}}
+    public static function bytes(string $html): ?string{self::autoload();$css=(string)@file_get_contents(dirname(__DIR__).'/assets/css/workforce.css');$html=str_replace('</head>','<style>'.$css.'</style></head>',$html);if(class_exists('Dompdf\\Dompdf')){$options=new Dompdf\Options();$options->set('isRemoteEnabled',false);$pdf=new Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper('A4','portrait');$pdf->render();return $pdf->output();}if(class_exists('Mpdf\\Mpdf')){$pdf=new Mpdf\Mpdf(['format'=>'A4','mode'=>'utf-8']);$pdf->SetDirectionality('rtl');$pdf->WriteHTML($html);return $pdf->Output('',\Mpdf\Output\Destination::STRING_RETURN);}return null;}
+    public static function pdf(int $id,bool $employee=false): void{$data=PayrollSlipRenderer::data($id,$employee,true);$html=PayrollSlipRenderer::page($data,false);$bytes=self::bytes($html);if($bytes!==null){Database::execute('INSERT INTO payroll_exports(slip_id,period_id,export_type,generated_by,generated_at) VALUES(?,?,?,?,NOW())',[$id,(int)$data['slip']['period_id'],'pdf',(int)Auth::user()['id']]);$name='payroll-'.$data['slip']['employee_no'].'-'.$data['slip']['period_key'].'.pdf';header('Content-Type: application/pdf');header('Content-Disposition: attachment; filename="'.$name.'"');header('Content-Length: '.strlen($bytes));echo $bytes;exit;}header('Content-Type:text/html; charset=utf-8');echo PayrollSlipRenderer::page($data,true);exit;}
+}

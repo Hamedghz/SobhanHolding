@@ -1,0 +1,11 @@
+{
+  "name": "شرکت پخش سبحان",
+  "short_name": "سبحان",
+  "description": "سامانه هلدینگ سبحان",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#004647",
+  "background_color": "#ffffff",
+  "icons": []
+}

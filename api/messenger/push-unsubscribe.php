@@ -1,0 +1,1 @@
+<?php require __DIR__.'/bootstrap.php';messenger_run(function($u){$in=messenger_input();$endpoint=trim((string)($in['endpoint']??''));Database::execute('UPDATE chat_push_subscriptions SET active=0,updated_at=NOW() WHERE user_id=?'.($endpoint!==''?' AND endpoint=?':''),$endpoint!==''?[(int)$u['id'],$endpoint]:[(int)$u['id']]);return ['subscribed'=>false];},true);

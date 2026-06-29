@@ -1,4 +1,10 @@
 const CACHE_NAME = 'sobhan-pwa-v1';
+try {
+  importScripts('/public/sw.js');
+} catch (error) {
+  // Push notifications are optional; app caching still works if this import fails.
+}
+
 const CORE_ASSETS = [
   '/',
   '/assets/css/app.css',

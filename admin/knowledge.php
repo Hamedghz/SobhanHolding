@@ -5,6 +5,7 @@ require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/JalaliDate.php';
 require_once __DIR__ . '/../core/SobhanApiClient.php';
 require_once __DIR__ . '/../core/KnowledgeIndexService.php';
+require_once __DIR__ . '/../lib/FileBackupService.php';
 
 Auth::requirePermission('manage_knowledge', 'view');
 
@@ -69,7 +70,7 @@ function knowledge_validate_upload(array $file, array $allowedExtensions, array 
         }
     }
 
-    return [
+    $result = [
         'ok' => true,
         'original_name' => $originalName,
         'extension' => $extension,
@@ -101,21 +102,13 @@ function knowledge_save_upload(array $file, array $validated, string $uploadDire
         'mime_type' => knowledge_detect_mime($path),
         'file_size' => (int)$file['size'],
     ];
+    try {$result['backup_id']=FileBackupService::registerSavedFile($result['file_path'],$result['original_name'],$result['mime_type'],$result['file_size']);}
+    catch(Throwable $e){error_log('Knowledge backup registration: '.$e->getMessage());$result['backup_id']=null;}
+    return $result;
 }
 
 if (isset($_GET['delete']) && Auth::verifyCsrf($_GET['csrf_token'] ?? '') && Auth::can('manage_knowledge', 'delete')) {
-    $document = Database::fetch('SELECT * FROM knowledge_documents WHERE id = ?', [(int)$_GET['delete']]);
-    if ($document) {
-        $root = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
-        $knowledgeRoot = realpath($root . '/uploads/knowledge');
-        $path = realpath($root . $document['file_path']);
-        if ($path && $knowledgeRoot && strncmp($path, $knowledgeRoot, strlen($knowledgeRoot)) === 0 && is_file($path)) {
-            @unlink($path);
-        }
-        Database::execute('DELETE FROM knowledge_documents WHERE id = ?', [$document['id']]);
-        Auth::log((int)($user['id'] ?? 0), 'delete', 'knowledge', (int)$document['id']);
-        flash('منبع دانش حذف شد.');
-    }
+    flash('حذف فایل‌های آپلودشده فقط پس از تأیید بکاپ و از صفحه مدیریت بکاپ مجاز است.', 'danger');
     redirect('/admin/knowledge.php');
 }
 
@@ -220,7 +213,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
                 <td><?= e(format_jalali_datetime($document['created_at'])) ?></td>
                 <td>
                     <?php if (Auth::can('manage_knowledge', 'delete')): ?>
-                        <a class="btn btn-small btn-danger" onclick="return confirm('حذف شود؟')" href="?delete=<?= e($document['id']) ?>&csrf_token=<?= e(Auth::csrfToken()) ?>">حذف</a>
+                        <a class="btn btn-small" href="/admin/uploaded-files-backup.php?q=<?=e(urlencode($document['file_path']))?>">مدیریت بکاپ</a>
                     <?php else: ?>
                         -
                     <?php endif; ?>

@@ -10,12 +10,7 @@ $pageTitle = 'فایل‌ها';
 $user = Auth::user();
 
 if (isset($_GET['delete']) && Auth::verifyCsrf($_GET['csrf_token'] ?? '') && Auth::can('files', 'delete')) {
-    $file = Database::fetch('SELECT * FROM user_files WHERE id = ?', [(int)$_GET['delete']]);
-    if ($file && (Auth::isAdmin() || (int)$file['user_id'] === (int)$user['id'])) {
-        @unlink(__DIR__ . '/..' . $file['file_path']);
-        Database::execute('DELETE FROM user_files WHERE id = ?', [$file['id']]);
-        flash('فایل حذف شد.');
-    }
+    flash('برای حذف امن نسخه هاست، از صفحه مدیریت بکاپ فایل‌ها استفاده کنید.', 'danger');
     redirect('/admin/files.php');
 }
 
@@ -122,7 +117,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
                 <td><?= $f['visibility'] === 'shared' ? 'اشتراکی' : 'خصوصی' ?></td>
                 <td><?= e($f['shared_names'] ?: '-') ?></td>
                 <td><?= e(format_jalali_datetime($f['created_at'])) ?></td>
-                <td><?php if (Auth::isAdmin() || (int)$f['user_id'] === (int)$user['id']): ?><a class="btn btn-small btn-danger" onclick="return confirm('حذف شود؟')" href="?delete=<?= e($f['id']) ?>&csrf_token=<?= e(Auth::csrfToken()) ?>">حذف</a><?php endif; ?></td>
+                <td><?php if (Auth::isAdmin()): ?><a class="btn btn-small" href="/admin/uploaded-files-backup.php?q=<?=e(urlencode($f['file_path']))?>">مدیریت بکاپ</a><?php endif; ?></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

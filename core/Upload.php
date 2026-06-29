@@ -4,7 +4,7 @@ class Upload
     public const FILE_EXTENSIONS = [];
     public const IMAGE_EXTENSIONS = ['jpg','jpeg','png','webp'];
 
-    public static function save(array $file, string $directory, ?array $allowedExtensions = null, ?int $maxSizeBytes = null): array
+    public static function save(array $file, string $directory, ?array $allowedExtensions = null, ?int $maxSizeBytes = null, bool $registerBackup = true): array
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
             return ['ok' => false, 'error' => 'فایل به درستی ارسال نشد.'];
@@ -51,7 +51,7 @@ class Upload
                 return ['ok' => false, 'error' => 'نوع فایل تصویری معتبر نیست.'];
             }
         }
-        return [
+        $result = [
             'ok' => true,
             'original_name' => $original,
             'stored_name' => $stored,
@@ -59,5 +59,17 @@ class Upload
             'mime_type' => $mime,
             'file_size' => (int)$file['size'],
         ];
+        if ($registerBackup) {
+            try {
+                require_once __DIR__ . '/../lib/FileBackupService.php';
+                $result['backup_id'] = FileBackupService::registerSavedFile($result['file_path'], $result['original_name'], $result['mime_type'], $result['file_size']);
+            } catch (Throwable $e) {
+                error_log('Upload backup registration: ' . $e->getMessage());
+                $result['backup_id'] = null;
+            }
+        } else {
+            $result['backup_id'] = null;
+        }
+        return $result;
     }
 }

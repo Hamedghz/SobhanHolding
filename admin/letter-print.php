@@ -1,0 +1,2 @@
+<?php
+require_once __DIR__.'/includes/letters.php';LetterModule::requireCapability('view');$letter=LetterModule::load((int)($_GET['id']??0));if(!$letter||!LetterModule::canViewLetter($letter)){http_response_code(404);exit('نامه در دسترس نیست.');}$letter['attachment_count']=(int)(Database::fetch('SELECT COUNT(*) count FROM organizational_letter_attachments WHERE letter_id=?',[(int)$letter['id']])['count']??0);echo letter_document_page($letter,true);

@@ -1,0 +1,1 @@
+<?php require __DIR__.'/_bootstrap.php';notify_method('POST');try{$device=notify_device();$in=notify_input();if(!hash_equals((string)$device['device_uid'],(string)($in['device_uid']??'')))throw new RuntimeException('device_auth_invalid');NotificationHubService::unregister($device);notify_json(true,['unregistered'=>true]);}catch(Throwable $e){notify_fail($e);}

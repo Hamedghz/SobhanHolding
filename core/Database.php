@@ -180,6 +180,19 @@ class Database
                 updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_ceo_periods_active (active)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+            "CREATE TABLE IF NOT EXISTS ceo_dashboard_manual_metrics (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                period_key VARCHAR(50) NOT NULL,
+                gross_sales DECIMAL(18,2) DEFAULT 0,
+                discounts DECIMAL(18,2) DEFAULT 0,
+                net_sales DECIMAL(18,2) DEFAULT 0,
+                source VARCHAR(50) DEFAULT 'excel_import',
+                uploaded_file_name VARCHAR(255) NULL,
+                imported_by INT NULL,
+                imported_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_ceo_dashboard_manual_period (period_key)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
             "CREATE TABLE IF NOT EXISTS pharmacies (
                 id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 title VARCHAR(150) NOT NULL,
@@ -231,12 +244,71 @@ class Database
             $pdo->exec($statement);
         }
 
+        $manualMetricColumns = [
+            'period_key' => 'VARCHAR(50) NULL',
+            'gross_sales' => 'DECIMAL(18,2) DEFAULT 0',
+            'discounts' => 'DECIMAL(18,2) DEFAULT 0',
+            'net_sales' => 'DECIMAL(18,2) DEFAULT 0',
+            'source' => "VARCHAR(50) DEFAULT 'excel_import'",
+            'uploaded_file_name' => 'VARCHAR(255) NULL',
+            'imported_by' => 'INT NULL',
+            'imported_at' => 'DATETIME DEFAULT CURRENT_TIMESTAMP',
+            'updated_at' => 'DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        ];
+        foreach ($manualMetricColumns as $column => $definition) {
+            if (self::tableExists('ceo_dashboard_manual_metrics') && !self::columnExists('ceo_dashboard_manual_metrics', $column)) {
+                $pdo->exec("ALTER TABLE ceo_dashboard_manual_metrics ADD `{$column}` {$definition}");
+            }
+        }
+        if (self::tableExists('ceo_dashboard_manual_metrics') && self::columnExists('ceo_dashboard_manual_metrics', 'period_key')) {
+            $indexStmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME=?');
+            $indexStmt->execute(['ceo_dashboard_manual_metrics', 'uniq_ceo_dashboard_manual_period']);
+            if ((int)$indexStmt->fetchColumn() === 0) {
+                $duplicate = $pdo->query('SELECT period_key FROM ceo_dashboard_manual_metrics WHERE period_key IS NOT NULL GROUP BY period_key HAVING COUNT(*)>1 LIMIT 1')->fetchColumn();
+                if ($duplicate === false) {
+                    try {
+                        $pdo->exec('ALTER TABLE ceo_dashboard_manual_metrics ADD UNIQUE KEY uniq_ceo_dashboard_manual_period (period_key)');
+                    } catch (Throwable $e) {
+                        error_log('CEO manual metrics unique index: ' . $e->getMessage());
+                    }
+                }
+            }
+        }
+
         require_once __DIR__ . '/ManagerDashboard.php';
         ManagerDashboard::repair($pdo);
         require_once __DIR__ . '/HrModule.php';
         HrModule::repair($pdo);
         require_once __DIR__ . '/SystemMaintenance.php';
         SystemMaintenance::repair($pdo);
+        require_once __DIR__ . '/OrgModule.php';
+        OrgModule::repair($pdo);
+        require_once __DIR__ . '/WorkPlannerModule.php';
+        WorkPlannerModule::repair($pdo);
+        require_once __DIR__ . '/PersonalPlannerModule.php';
+        PersonalPlannerModule::repair($pdo);
+        require_once __DIR__ . '/ThemeProfile.php';
+        ThemeProfile::repair($pdo);
+        require_once __DIR__ . '/LetterModule.php';
+        LetterModule::repair($pdo);
+        require_once __DIR__ . '/EmailHubModule.php';
+        EmailHubModule::repair($pdo);
+        require_once __DIR__ . '/WorkforceModule.php';
+        WorkforceModule::repair($pdo);
+        require_once __DIR__ . '/ManagementReportsModule.php';
+        ManagementReportsModule::repair($pdo);
+        require_once __DIR__ . '/ManagementMeetingsModule.php';
+        ManagementMeetingsModule::repair($pdo);
+        require_once __DIR__ . '/HrAttendanceModule.php';
+        HrAttendanceModule::repair($pdo);
+        require_once __DIR__ . '/FileBackupModule.php';
+        FileBackupModule::repair($pdo);
+        require_once __DIR__ . '/MessengerModule.php';
+        MessengerModule::repair($pdo);
+        require_once __DIR__ . '/../lib/NotificationService.php';
+        NotificationService::repair($pdo);
+        require_once __DIR__ . '/WindowsNotificationHubModule.php';
+        WindowsNotificationHubModule::repair($pdo);
 
         if (self::tableExists('users')) {
             if (!self::columnExists('users', 'description')) {
@@ -245,7 +317,7 @@ class Database
             if (!self::columnExists('users', 'upload_quota_mb')) {
                 $pdo->exec('ALTER TABLE users ADD upload_quota_mb INT NULL DEFAULT NULL AFTER description');
             }
-            $pdo->exec("ALTER TABLE users MODIFY role ENUM('admin','manager','employee') NOT NULL DEFAULT 'employee'");
+            $pdo->exec("ALTER TABLE users MODIFY role ENUM('super_admin','admin','manager','employee') NOT NULL DEFAULT 'employee'");
         }
         if (self::tableExists('survey_results') && !self::columnExists('survey_results', 'employee_id')) {
             $pdo->exec('ALTER TABLE survey_results ADD employee_id INT UNSIGNED NULL AFTER user_id, ADD INDEX idx_survey_results_employee (employee_id)');
@@ -445,6 +517,14 @@ class Database
                 ['sobhan_api_key', '', 'password'],
                 ['sobhan_api_timeout', '10', 'number'],
                 ['sobhan_api_enabled', '0', 'boolean'],
+                ['sobhan_windows_api_url', '', 'text'],
+                ['sobhan_reporting_api_url', '', 'text'],
+                ['sobhan_ai_model_api_url', '', 'text'],
+                ['sobhan_windows_api_enabled', '0', 'boolean'],
+                ['sobhan_reporting_api_enabled', '0', 'boolean'],
+                ['sobhan_ai_model_api_enabled', '0', 'boolean'],
+                ['sobhan_api_retry_count', '1', 'number'],
+                ['sobhan_ai_model', '', 'text'],
                 ['sobhan_distribution_data_mode', 'import_file', 'select'],
                 ['sobhan_ai_autofill_enabled', '0', 'boolean'],
                 ['sobhan_ai_overwrite_manual_data', '0', 'boolean'],

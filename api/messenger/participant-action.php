@@ -1,0 +1,1 @@
+<?php require __DIR__.'/bootstrap.php';messenger_run(function($u){$in=messenger_input();$in['action']=$_GET['participant_action']??'update';MessengerService::participantAction((int)($in['conversation_id']??0),(int)($in['user_id']??0),$in,$u);return ['updated'=>true];},true);

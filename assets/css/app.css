@@ -444,6 +444,12 @@ select option,
     border-color: #bbf7d0;
 }
 
+.alert-warning {
+    background: #fffbeb;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
 .alert-danger,
 .alert-error {
     background: #fef2f2;
