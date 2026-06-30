@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "dgSpecHash": "0P4Rqcadd/Y=",
+  "success": true,
+  "projectFilePath": "E:\\Site\\SobhanHolding\\SobhanNotificationHub\\SobhanNotificationHub.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.data.sqlite\\10.0.8\\microsoft.data.sqlite.10.0.8.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.data.sqlite.core\\10.0.8\\microsoft.data.sqlite.core.10.0.8.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.web.webview2\\1.0.3719.77\\microsoft.web.webview2.1.0.3719.77.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windows.ai.machinelearning\\2.1.70\\microsoft.windows.ai.machinelearning.2.1.70.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windows.sdk.buildtools\\10.0.26100.4654\\microsoft.windows.sdk.buildtools.10.0.26100.4654.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windows.sdk.buildtools.msix\\1.7.251221100\\microsoft.windows.sdk.buildtools.msix.1.7.251221100.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windowsappsdk\\2.2.0\\microsoft.windowsappsdk.2.2.0.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windowsappsdk.ai\\2.2.3\\microsoft.windowsappsdk.ai.2.2.3.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windowsappsdk.base\\2.0.4\\microsoft.windowsappsdk.base.2.0.4.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windowsappsdk.dwrite\\2.1.0\\microsoft.windowsappsdk.dwrite.2.1.0.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windowsappsdk.foundation\\2.1.0\\microsoft.windowsappsdk.foundation.2.1.0.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windowsappsdk.interactiveexperiences\\2.0.15\\microsoft.windowsappsdk.interactiveexperiences.2.0.15.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windowsappsdk.ml\\2.1.70\\microsoft.windowsappsdk.ml.2.1.70.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windowsappsdk.runtime\\2.2.0\\microsoft.windowsappsdk.runtime.2.2.0.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windowsappsdk.widgets\\2.0.5\\microsoft.windowsappsdk.widgets.2.0.5.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windowsappsdk.winui\\2.2.1\\microsoft.windowsappsdk.winui.2.2.1.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\sqlitepclraw.bundle_e_sqlite3\\2.1.11\\sqlitepclraw.bundle_e_sqlite3.2.1.11.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\sqlitepclraw.core\\2.1.11\\sqlitepclraw.core.2.1.11.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\sqlitepclraw.lib.e_sqlite3\\2.1.11\\sqlitepclraw.lib.e_sqlite3.2.1.11.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\sqlitepclraw.provider.e_sqlite3\\2.1.11\\sqlitepclraw.provider.e_sqlite3.2.1.11.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\system.memory\\4.5.3\\system.memory.4.5.3.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\system.numerics.tensors\\9.0.0\\system.numerics.tensors.9.0.0.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\system.security.cryptography.protecteddata\\10.0.8\\system.security.cryptography.protecteddata.10.0.8.nupkg.sha512",
+    "C:\\Users\\omerta\\.nuget\\packages\\microsoft.windows.sdk.net.ref\\10.0.19041.56\\microsoft.windows.sdk.net.ref.10.0.19041.56.nupkg.sha512"
+  ],
+  "logs": []
+}

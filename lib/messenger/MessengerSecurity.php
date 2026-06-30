@@ -8,7 +8,7 @@ final class MessengerSecurity
         $user = Auth::user();
         if (!$user) return false;
         if (in_array($user['role'] ?? '', ['admin','super_admin'], true)) return true;
-        if ($permission === 'messenger.view') return Auth::can('messenger.view') || Auth::can('dashboard');
+        if ($permission === 'messenger.view') return Auth::can('messenger.view');
         return Auth::can($permission, $action);
     }
 

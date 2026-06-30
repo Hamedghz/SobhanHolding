@@ -1,5 +1,9 @@
 # Sobhan Messenger
 
+مسیر اصلی گفتگوی واقعی `/employee/messenger.php` است. `/messenger/index.php` فقط آرشیو گزارش‌های فورواردشده برای داده‌های legacy است و مدل‌های `messenger_messages` و `sales_report_shares` با chat مخلوط نمی‌شوند. فوروارد گزارش فروش یک پیام `message_type=report_card` در `chat_messages` می‌سازد.
+
+APIهای اصلی `/api/messenger/conversations.php` و `/api/messenger/messages.php` هستند و خطا در نوار داخل UI نمایش داده می‌شود. مجوزهای پایه `messenger.view`, `messenger.private.send`, `messenger.group.create`, `messenger.channel.create`, `messenger.broadcast.send`, `messenger.admin.dashboard` به‌شکل idempotent ثبت می‌شوند و seed دسترسی کاربر را خودکار افزایش نمی‌دهد.
+
 ماژول PHP مرجع نهایی مجوزها، عضویت، پیام‌ها، فایل خصوصی، audit و اعلان است. سرور Socket.IO تنها پس از توکن کوتاه‌عمر و تأیید عضویت در سایت، کاربر را وارد اتاق گفتگو می‌کند.
 
 ## راه‌اندازی

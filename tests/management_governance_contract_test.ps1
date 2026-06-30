@@ -14,4 +14,7 @@ $decisions=Get-Content(Join-Path $root 'admin/management-decisions.php')-Raw
 if($decisions-notmatch'\\xEF\\xBB\\xBF' -or $decisions-notmatch'managementAnalytics'){throw 'CSV BOM or analytics is missing.'}
 $edit=Get-Content(Join-Path $root 'admin/management-decision-edit.php')-Raw
 if($edit-notmatch'canEditDecision'){throw 'Decision edit GET guard is missing.'}
+foreach($repoFile in @('lib/meetings/MeetingRepository.php','lib/meetings/DecisionRepository.php','lib/meetings/RuleRepository.php','lib/meetings/FollowupRepository.php')){if(-not(Test-Path(Join-Path $root $repoFile))){throw "Missing separated repository: $repoFile"}}
+$nav=Get-Content(Join-Path $root 'admin/includes/management-governance-nav.php')-Raw
+if($nav-notmatch'تنظیمات پیشرفته'){throw 'Advanced UI grouping is missing.'}
 Write-Output "Management governance contract checks passed ($($files.Count) files)."

@@ -10,9 +10,7 @@ function admin_menu_registry(): array
             ['title' => 'پنل کارمند', 'url' => '/admin/employee-dashboard.php', 'permission' => 'employee_portal', 'fallback_role' => 'employee', 'active' => ['employee-dashboard.php']],
         ]],
         'personal_planner' => ['title' => 'برنامه کاری من', 'items' => [
-            ['title' => 'برنامه کاری', 'url' => '/admin/personal-planner.php', 'permission' => 'dashboard', 'active' => ['personal-planner.php']],
-            ['title' => 'گزارش برنامه کاری', 'url' => '/admin/personal-planner-report.php', 'permission' => 'dashboard', 'active' => ['personal-planner-report.php']],
-            ['title' => 'تنظیمات برنامه کاری', 'url' => '/admin/personal-planner-settings.php', 'permission' => 'dashboard', 'active' => ['personal-planner-settings.php']],
+            ['title' => 'برنامه کاری شخصی', 'url' => '/employee/work-planner.php', 'permission' => 'dashboard', 'active_paths' => ['/employee/work-planner.php']],
         ]],
         'sales' => ['title' => 'فروش و تحلیل عملکرد', 'items' => [
             ['title' => 'ورود گزارش فروش', 'url' => '/admin/manager-dashboard-import.php', 'permission' => 'manager_dashboard.import', 'active' => ['manager-dashboard-import.php']],
@@ -74,6 +72,8 @@ function admin_menu_registry(): array
         ]],
         'correspondence' => ['title' => 'مکاتبات اداری', 'items' => [
             ['title' => 'پیام‌رسان سازمانی', 'url' => '/employee/messenger.php', 'permission' => 'messenger.view', 'active_paths' => ['/employee/messenger.php','/employee/message-inbox.php','/messenger/','/messenger/report-view.php']],
+            ['title' => 'تیکت‌های من', 'url' => '/employee/tickets.php', 'permission' => 'dashboard', 'active_paths' => ['/employee/tickets.php','/employee/ticket-create.php','/employee/ticket-view.php']],
+            ['title' => 'مدیریت تیکت‌ها', 'url' => '/admin/tickets.php', 'permission' => 'ticketing.manage', 'active_paths' => ['/admin/tickets.php','/admin/ticket-categories.php','/admin/ticket-settings.php']],
             ['title' => 'داشبورد پیام‌رسان', 'url' => '/admin/messenger-dashboard.php', 'permission' => 'messenger.admin.dashboard', 'active' => ['messenger-dashboard.php']],
             ['title' => 'مدیریت گروه‌ها', 'url' => '/admin/messenger-groups.php', 'permission' => 'messenger.group.manage', 'active' => ['messenger-groups.php']],
             ['title' => 'مدیریت کانال‌ها', 'url' => '/admin/messenger-channels.php', 'permission' => 'messenger.channel.manage', 'active' => ['messenger-channels.php']],

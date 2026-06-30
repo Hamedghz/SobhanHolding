@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../lib/NotificationService.php';
+require_once __DIR__ . '/../lib/messenger/MessengerService.php';
 require_once __DIR__ . '/SalesReportShareService.php';
 
 class MessengerForwardService
@@ -57,6 +58,11 @@ class MessengerForwardService
             error_log('sales report forward transaction: '.$e->getMessage());
             throw new RuntimeException('forward_failed', 0, $e);
         }
+
+        try {
+            $chatMessages=MessengerService::sendReportCardToUsers($recipients,['share_id'=>$shareId,'title'=>$built['snapshot']['title'],'description'=>$description,'preview_text'=>self::preview($built['snapshot']),'report_url'=>'/messenger/report-view.php?id='.$shareId,'attachment_url'=>$attachment?'/messenger/report-attachment.php?id='.$shareId:null],$sender);
+            self::log($shareId,$messageId,(int)$sender['id'],'report_card_sent','success',['chat_message_count'=>count($chatMessages)]);
+        } catch (Throwable $e) { error_log('report card chat delivery: '.$e->getMessage());self::log($shareId,$messageId,(int)$sender['id'],'report_card_sent','failed');throw new RuntimeException('ارسال گزارش در گفتگوی واقعی انجام نشد.',0,$e); }
 
         foreach ($recipients as $recipientId) {
             try {
