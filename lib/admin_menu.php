@@ -32,6 +32,7 @@ function admin_menu_registry(): array
             ['title' => 'قوانین مصوب', 'url' => '/admin/management-rules.php', 'management_governance' => true, 'active_paths' => ['/admin/management-rules.php']],
         ]],
         'hr' => ['title' => 'منابع انسانی', 'items' => [
+            ['title' => 'کارکرد من', 'url' => '/employee/my-attendance.php', 'permission' => 'hr_attendance.own', 'attendance_own' => true, 'active_paths' => ['/employee/my-attendance.php']],
             ['title' => 'کاربران و پرسنل', 'url' => '/admin/users.php', 'permission' => 'users', 'active' => ['users.php']],
             ['title' => 'ایمپورت و اکسپورت کاربران', 'url' => '/admin/users-import-export.php', 'permission' => 'users.import_export', 'active' => ['users-import-export.php']],
             ['title' => 'واحد، نقش و ساختار سازمانی', 'url' => '/admin/hr-settings.php', 'permission' => 'hr_settings', 'active' => ['hr-settings.php']],
@@ -124,6 +125,7 @@ function admin_menu_registry(): array
 
 function admin_menu_allowed(array $item): bool
 {
+    if (!empty($item['attendance_own'])) return (bool)Auth::user();
     if (!empty($item['management_governance'])) {
         if (!class_exists('ManagementMeetingsRepository')) require_once __DIR__ . '/ManagementMeetingsRepository.php';
         return ManagementMeetingsRepository::menuAllowed();
