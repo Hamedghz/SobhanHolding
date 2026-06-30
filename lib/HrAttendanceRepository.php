@@ -50,10 +50,13 @@ final class HrAttendanceRepository
         if(self::minutes($end)<=self::minutes($start))throw new InvalidArgumentException('ساعت خروج باید بعد از ساعت ورود باشد.');
         $late=self::boundedInt($data['late_tolerance_minutes']??0,0,180,'تلورانس تأخیر');
         $early=self::boundedInt($data['early_leave_tolerance_minutes']??0,0,180,'تلورانس تعجیل');
+        $checkinFrom=self::optionalTime($data['allowed_checkin_from']??'');$checkinTo=self::optionalTime($data['allowed_checkin_to']??'');$checkoutFrom=self::optionalTime($data['allowed_checkout_from']??'');$checkoutTo=self::optionalTime($data['allowed_checkout_to']??'');
+        if($checkinFrom&&$checkinTo&&self::minutes($checkinTo)<self::minutes($checkinFrom))throw new InvalidArgumentException('پایان بازه ورود باید بعد از شروع آن باشد.');
+        if($checkoutFrom&&$checkoutTo&&self::minutes($checkoutTo)<self::minutes($checkoutFrom))throw new InvalidArgumentException('پایان بازه خروج باید بعد از شروع آن باشد.');
         $pdo=Database::connection();$pdo->beginTransaction();
         try{
             Database::execute('UPDATE hr_attendance_settings SET active=0,updated_at=NOW() WHERE work_group_id=?',[$groupId]);
-            Database::execute('INSERT INTO hr_attendance_settings(work_group_id,effective_from,default_start_time,default_end_time,late_tolerance_minutes,early_leave_tolerance_minutes,allow_before_shift_overtime,allow_after_shift_overtime,require_overtime_approval,active,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,1,?,NOW(),NOW()) ON DUPLICATE KEY UPDATE default_start_time=VALUES(default_start_time),default_end_time=VALUES(default_end_time),late_tolerance_minutes=VALUES(late_tolerance_minutes),early_leave_tolerance_minutes=VALUES(early_leave_tolerance_minutes),allow_before_shift_overtime=VALUES(allow_before_shift_overtime),allow_after_shift_overtime=VALUES(allow_after_shift_overtime),require_overtime_approval=VALUES(require_overtime_approval),active=1,updated_at=NOW()',[$groupId,$effective,$start,$end,$late,$early,!empty($data['allow_before_shift_overtime'])?1:0,!empty($data['allow_after_shift_overtime'])?1:0,!empty($data['require_overtime_approval'])?1:0,$by]);
+            Database::execute('INSERT INTO hr_attendance_settings(work_group_id,effective_from,default_start_time,default_end_time,late_tolerance_minutes,early_leave_tolerance_minutes,allowed_checkin_from,allowed_checkin_to,allowed_checkout_from,allowed_checkout_to,allow_before_shift_overtime,allow_after_shift_overtime,require_overtime_approval,active,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,NOW(),NOW()) ON DUPLICATE KEY UPDATE default_start_time=VALUES(default_start_time),default_end_time=VALUES(default_end_time),late_tolerance_minutes=VALUES(late_tolerance_minutes),early_leave_tolerance_minutes=VALUES(early_leave_tolerance_minutes),allowed_checkin_from=VALUES(allowed_checkin_from),allowed_checkin_to=VALUES(allowed_checkin_to),allowed_checkout_from=VALUES(allowed_checkout_from),allowed_checkout_to=VALUES(allowed_checkout_to),allow_before_shift_overtime=VALUES(allow_before_shift_overtime),allow_after_shift_overtime=VALUES(allow_after_shift_overtime),require_overtime_approval=VALUES(require_overtime_approval),active=1,updated_at=NOW()',[$groupId,$effective,$start,$end,$late,$early,$checkinFrom,$checkinTo,$checkoutFrom,$checkoutTo,!empty($data['allow_before_shift_overtime'])?1:0,!empty($data['allow_after_shift_overtime'])?1:0,!empty($data['require_overtime_approval'])?1:0,$by]);
             $pdo->commit();Auth::log($by,'hr_attendance_settings_saved','hr_attendance_settings');
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
@@ -123,6 +126,39 @@ final class HrAttendanceRepository
         return Database::fetchAll('SELECT e.*,u.name employee_name,u.employee_no,u.department,u.role_key,u.sales_line,ou.title unit_title,r.title role_title,g.title group_title,g.code group_code,a.name approver_name FROM hr_attendance_entries e JOIN users u ON u.id=e.employee_id JOIN hr_work_groups g ON g.id=e.work_group_id LEFT JOIN org_units ou ON ou.id=u.org_unit_id LEFT JOIN org_roles r ON r.id=u.org_role_id LEFT JOIN users a ON a.id=e.approved_by WHERE '.implode(' AND ',$where).' ORDER BY e.attendance_date DESC,u.name',$params);
     }
 
+    public static function myReport(int $userId,array $filters=[]): array
+    {
+        $actor=Auth::user();if($userId<1||!$actor||(int)$actor['id']!==$userId)return [];$where=['e.employee_id=?'];$params=[$userId];
+        $year=(int)($filters['year']??0);$month=(int)($filters['month']??0);$from=trim((string)($filters['date_from']??''));$to=trim((string)($filters['date_to']??''));
+        if($from===''&&$year&&$month)$from=JalaliDate::toGregorian(sprintf('%04d/%02d/01',$year,$month))??'';
+        if($to===''&&$year&&$month)$to=JalaliDate::toGregorian(sprintf('%04d/%02d/%02d',$year,$month,JalaliDate::monthLength($year,$month)))??'';
+        if($from!==''){$from=self::date($from);$where[]='e.attendance_date>=?';$params[]=$from;}
+        if($to!==''){$to=self::date($to);$where[]='e.attendance_date<=?';$params[]=$to;}
+        $rows=Database::fetchAll('SELECT e.*,g.title group_title,g.code group_code,a.name approver_name FROM hr_attendance_entries e JOIN hr_work_groups g ON g.id=e.work_group_id LEFT JOIN users a ON a.id=e.approved_by WHERE '.implode(' AND ',$where).' ORDER BY e.attendance_date DESC,e.id DESC',$params);
+        $groupCode=self::groupCodeForUser($userId);$holidays=($from!==''&&$to!=='')?self::holidaysBetween($from,$to,$groupCode):[];$holidayMap=[];foreach($holidays as $holiday)$holidayMap[$holiday['holiday_date']]=$holiday;
+        foreach($rows as &$row){$hasTimes=!empty($row['actual_in_time'])&&!empty($row['actual_out_time']);$work=$hasTimes?max(0,self::minutes($row['actual_out_time'])-self::minutes($row['actual_in_time'])):0;if(!in_array($row['day_status'],['present','half_day','holiday'],true))$work=0;$row['work_minutes']=$work;$row['scheduled_work_minutes']=(!empty($row['approved_start_time'])&&!empty($row['approved_end_time']))?max(0,self::minutes($row['approved_end_time'])-self::minutes($row['approved_start_time'])):0;if(isset($holidayMap[$row['attendance_date']])){$holiday=$holidayMap[$row['attendance_date']];$row['is_holiday']=1;$row['holiday_id']=$holiday['id'];$row['late_minutes']=0;$row['early_leave_minutes']=0;$row['normal_overtime_minutes']=0;$row['holiday_overtime_minutes']=$work;$row['display_day_status']='holiday';$row['holiday_title']=$holiday['title'];$row['holiday_is_half_day']=(int)$holiday['is_half_day'];}else{$row['display_day_status']=$row['day_status'];}}
+        unset($row);return $rows;
+    }
+
+    public static function holidaysBetween(string $from,string $to,string $groupCode): array
+    {
+        $from=self::date($from);$to=self::date($to);if($to<$from)throw new InvalidArgumentException('بازه گزارش معتبر نیست.');$scope=strtoupper($groupCode)==='SALES'?'sales':'admin_warehouse';$rows=Database::fetchAll('SELECT * FROM hr_month_holidays WHERE active=1 AND holiday_date BETWEEN ? AND ? AND applies_to_group IN("all",?) ORDER BY holiday_date,applies_to_group="all" ASC,id DESC',[$from,$to,$scope]);$byDate=[];foreach($rows as $row){$date=$row['holiday_date'];if(!isset($byDate[$date])||(!(int)$row['is_half_day']&&(int)$byDate[$date]['is_half_day']))$byDate[$date]=$row;}return array_values($byDate);
+    }
+
+    public static function myReportStats(array $rows,array $filters=[]): array
+    {
+        $from=trim((string)($filters['date_from']??''));$to=trim((string)($filters['date_to']??''));if($from!=='')$from=self::date($from);if($to!=='')$to=self::date($to);if(($from===''||$to==='')&&$rows){$dates=array_column($rows,'attendance_date');sort($dates);$from=$from?:$dates[0];$to=$to?:$dates[count($dates)-1];}$groupCode=(string)($filters['group_code']??($rows[0]['group_code']??'ADMIN_WAREHOUSE'));$holidays=($from&&$to)?self::holidaysBetween($from,$to,$groupCode):[];
+        $stats=['work_minutes'=>0,'late_minutes'=>0,'early_leave_minutes'=>0,'approved_overtime_minutes'=>0,'absent'=>0,'leave'=>0,'mission'=>0,'holiday_count'=>count($holidays),'holiday_equivalent'=>0.0,'calendar_days'=>0,'expected_work_days'=>0.0];$leaveDates=[];$missionDates=[];$holidayFractions=[];
+        foreach($holidays as $holiday){$fraction=(int)$holiday['is_half_day']?0.5:1.0;$stats['holiday_equivalent']+=$fraction;$holidayFractions[$holiday['holiday_date']]=$fraction;}
+        foreach($rows as $row){$stats['work_minutes']+=(int)$row['work_minutes'];$stats['late_minutes']+=(int)$row['late_minutes'];$stats['early_leave_minutes']+=(int)$row['early_leave_minutes'];if($row['overtime_status']==='approved')$stats['approved_overtime_minutes']+=(int)$row['normal_overtime_minutes']+(int)$row['holiday_overtime_minutes'];$stats['absent']+=(int)($row['day_status']==='absent');$stats['leave']+=(int)($row['day_status']==='leave');$stats['mission']+=(int)($row['day_status']==='mission');if($row['day_status']==='leave')$leaveDates[$row['attendance_date']]=true;if($row['day_status']==='mission')$missionDates[$row['attendance_date']]=true;}
+        $leaveDeduction=0.0;foreach(array_keys($leaveDates) as $date)$leaveDeduction+=max(0,1.0-($holidayFractions[$date]??0));$missionDeduction=0.0;foreach(array_keys($missionDates) as $date)$missionDeduction+=max(0,1.0-($holidayFractions[$date]??0));if($from&&$to)$stats['calendar_days']=(int)(new DateTimeImmutable($from))->diff(new DateTimeImmutable($to))->days+1;$stats['expected_work_days']=max(0,$stats['calendar_days']-$stats['holiday_equivalent']-$leaveDeduction-$missionDeduction);return $stats;
+    }
+
+    public static function groupCodeForUser(int $userId): string
+    {
+        $employee=Database::fetch('SELECT u.sales_line,COALESCE(r.is_sales_role,0) is_sales_role FROM users u LEFT JOIN org_roles r ON r.id=u.org_role_id WHERE u.id=? AND u.status="active"',[$userId]);return $employee?self::employeeGroupCode($employee):'ADMIN_WAREHOUSE';
+    }
+
     public static function reportStats(array $rows): array
     {
         $stats=['late'=>0,'early'=>0,'normal_overtime'=>0,'holiday_overtime'=>0,'absent'=>0,'leave'=>0,'mission'=>0,'punctual'=>0];$employees=[];$lateEmployees=[];
@@ -145,8 +181,8 @@ final class HrAttendanceRepository
         $status=array_key_exists($row['day_status']??'',self::DAY_STATUSES)?$row['day_status']:'present';$in=self::optionalTime($row['actual_in_time']??'');$out=self::optionalTime($row['actual_out_time']??'');
         if($status==='present'&&(!$in||!$out))throw new InvalidArgumentException('برای کارمند «'.$employee['name'].'» ساعت ورود و خروج را وارد کنید.');
         if($in&&$out&&self::minutes($out)<self::minutes($in))throw new InvalidArgumentException('ساعت خروج «'.$employee['name'].'» نمی‌تواند قبل از ورود باشد.');
-        $break=self::boundedInt($row['break_minutes']??0,0,720,'زمان استراحت');$setting=self::settingForDate((int)$group['id'],$date);if(!$setting)throw new InvalidArgumentException('برای گروه «'.$group['title'].'» تنظیم ساعت مؤثر ثبت نشده است.');
-        $holiday=self::holidayForDate($date,$groupCode);$calc=self::calculate($setting,$holiday,$status,$in,$out,$break);$old=Database::fetch('SELECT * FROM hr_attendance_entries WHERE employee_id=? AND attendance_date=?',[(int)$employee['id'],$date]);
+        $break=0;$setting=self::settingForDate((int)$group['id'],$date);if(!$setting)throw new InvalidArgumentException('برای گروه «'.$group['title'].'» تنظیم ساعت مؤثر ثبت نشده است.');
+        $holiday=self::holidayForDate($date,$groupCode);$calc=self::calculate($setting,$holiday,$status,$in,$out);$old=Database::fetch('SELECT * FROM hr_attendance_entries WHERE employee_id=? AND attendance_date=?',[(int)$employee['id'],$date]);
         $overtime=$calc['normal_overtime_minutes']+$calc['holiday_overtime_minutes'];$otStatus=$overtime===0?'none':((int)$setting['require_overtime_approval']?'pending':'approved');
         $values=[(int)$group['id'],$calc['is_holiday'],$holiday['id']??null,$setting['default_start_time'],$setting['default_end_time'],$in,$out,$break,$calc['late_minutes'],$calc['early_leave_minutes'],$calc['normal_overtime_minutes'],$calc['holiday_overtime_minutes'],$calc['work_minutes'],$status,$otStatus,self::text($row['notes']??'',5000),$by];
         if($old){Database::execute('UPDATE hr_attendance_entries SET work_group_id=?,is_holiday=?,holiday_id=?,approved_start_time=?,approved_end_time=?,actual_in_time=?,actual_out_time=?,break_minutes=?,late_minutes=?,early_leave_minutes=?,normal_overtime_minutes=?,holiday_overtime_minutes=?,work_minutes=?,day_status=?,overtime_status=?,notes=?,approved_by=NULL,approved_at=NULL,updated_at=NOW() WHERE id=?',[...array_slice($values,0,16),(int)$old['id']]);$id=(int)$old['id'];$action='update';}
@@ -154,14 +190,14 @@ final class HrAttendanceRepository
         $new=Database::fetch('SELECT * FROM hr_attendance_entries WHERE id=?',[$id]);self::log($id,$action,$old,$new,$by);Auth::log($by,'hr_attendance_'.$action,'hr_attendance_entries',$id);
     }
 
-    private static function calculate(array $setting,?array $holiday,string $status,?string $in,?string $out,int $break): array
+    private static function calculate(array $setting,?array $holiday,string $status,?string $in,?string $out): array
     {
         $zero=['is_holiday'=>$holiday?1:0,'late_minutes'=>0,'early_leave_minutes'=>0,'normal_overtime_minutes'=>0,'holiday_overtime_minutes'=>0,'work_minutes'=>0];
         if(!$in||!$out||!in_array($status,['present','half_day','holiday'],true))return $zero;
-        $inM=self::minutes($in);$outM=self::minutes($out);$start=self::minutes($setting['default_start_time']);$end=self::minutes($setting['default_end_time']);$work=max(0,$outM-$inM-$break);
+        $inM=self::minutes($in);$outM=self::minutes($out);$start=self::minutes($setting['default_start_time']);$end=self::minutes($setting['default_end_time']);$work=max(0,$outM-$inM);
         $zero['work_minutes']=$work;
         if($holiday){$zero['holiday_overtime_minutes']=$work;return $zero;}
-        $zero['late_minutes']=max(0,$inM-$start-(int)$setting['late_tolerance_minutes']);$zero['early_leave_minutes']=max(0,$end-$outM-(int)$setting['early_leave_tolerance_minutes']);
+        $lateThreshold=!empty($setting['allowed_checkin_to'])?self::minutes($setting['allowed_checkin_to']):$start+(int)$setting['late_tolerance_minutes'];$earlyThreshold=!empty($setting['allowed_checkout_from'])?self::minutes($setting['allowed_checkout_from']):$end-(int)$setting['early_leave_tolerance_minutes'];$zero['late_minutes']=max(0,$inM-$lateThreshold);$zero['early_leave_minutes']=max(0,$earlyThreshold-$outM);
         $zero['normal_overtime_minutes']=((int)$setting['allow_before_shift_overtime']?max(0,$start-$inM):0)+((int)$setting['allow_after_shift_overtime']?max(0,$outM-$end):0);
         return $zero;
     }

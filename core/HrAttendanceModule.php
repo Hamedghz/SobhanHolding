@@ -6,6 +6,7 @@ final class HrAttendanceModule
     public static function repair(PDO $pdo): void
     {
         foreach (self::schema() as $sql) $pdo->exec($sql);
+        foreach (['allowed_checkin_from'=>'TIME NULL','allowed_checkin_to'=>'TIME NULL','allowed_checkout_from'=>'TIME NULL','allowed_checkout_to'=>'TIME NULL'] as $column=>$definition) self::ensureColumn($pdo,'hr_attendance_settings',$column,$definition);
         self::seed($pdo);
         try { self::repairView($pdo); } catch (Throwable $e) { error_log('HR attendance summary view: '.$e->getMessage()); }
     }
@@ -33,6 +34,10 @@ final class HrAttendanceModule
                 default_end_time TIME NOT NULL,
                 late_tolerance_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 0,
                 early_leave_tolerance_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                allowed_checkin_from TIME NULL,
+                allowed_checkin_to TIME NULL,
+                allowed_checkout_from TIME NULL,
+                allowed_checkout_to TIME NULL,
                 allow_before_shift_overtime TINYINT(1) NOT NULL DEFAULT 0,
                 allow_after_shift_overtime TINYINT(1) NOT NULL DEFAULT 1,
                 require_overtime_approval TINYINT(1) NOT NULL DEFAULT 1,
@@ -126,7 +131,13 @@ final class HrAttendanceModule
             ['hr_attendance', 'حضور و کارکرد پرسنل', 145],
             ['hr_attendance.settings', 'تنظیمات حضور و کارکرد', 146],
             ['hr_attendance.reports', 'گزارش حضور و کارکرد', 147],
+            ['hr_attendance.own', 'مشاهده کارکرد شخصی', 148],
         ] as $row) $module->execute($row);
+    }
+
+    private static function ensureColumn(PDO $pdo,string $table,string $column,string $definition): void
+    {
+        $stmt=$pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?');$stmt->execute([$table,$column]);if(!(int)$stmt->fetchColumn())$pdo->exec("ALTER TABLE `{$table}` ADD `{$column}` {$definition}");
     }
 
     private static function repairView(PDO $pdo): void
