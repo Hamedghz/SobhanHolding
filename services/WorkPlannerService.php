@@ -5,7 +5,7 @@ require_once __DIR__ . '/../lib/OrgAccess.php';
 function work_planner_status_label(string $value): string { return ['todo'=>'انجام‌نشده','in_progress'=>'در حال انجام','waiting'=>'منتظر اقدام','blocked'=>'مسدود','done'=>'تکمیل‌شده','cancelled'=>'لغوشده','overdue'=>'عقب‌افتاده'][$value]??'نامشخص'; }
 function work_planner_priority_label(string $value): string { return ['low'=>'کم','normal'=>'عادی','high'=>'بالا','urgent'=>'فوری'][$value]??'عادی'; }
 function work_planner_style_label(string $value): string { return ['field_sales'=>'فروش میدانی','supervisor'=>'سرپرستی','sales_manager'=>'مدیریت فروش','warehouse_operation'=>'عملیات انبار','finance_admin'=>'مالی و اداری','it_planning'=>'فناوری و برنامه‌ریزی','executive'=>'مدیریتی','general_employee'=>'کارمند عمومی'][$value]??'کارمند عمومی'; }
-function work_planner_action_label(string $value): string { return ['created'=>'ایجاد','updated'=>'ویرایش','status_changed'=>'تغییر وضعیت','progress_changed'=>'تغییر پیشرفت','assigned'=>'تخصیص','completed'=>'تکمیل','cancelled'=>'لغو','comment_added'=>'ثبت پیگیری'][$value]??'بروزرسانی'; }
+function work_planner_action_label(string $value): string { return ['created'=>'ایجاد','updated'=>'ویرایش','status_changed'=>'تغییر وضعیت','progress_changed'=>'تغییر پیشرفت','assigned'=>'تخصیص','completed'=>'تکمیل','cancelled'=>'لغو','comment_added'=>'ثبت پیگیری','moved_to_tomorrow'=>'انتقال به فردا','recurrence_created'=>'ساخت تکرار بعدی'][$value]??'بروزرسانی'; }
 
 class WorkPlannerService
 {
@@ -36,7 +36,6 @@ class WorkPlannerService
 
     public static function getDashboardTasks(int $userId): array
     {
-        self::generateDailyTasksForUser($userId);
         $prefs=self::getUserPlannerPreferences($userId);if(!(int)$prefs['dashboard_widget_enabled'])return ['enabled'=>false,'counts'=>[],'tasks'=>[],'completion'=>0];
         $rows=Database::fetchAll('SELECT * FROM work_planner_tasks WHERE user_id=? AND is_visible_on_dashboard=1 AND status NOT IN("done","cancelled") ORDER BY CASE WHEN due_date<CURDATE() THEN 0 WHEN priority="urgent" THEN 1 WHEN status="in_progress" THEN 2 WHEN due_date=CURDATE() THEN 3 ELSE 4 END,due_date,id LIMIT 5',[$userId]);
         $counts=Database::fetch('SELECT SUM(due_date=CURDATE() AND status NOT IN("done","cancelled")) today_count,SUM(status="in_progress") in_progress_count,SUM(due_date<CURDATE() AND status NOT IN("done","cancelled")) overdue_count,SUM(priority="urgent" AND status NOT IN("done","cancelled")) urgent_count,SUM(due_date=CURDATE()) today_total,SUM(due_date=CURDATE() AND status="done") today_done FROM work_planner_tasks WHERE user_id=?',[$userId])?:[];
@@ -52,7 +51,22 @@ class WorkPlannerService
     public static function updateTaskStatus(int $taskId,string $status,int $userId): bool
     {
         if(!in_array($status,['todo','in_progress','waiting','blocked','done','cancelled','overdue'],true)||!self::canUserAccessTask($userId,$taskId))return false;$task=Database::fetch('SELECT status,progress_percent,user_id,is_locked FROM work_planner_tasks WHERE id=?',[$taskId]);if(!$task)return false;$actor=Database::fetch('SELECT role FROM users WHERE id=?',[$userId]);if($status==='cancelled'&&(int)$task['is_locked']&&($actor['role']??'')!=='super_admin')return false;
-        Database::execute('UPDATE work_planner_tasks SET status=?,progress_percent=IF(?="done",100,progress_percent),completed_at=IF(?="done",NOW(),NULL),updated_at=NOW() WHERE id=?',[$status,$status,$status,$taskId]);self::logTaskAction($taskId,$userId,$status==='done'?'completed':'status_changed',['status'=>$task['status']],['status'=>$status]);return true;
+        Database::execute('UPDATE work_planner_tasks SET status=?,progress_percent=IF(?="done",100,progress_percent),completed_at=IF(?="done",NOW(),NULL),updated_at=NOW() WHERE id=?',[$status,$status,$status,$taskId]);self::logTaskAction($taskId,$userId,$status==='done'?'completed':'status_changed',['status'=>$task['status']],['status'=>$status]);if($status==='done'&&$task['status']!=='done')self::createNextRecurrence($taskId,$userId);return true;
+    }
+
+    public static function moveToTomorrow(int $taskId,int $userId): bool
+    {
+        if(!self::canUserAccessTask($userId,$taskId))return false;$task=Database::fetch('SELECT due_date,status FROM work_planner_tasks WHERE id=?',[$taskId]);if(!$task||in_array($task['status'],['done','cancelled'],true))return false;$old=$task['due_date'];$base=$old?:date('Y-m-d');$due=(new DateTimeImmutable($base))->modify('+1 day')->format('Y-m-d');Database::execute('UPDATE work_planner_tasks SET due_date=?,updated_at=NOW() WHERE id=?',[$due,$taskId]);self::logTaskAction($taskId,$userId,'moved_to_tomorrow',['due_date'=>$old],['due_date'=>$due]);return true;
+    }
+
+    public static function updatePersonalTask(int $taskId,array $input,int $userId): bool
+    {
+        $task=Database::fetch('SELECT user_id,is_personal,title,description,priority,due_date,recurrence_type,recurrence_interval FROM work_planner_tasks WHERE id=?',[$taskId]);if(!$task||(int)$task['user_id']!==$userId||!(int)$task['is_personal'])return false;$title=trim((string)($input['title']??''));if($title==='')throw new InvalidArgumentException('عنوان وظیفه الزامی است.');$priority=in_array($input['priority']??'',['low','normal','high','urgent'],true)?$input['priority']:'normal';$due=trim((string)($input['due_date']??''))?:null;$recurrence=in_array($input['recurrence_type']??'none',['none','daily','weekly','monthly'],true)?$input['recurrence_type']:'none';$interval=max(1,min(365,(int)($input['recurrence_interval']??1)));Database::execute('UPDATE work_planner_tasks SET title=?,description=?,priority=?,due_date=?,recurrence_type=?,recurrence_interval=?,updated_at=NOW() WHERE id=?',[$title,trim((string)($input['description']??'')),$priority,$due,$recurrence,$interval,$taskId]);self::logTaskAction($taskId,$userId,'updated',$task,['title'=>$title,'priority'=>$priority,'due_date'=>$due,'recurrence_type'=>$recurrence]);return true;
+    }
+
+    private static function createNextRecurrence(int $taskId,int $userId): void
+    {
+        $task=Database::fetch('SELECT * FROM work_planner_tasks WHERE id=?',[$taskId]);if(!$task)return;$type=(string)($task['recurrence_type']??'none');if($type==='none')return;$interval=max(1,(int)($task['recurrence_interval']??1));$modifier=match($type){'daily'=>"+{$interval} day",'weekly'=>"+{$interval} week",'monthly'=>"+{$interval} month",default=>null};if(!$modifier)return;$base=$task['due_date']?:date('Y-m-d');$due=(new DateTimeImmutable($base))->modify($modifier)->format('Y-m-d');if(Database::fetch('SELECT id FROM work_planner_tasks WHERE parent_task_id=? AND due_date=? LIMIT 1',[$taskId,$due]))return;Database::execute('INSERT INTO work_planner_tasks(user_id,employee_id,assigned_by,title,description,task_type,priority,status,start_date,due_date,progress_percent,parent_task_id,is_locked,is_personal,is_visible_on_dashboard,recurrence_type,recurrence_interval,created_at,updated_at) VALUES(?,?,?, ?,?,"custom",?,"todo",CURDATE(),?,0,?,0,1,1,?,?,NOW(),NOW())',[(int)$task['user_id'],(int)$task['user_id'],$userId,$task['title'],$task['description'],$task['priority'],$due,$taskId,$type,$interval]);self::logTaskAction((int)Database::lastInsertId(),$userId,'recurrence_created',['source_task_id'=>$taskId],['due_date'=>$due]);
     }
 
     public static function updateTaskProgress(int $taskId,int $progress,int $userId): bool

@@ -395,22 +395,22 @@ class NotificationService
 
     public static function notifyTicketAssigned(int $userId, int $ticketId, string $ticketTitle): ?int
     {
-        return self::create($userId, 'ticket_assigned', 'تیکت جدید برای شما ثبت شد', $ticketTitle, '/admin/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک تیکت جدید به شما تخصیص داده شد.']);
+        return self::create($userId, 'ticket_assigned', 'تیکت جدید برای شما ثبت شد', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک تیکت جدید به شما تخصیص داده شد.']);
     }
 
     public static function notifyTicketReply(int $userId, int $ticketId, string $ticketTitle): ?int
     {
-        return self::create($userId, 'ticket_reply', 'پاسخ جدید روی تیکت', $ticketTitle, '/admin/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک پاسخ جدید روی تیکت شما ثبت شد.']);
+        return self::create($userId, 'ticket_reply', 'پاسخ جدید روی تیکت', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک پاسخ جدید روی تیکت شما ثبت شد.']);
     }
 
     public static function notifyTicketStatusChanged(int $userId, int $ticketId, string $status): ?int
     {
-        return self::create($userId, 'ticket_status_changed', 'وضعیت تیکت تغییر کرد', 'وضعیت جدید: ' . $status, '/admin/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'وضعیت یکی از تیکت‌های شما تغییر کرد.']);
+        return self::create($userId, 'ticket_status_changed', 'وضعیت تیکت تغییر کرد', 'وضعیت جدید: ' . $status, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'وضعیت یکی از تیکت‌های شما تغییر کرد.']);
     }
 
     public static function notifyTicketReassigned(int $userId, int $ticketId, string $ticketTitle): ?int
     {
-        return self::create($userId, 'ticket_reassigned', 'تیکت به شما ارجاع شد', $ticketTitle, '/admin/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک تیکت به شما ارجاع شد.']);
+        return self::create($userId, 'ticket_reassigned', 'تیکت به شما ارجاع شد', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک تیکت به شما ارجاع شد.']);
     }
 
     public static function notifyCartableItem(int $userId, int $itemId, string $title, string $actionUrl): ?int
@@ -430,12 +430,12 @@ class NotificationService
 
     public static function notifySlaWarning(int $userId, int $ticketId): ?int
     {
-        return self::create($userId, 'sla_warning', 'هشدار SLA', 'مهلت پاسخ یا انجام تیکت رو به پایان است.', '/admin/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'priority' => 'high']);
+        return self::create($userId, 'sla_warning', 'هشدار SLA', 'مهلت پاسخ یا انجام تیکت رو به پایان است.', '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'priority' => 'high']);
     }
 
     public static function notifySlaBreach(int $userId, int $ticketId): ?int
     {
-        return self::create($userId, 'sla_breach', 'عبور از SLA', 'تیکت از زمان SLA عبور کرده است.', '/admin/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'priority' => 'urgent']);
+        return self::create($userId, 'sla_breach', 'عبور از SLA', 'تیکت از زمان SLA عبور کرده است.', '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'priority' => 'urgent']);
     }
 
     public static function notifyDueDateReminder(int $userId, int $itemId, string $title, string $actionUrl): ?int
@@ -445,7 +445,7 @@ class NotificationService
 
     public static function notifyTicketReopened(int $userId, int $ticketId): ?int
     {
-        return self::create($userId, 'ticket_reopened', 'تیکت بسته‌شده بازگشایی شد', 'یک تیکت دوباره باز شده است.', '/admin/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'priority' => 'high']);
+        return self::create($userId, 'ticket_reopened', 'تیکت بسته‌شده بازگشایی شد', 'یک تیکت دوباره باز شده است.', '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'priority' => 'high']);
     }
 
     public static function notifyInternalMessage(int $userId, int $messageId, string $actionUrl): ?int

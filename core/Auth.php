@@ -31,12 +31,6 @@ class Auth
             $_SESSION['user_id'] = (int)$user['id'];
             $_SESSION['role'] = $user['role'];
             Database::execute('UPDATE users SET last_login_at=NOW() WHERE id=?', [(int)$user['id']]);
-            try {
-                require_once __DIR__ . '/../services/WorkPlannerService.php';
-                WorkPlannerService::generateDailyTasksForUser((int)$user['id']);
-            } catch (Throwable $e) {
-                error_log('Work planner login generation: ' . $e->getMessage());
-            }
             self::log((int)$user['id'], 'login', 'auth');
             return true;
         }
