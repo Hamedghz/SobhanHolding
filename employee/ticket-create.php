@@ -12,28 +12,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!Auth::verifyCsrf($_POST['_csrf'] ?? null)) throw new DomainException('اعتبار فرم منقضی شده است.');
         $id = TicketService::create($_POST, (int)$user['id']);
 
-        $assignedUserId = (int)($_POST['assigned_user_id'] ?? 0);
-        $assignedUnitId = (int)($_POST['assigned_unit_id'] ?? 0);
-        if ($assignedUserId || $assignedUnitId) {
-            $targetUser = $assignedUserId ? Database::fetch('SELECT id,name FROM users WHERE id=? AND status="active"', [$assignedUserId]) : null;
-            $targetUnit = $assignedUnitId ? Database::fetch('SELECT id,title FROM org_units WHERE id=? AND active=1', [$assignedUnitId]) : null;
-            if ($assignedUserId && !$targetUser) throw new InvalidArgumentException('عضو گیرنده معتبر نیست.');
-            if ($assignedUnitId && !$targetUnit) throw new InvalidArgumentException('واحد گیرنده معتبر نیست.');
-
-            Database::execute(
-                'UPDATE tickets SET assigned_user_id=?,assigned_unit_id=?,status=IF(status="open","assigned",status),updated_at=NOW() WHERE id=? AND requester_user_id=?',
-                [$assignedUserId ?: null, $assignedUnitId ?: null, $id, (int)$user['id']]
-            );
-            Database::execute(
-                'INSERT INTO ticket_assignments(ticket_id,assigned_user_id,assigned_unit_id,assigned_by,note,created_at) VALUES(?,?,?,?,?,NOW())',
-                [$id, $assignedUserId ?: null, $assignedUnitId ?: null, (int)$user['id'], 'ارسال/ارجاع مستقیم هنگام ثبت تیکت']
-            );
-            Database::execute(
-                'INSERT INTO ticket_status_logs(ticket_id,actor_user_id,old_status,new_status,note,created_at) VALUES(?,?,?,?,?,NOW())',
-                [$id, (int)$user['id'], 'open', 'assigned', 'ارسال مستقیم به عضو/واحد']
-            );
-        }
-
         if (($_FILES['attachment']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
             $saved = Upload::save($_FILES['attachment'], 'uploads/tickets', ['pdf','doc','docx','xls','xlsx','jpg','jpeg','png','webp','txt','zip'], 10*1024*1024);
             if (!$saved['ok']) throw new InvalidArgumentException($saved['error']);
