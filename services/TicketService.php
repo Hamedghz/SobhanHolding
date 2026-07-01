@@ -153,9 +153,11 @@ final class TicketService
         if ($subject === '' || $message === '' || !$category) throw new InvalidArgumentException('عنوان، متن و دسته‌بندی معتبر الزامی است.');
 
         $priority = in_array($input['priority'] ?? '', array_keys(self::PRIORITIES), true) ? $input['priority'] : 'normal';
-        $assigned = (int)($category['default_assignee_user_id'] ?? 0) ?: null;
-        $unit = (int)($category['assigned_unit_id'] ?? 0) ?: null;
-        $status = $assigned ? 'assigned' : 'open';
+        $assigned = (int)($input['assigned_user_id'] ?? 0) ?: ((int)($category['default_assignee_user_id'] ?? 0) ?: null);
+        $unit = (int)($input['assigned_unit_id'] ?? 0) ?: ((int)($category['assigned_unit_id'] ?? 0) ?: null);
+        if ($assigned && !Database::fetch('SELECT id FROM users WHERE id=? AND status="active"', [$assigned])) throw new InvalidArgumentException('عضو گیرنده معتبر نیست.');
+        if ($unit && !Database::fetch('SELECT id FROM org_units WHERE id=? AND active=1', [$unit])) throw new InvalidArgumentException('واحد گیرنده معتبر نیست.');
+        $status = ($assigned || $unit) ? 'assigned' : 'open';
         $sla = Database::fetch('SELECT resolution_minutes FROM ticket_sla_rules WHERE active=1 AND priority=? AND (category_id=? OR category_id IS NULL) ORDER BY category_id IS NULL LIMIT 1', [$priority, $categoryId]);
         $due = $sla ? date('Y-m-d H:i:s', time() + (int)$sla['resolution_minutes'] * 60) : null;
 
@@ -173,7 +175,7 @@ final class TicketService
             Database::execute('INSERT INTO ticket_messages(ticket_id,user_id,message,is_internal,created_at) VALUES(?,?,?,0,NOW())', [$id,$userId,$message]);
             Database::execute('INSERT INTO ticket_status_logs(ticket_id,actor_user_id,old_status,new_status,note,created_at) VALUES(?,?,NULL,?,"ایجاد تیکت",NOW())', [$id,$userId,$status]);
             if ($assigned || $unit) {
-                Database::execute('INSERT INTO ticket_assignments(ticket_id,assigned_user_id,assigned_unit_id,assigned_by,note,created_at) VALUES(?,?,?,? ,"ارجاع خودکار بر اساس دسته‌بندی",NOW())', [$id,$assigned,$unit,$userId]);
+                Database::execute('INSERT INTO ticket_assignments(ticket_id,assigned_user_id,assigned_unit_id,assigned_by,note,created_at) VALUES(?,?,?,?,?,NOW())', [$id,$assigned,$unit,$userId,'ارجاع هنگام ثبت تیکت']);
             }
             $pdo->commit();
         } catch (Throwable $e) {
@@ -181,7 +183,7 @@ final class TicketService
             throw $e;
         }
 
-        if ($assigned && $assigned !== $userId) self::notify(static fn() => NotificationService::notifyTicketAssigned($assigned, $id, $subject));
+        self::notifyTicketAudience($id, $subject, $userId, $assigned, $unit, 'created');
         Auth::log($userId, 'ticket_created', 'tickets', $id);
         return $id;
     }
@@ -199,8 +201,8 @@ final class TicketService
         if (!$internal) {
             $nextStatus = $userId === (int)$ticket['requester_user_id'] ? 'waiting_admin' : 'waiting_user';
             Database::execute('UPDATE tickets SET last_message_at=NOW(),status=IF(status IN("resolved","closed","cancelled"),status,?),updated_at=NOW() WHERE id=?', [$nextStatus,$id]);
-            $target = $userId === (int)$ticket['requester_user_id'] ? (int)($ticket['assigned_user_id'] ?? 0) : (int)$ticket['requester_user_id'];
-            if ($target && $target !== $userId) self::notify(static fn() => NotificationService::notifyTicketReply($target, $id, $ticket['subject']));
+            $targets = $userId === (int)$ticket['requester_user_id'] ? self::ticketAudience((int)($ticket['assigned_user_id'] ?? 0), (int)($ticket['assigned_unit_id'] ?? 0), $userId) : [(int)$ticket['requester_user_id']];
+            foreach ($targets as $target) if ($target && $target !== $userId) self::notify(static fn() => NotificationService::notifyTicketReply($target, $id, $ticket['subject']));
         }
         Auth::log($userId, 'ticket_reply', 'tickets', $id);
         return $messageId;
@@ -238,7 +240,7 @@ final class TicketService
             throw $e;
         }
 
-        if ($assigned && $assigned !== (int)($ticket['assigned_user_id'] ?? 0)) self::notify(static fn() => NotificationService::notifyTicketReassigned($assigned, $id, $ticket['subject']));
+        if ($assigned !== (int)($ticket['assigned_user_id'] ?? 0) || $unit !== (int)($ticket['assigned_unit_id'] ?? 0)) self::notifyTicketAudience($id, $ticket['subject'], $actorId, $assigned, $unit, 'reassigned');
         if ($status !== $ticket['status']) self::notify(static fn() => NotificationService::notifyTicketStatusChanged((int)$ticket['requester_user_id'], $id, self::STATUSES[$status]));
         Auth::log($actorId, 'ticket_managed', 'tickets', $id);
     }
@@ -263,6 +265,32 @@ final class TicketService
             $params[] = (int)$user['org_unit_id'];
         }
         return ['(' . implode(' OR ', $conditions) . ')', $params];
+    }
+
+    private static function notifyTicketAudience(int $ticketId, string $subject, int $actorId, ?int $assigned, ?int $unit, string $mode): void
+    {
+        foreach (self::ticketAudience($assigned, $unit, $actorId) as $target) {
+            if ($target === $actorId) continue;
+            self::notify(static function () use ($target, $ticketId, $subject, $mode) {
+                if ($mode === 'reassigned') NotificationService::notifyTicketReassigned($target, $ticketId, $subject);
+                else NotificationService::notifyTicketAssigned($target, $ticketId, $subject);
+            });
+        }
+    }
+
+    private static function ticketAudience(?int $assigned, ?int $unit, int $excludeUserId = 0): array
+    {
+        $ids = [];
+        if ($assigned) $ids[] = $assigned;
+        if ($unit) {
+            $rows = Database::fetchAll('SELECT id FROM users WHERE status="active" AND org_unit_id=?', [$unit]);
+            foreach ($rows as $row) $ids[] = (int)$row['id'];
+        }
+        if (!$ids) {
+            $admins = Database::fetchAll('SELECT id FROM users WHERE status="active" AND role IN("admin","super_admin")');
+            foreach ($admins as $row) $ids[] = (int)$row['id'];
+        }
+        return array_values(array_unique(array_filter(array_map('intval', $ids), static fn($id) => $id > 0 && $id !== $excludeUserId)));
     }
 
     private static function notify(callable $callback): void
