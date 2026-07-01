@@ -1,12 +1,17 @@
 <?php
 require_once __DIR__.'/../core/Auth.php';
+require_once __DIR__.'/../core/Database.php';
 require_once __DIR__.'/../core/Response.php';
 require_once __DIR__.'/../services/TicketService.php';
 
 Auth::requireLogin();
 if (!TicketService::canManage()) {
     http_response_code(403);
-    exit('دسترسی مدیریت تیکت‌ها برای شما فعال نیست.');
+    $pageTitle = 'مدیریت تیکت‌ها';
+    require __DIR__.'/../views/partials/admin-header.php';
+    echo '<section class="card"><h1>دسترسی مدیریت تیکت‌ها برای شما فعال نیست</h1><p class="muted">برای مشاهده تیکت‌های سازمانی، مجوز ticketing.manage لازم است.</p></section>';
+    require __DIR__.'/../views/partials/admin-footer.php';
+    exit;
 }
 
 $filters = [
@@ -32,6 +37,7 @@ require __DIR__.'/../views/partials/admin-header.php';
         <p class="muted">صف مستقل رسیدگی به درخواست‌ها؛ بدون مدیریت در Inbox پیام‌رسان</p>
     </div>
     <div>
+        <a class="btn btn-primary" href="/employee/ticket-create.php">ثبت تیکت جدید</a>
         <a class="btn" href="/admin/ticket-categories.php">دسته‌بندی‌ها</a>
         <a class="btn" href="/admin/ticket-settings.php">SLA و تنظیمات</a>
     </div>
@@ -46,7 +52,7 @@ require __DIR__.'/../views/partials/admin-header.php';
     <label>وضعیت<select name="status"><option value="">همه</option><?php foreach(TicketService::STATUSES as $key=>$label):?><option value="<?=$key?>" <?=$filters['status']===$key?'selected':''?>><?=e($label)?></option><?php endforeach?></select></label>
     <label>اولویت<select name="priority"><option value="">همه</option><?php foreach(TicketService::PRIORITIES as $key=>$label):?><option value="<?=$key?>" <?=$filters['priority']===$key?'selected':''?>><?=e($label)?></option><?php endforeach?></select></label>
     <label>دسته<select name="category_id"><option value="">همه</option><?php foreach($categories as $category):?><option value="<?=$category['id']?>" <?=$filters['category_id']==$category['id']?'selected':''?>><?=e($category['title'])?></option><?php endforeach?></select></label>
-    <label>مسئول<select name="assigned_user_id"><option value="">همه</option><?php foreach($users as $user):?><option value="<?=$user['id']?>" <?=$filters['assigned_user_id']==$user['id']?'selected':''?>><?=e($user['name'])?></option><?php endforeach?></select></label>
+    <label>مسئول<select name="assigned_user_id"><option value="">همه</option><?php foreach($users as $member):?><option value="<?=$member['id']?>" <?=$filters['assigned_user_id']==$member['id']?'selected':''?>><?=e($member['name'])?></option><?php endforeach?></select></label>
     <label>واحد<select name="assigned_unit_id"><option value="">همه</option><?php foreach($units as $unit):?><option value="<?=$unit['id']?>" <?=$filters['assigned_unit_id']==$unit['id']?'selected':''?>><?=e($unit['title'])?></option><?php endforeach?></select></label>
     <label><input type="checkbox" name="overdue" value="1" <?=$filters['overdue']?'checked':''?>> فقط SLA گذشته</label>
     <button class="btn btn-primary">اعمال</button>
@@ -65,11 +71,11 @@ require __DIR__.'/../views/partials/admin-header.php';
                     <td><?=e($ticket['assignee_name'] ?: $ticket['unit_title'] ?: '—')?></td>
                     <td><?=e(TicketService::PRIORITIES[$ticket['priority']] ?? $ticket['priority'])?></td>
                     <td><span class="badge"><?=e(TicketService::STATUSES[$ticket['status']] ?? $ticket['status'])?></span></td>
-                    <td><?=e($ticket['due_at'] ? format_jalali_datetime($ticket['due_at']) : '—')?><?php if(!empty($ticket['is_overdue'])):?><small>گذشته از SLA</small><?php endif;?></td>
+                    <td><?=e($ticket['due_at'] && function_exists('format_jalali_datetime') ? format_jalali_datetime($ticket['due_at']) : ($ticket['due_at'] ?: '—'))?><?php if(!empty($ticket['is_overdue'])):?><small>گذشته از SLA</small><?php endif;?></td>
                     <td><a class="btn btn-small" href="/employee/ticket-view.php?id=<?=$ticket['id']?>">رسیدگی</a></td>
                 </tr>
             <?php endforeach; ?>
-            <?php if(!$rows): ?><tr><td colspan="8">تیکتی مطابق فیلتر پیدا نشد.</td></tr><?php endif; ?>
+            <?php if(!$rows): ?><tr><td colspan="8"><strong>هنوز تیکتی برای نمایش وجود ندارد.</strong><br><span class="muted">برای تست جریان ارسال/دریافت/ارجاع، از دکمه «ثبت تیکت جدید» یک تیکت بسازید یا فیلترها را پاک کنید.</span></td></tr><?php endif; ?>
             </tbody>
         </table>
     </div>
