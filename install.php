@@ -13,10 +13,10 @@ function h($value): string
 function safeError(Throwable $exception, string $password): string
 {
     $message = $exception->getMessage();
-    if ($password !== '') {
-        $message = str_replace($password, '********', $message);
-    }
-    return h($message);
+    if ($password !== '') $message = str_replace($password, '********', $message);
+    $reference = substr(hash('sha256', $message), 0, 10);
+    error_log('Installer database error [' . $reference . ']: ' . $message);
+    return h('عملیات دیتابیس انجام نشد. تنظیمات اتصال و گزارش فنی سرور را بررسی کنید. شناسه خطا: ' . $reference);
 }
 
 if (file_exists($lock)) {
@@ -84,6 +84,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Fresh install only: runtime repairs/defaults are handled by core/Database.php::migrate().
             $schema = file_get_contents(__DIR__ . '/database/schema.sql');
+            if ($schema === false) throw new RuntimeException('schema_file_unavailable');
+            // Comments may contain semicolons; remove them before splitting SQL statements.
+            $schema = preg_replace('/\/\*.*?\*\//s', '', $schema) ?? $schema;
+            $schema = preg_replace('/^\s*(?:--|#).*$/m', '', $schema) ?? $schema;
             foreach (array_filter(array_map('trim', explode(';', $schema))) as $statement) {
                 $pdo->exec($statement);
             }
