@@ -131,7 +131,7 @@ function admin_menu_registry(): array
             ['title' => 'نصب پلنر شخصی', 'url' => '/install/personal_planner_seed.php', 'permission' => 'system_maintenance', 'active' => ['personal_planner_seed.php']],
             ['title' => 'نصب قوانین و صورتجلسات', 'url' => '/install/management_meetings_seed.php', 'permission' => 'system_maintenance', 'active' => ['management_meetings_seed.php']],
             ['title' => 'نصب حضور و کارکرد', 'url' => '/install/hr_attendance_seed.php', 'permission' => 'system_maintenance', 'active' => ['hr_attendance_seed.php']],
-            ['title' => 'نصب پنل سرپرستان فروش', 'url' => '/install/seed_supervisor_panel.php', 'permission' => 'system_maintenance', 'active' => ['seed_supervisor_panel.php']],
+            ['title' => 'تعمیر پنل سرپرستان فروش', 'url' => '/install/sales_supervisor_panel_repair.php', 'permission' => 'system_maintenance', 'active' => ['sales_supervisor_panel_repair.php']],
         ]],
     ];
 }
