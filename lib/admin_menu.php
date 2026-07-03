@@ -7,6 +7,7 @@ function admin_menu_registry(): array
             ['title' => 'داشبورد اصلی', 'url' => '/admin/index.php', 'permission' => 'dashboard', 'active' => ['index.php']],
             ['title' => 'پنل مدیرعامل', 'url' => '/admin/ceo-dashboard.php', 'any' => ['view_ceo_dashboard', 'ceo_dashboard'], 'active' => ['ceo-dashboard.php']],
             ['title' => 'پنل مدیران فروش', 'url' => '/admin/manager-dashboard.php', 'permission' => 'manager_dashboard.view', 'active' => ['manager-dashboard.php']],
+            ['title' => 'پنل سرپرست فروش', 'url' => '/admin/supervisor-dashboard.php', 'permission' => 'supervisor.panel.view', 'active_paths' => ['/admin/supervisor-dashboard.php','/admin/supervisor-sales-report.php','/admin/supervisor-actions.php','/admin/supervisor-action-view.php']],
             ['title' => 'پنل کارمند', 'url' => '/admin/employee-dashboard.php', 'permission' => 'employee_portal', 'fallback_role' => 'employee', 'active' => ['employee-dashboard.php']],
         ]],
         'personal_planner' => ['title' => 'برنامه کاری من', 'items' => [
@@ -15,8 +16,18 @@ function admin_menu_registry(): array
         'sales' => ['title' => 'فروش و تحلیل عملکرد', 'items' => [
             ['title' => 'ورود گزارش فروش', 'url' => '/admin/manager-dashboard-import.php', 'permission' => 'manager_dashboard.import', 'active' => ['manager-dashboard-import.php']],
             ['title' => 'خروجی گزارش فروش', 'url' => '/admin/manager-dashboard-export.php', 'permission' => 'manager_dashboard.export', 'active' => ['manager-dashboard-export.php']],
+            ['title' => 'گزارش عملکرد سرپرستان', 'url' => '/admin/sales-manager-supervisor-reports.php', 'permission' => 'sales_manager.supervisors.view', 'active_paths' => ['/admin/sales-manager-supervisor-reports.php']],
+            ['title' => 'اسکریپت‌های فروش', 'url' => '/admin/sales-scripts.php', 'permission' => 'sales_manager.scripts.manage', 'active_paths' => ['/admin/sales-scripts.php','/admin/sales-script-fields.php']],
+            ['title' => 'اقدامات فروش', 'url' => '/admin/sales-actions.php', 'permission' => 'sales_manager.actions.manage', 'active_paths' => ['/admin/sales-actions.php']],
+            ['title' => 'پیشنهاد اردر خرید', 'url' => '/admin/sales-purchase-suggestions.php', 'permission' => 'sales_manager.purchase_suggestions.manage', 'active_paths' => ['/admin/sales-purchase-suggestions.php']],
+            ['title' => 'گزارش‌کار روزانه مدیر فروش', 'url' => '/admin/sales-manager-daily-work-log.php', 'permission' => 'sales_manager.daily_logs.manage', 'active_paths' => ['/admin/sales-manager-daily-work-log.php']],
             ['title' => 'اطلاعات لاین‌ها', 'url' => '/admin/ceo-dashboard-settings.php#lines', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-lines.php']],
             ['title' => 'اطلاعات ویزیتورها', 'url' => '/admin/ceo-dashboard-settings.php#visitors', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-visitors.php']],
+        ]],
+        'sales_supervisor' => ['title' => 'پنل سرپرست فروش', 'items' => [
+            ['title' => 'داشبورد سرپرست', 'url' => '/admin/supervisor-dashboard.php', 'permission' => 'supervisor.panel.view', 'active' => ['supervisor-dashboard.php']],
+            ['title' => 'گزارش فروش ویزیتورها', 'url' => '/admin/supervisor-sales-report.php', 'permission' => 'supervisor.sales.view', 'active' => ['supervisor-sales-report.php']],
+            ['title' => 'اسکریپت فروش و اقدامات', 'url' => '/admin/supervisor-actions.php', 'permission' => 'supervisor.actions.manage', 'active_paths' => ['/admin/supervisor-actions.php','/admin/supervisor-action-view.php']],
         ]],
         'management_reports' => ['title' => 'گزارشات مدیران', 'items' => [
             ['title' => 'آماده‌سازی گزارش مدیران فروش', 'url' => '/admin/management-report-prepare.php?type=sales', 'management_report_type' => 'sales', 'active_paths' => ['/admin/management-report-prepare.php']],
@@ -110,6 +121,7 @@ function admin_menu_registry(): array
             ['title' => 'تنظیمات عمومی', 'url' => '/admin/settings.php', 'permission' => 'settings', 'active' => ['settings.php']],
             ['title' => 'تنظیمات داشبورد مدیرعامل', 'url' => '/admin/ceo-dashboard-settings.php', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-settings.php']],
             ['title' => 'تنظیمات داشبورد مدیران', 'url' => '/admin/manager-dashboard-settings.php', 'any' => ['manager_dashboard.settings', 'manager_dashboard.ai_settings'], 'active' => ['manager-dashboard-settings.php']],
+            ['title' => 'تنظیمات پنل سرپرستان', 'url' => '/admin/supervisor-settings.php', 'permission' => 'admin.supervisor_settings.manage', 'active' => ['supervisor-settings.php']],
         ]],
         'system' => ['title' => 'ابزارهای سیستم', 'items' => [
             ['title' => 'بکاپ فایل‌های سایت', 'url' => '/admin/uploaded-files-backup.php', 'permission' => 'file_backup.manage', 'active' => ['uploaded-files-backup.php']],
@@ -119,6 +131,7 @@ function admin_menu_registry(): array
             ['title' => 'نصب پلنر شخصی', 'url' => '/install/personal_planner_seed.php', 'permission' => 'system_maintenance', 'active' => ['personal_planner_seed.php']],
             ['title' => 'نصب قوانین و صورتجلسات', 'url' => '/install/management_meetings_seed.php', 'permission' => 'system_maintenance', 'active' => ['management_meetings_seed.php']],
             ['title' => 'نصب حضور و کارکرد', 'url' => '/install/hr_attendance_seed.php', 'permission' => 'system_maintenance', 'active' => ['hr_attendance_seed.php']],
+            ['title' => 'نصب پنل سرپرستان فروش', 'url' => '/install/seed_supervisor_panel.php', 'permission' => 'system_maintenance', 'active' => ['seed_supervisor_panel.php']],
         ]],
     ];
 }
