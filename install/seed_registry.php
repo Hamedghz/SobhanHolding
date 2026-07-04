@@ -8,4 +8,5 @@ return [
     'dashboard_defaults' => ['title' => 'پیش‌فرض‌های داشبورد', 'description' => 'در حالت امن داده عملیاتی یا سفارشی داشبورد را تغییر نمی‌دهد.', 'file' => 'seeds/006_dashboard_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
     'permissions' => ['title' => 'دسترسی‌ها', 'description' => 'کلیدهای مجوز مفقود را بدون تغییر دسترسی کاربران اضافه می‌کند.', 'file' => 'seeds/007_permissions_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
     'survey_templates' => ['title' => 'قالب‌های نظرسنجی', 'description' => 'قالب‌های سیستمی مفقود را بررسی می‌کند.', 'file' => 'seeds/008_survey_templates_seed.php', 'dependencies' => [], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
+    'sales_structure' => ['title' => 'ساختار فروش و محدوده‌ها', 'description' => 'لاین‌ها، شهرها، مناطق زاهدان و جدول‌های رابطه مدیر/سرپرست/ویزیتور را ایجاد و Seed می‌کند.', 'file' => 'seeds/009_sales_structure_seed.php', 'dependencies' => ['permissions'], 'default_mode' => 'safe', 'admin_only' => true, 'super_admin_only' => false],
 ];
