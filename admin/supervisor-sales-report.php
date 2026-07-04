@@ -5,7 +5,7 @@ require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../services/SalesOperationsService.php';
 
 SalesOperationsService::boot();
-SalesOperationsService::ensureSupervisorAccess();
+SalesOperationsService::requireSupervisorPermission('supervisor.sales.view');
 $user = Auth::user();
 $supervisorId = (int)$user['id'];
 [$from,$to] = SalesOperationsService::dateFilters($_GET);

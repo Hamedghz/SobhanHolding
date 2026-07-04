@@ -37,10 +37,45 @@ class SalesOperationsService
         if (!self::isSupervisor(Auth::user())) { http_response_code(403); echo 'دسترسی غیرمجاز'; exit; }
     }
 
+    public static function isSalesManagerUserId(int $userId): bool
+    {
+        if($userId<1)return false;$user=Database::fetch('SELECT id,role_key,status FROM users WHERE id=?',[$userId]);
+        return (bool)$user&&$user['status']==='active'&&(in_array((string)$user['role_key'],self::SALES_MANAGER_ROLE_KEYS,true)||(bool)Database::fetch('SELECT id FROM sales_team_assignments WHERE sales_manager_id=? AND active=1 LIMIT 1',[$userId]));
+    }
+
+    public static function isSupervisorUserId(int $userId): bool
+    {if($userId<1)return false;$user=Database::fetch('SELECT role_key,status FROM users WHERE id=?',[$userId]);return (bool)$user&&$user['status']==='active'&&in_array((string)$user['role_key'],self::SUPERVISOR_ROLE_KEYS,true);}
+
+    public static function isVisitorUserId(int $userId): bool
+    {if($userId<1)return false;$user=Database::fetch('SELECT role_key,status FROM users WHERE id=?',[$userId]);return (bool)$user&&$user['status']==='active'&&in_array((string)$user['role_key'],['VISITOR','visitor','ویزیتور'],true);}
+
+    public static function requireSupervisorPermission(string $permission): void
+    {
+        Auth::requireLogin();
+        if (!self::isSupervisor(Auth::user()) || (!self::canViewAll(Auth::user()) && !Auth::can($permission))) {
+            http_response_code(403); echo 'دسترسی غیرمجاز'; exit;
+        }
+    }
+
     public static function ensureSalesManagerAccess(): void
     {
         Auth::requireLogin();
         if (!self::isSalesManager(Auth::user())) { http_response_code(403); echo 'دسترسی غیرمجاز'; exit; }
+    }
+
+    public static function requireSalesManagerPermission(string $permission): void
+    {
+        Auth::requireLogin();
+        if (!self::isSalesManager(Auth::user()) || (!self::canViewAll(Auth::user()) && !Auth::can($permission))) {
+            http_response_code(403); echo 'دسترسی غیرمجاز'; exit;
+        }
+    }
+
+    public static function uiError(Throwable $error, string $fallback): string
+    {
+        if ($error instanceof InvalidArgumentException) return $error->getMessage();
+        error_log('Sales operations: '.$error->getMessage());
+        return $fallback;
     }
 
     public static function supervisorManagerId(int $supervisorId): ?int
@@ -85,7 +120,16 @@ class SalesOperationsService
     {
         $from = trim((string)($input['from'] ?? '')) ?: date('Y-m-01');
         $to = trim((string)($input['to'] ?? '')) ?: date('Y-m-d');
+        if (!self::validDate($from)) $from = date('Y-m-01');
+        if (!self::validDate($to)) $to = date('Y-m-d');
+        if ($from > $to) [$from,$to] = [$to,$from];
         return [$from, $to];
+    }
+
+    public static function validDate(string $date): bool
+    {
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        return $parsed !== false && $parsed->format('Y-m-d') === $date;
     }
 
     public static function getSupervisorSalesSummary(int $supervisorId, array $filters = []): array
@@ -134,9 +178,9 @@ class SalesOperationsService
     {
         $user = Auth::user();
         $supervisorId = (int)($data['supervisor_id'] ?? ($user['id'] ?? 0));
-        if (!self::canViewAll($user) && (int)$user['id'] !== $supervisorId) throw new RuntimeException('دسترسی ثبت اقدام برای این سرپرست وجود ندارد.');
+        if (!self::canViewAll($user) && (int)$user['id'] !== $supervisorId) throw new InvalidArgumentException('دسترسی ثبت اقدام برای این سرپرست وجود ندارد.');
         $visitorId = (int)($data['visitor_id'] ?? 0);
-        if ($visitorId && !self::assertVisitorBelongsToSupervisor($visitorId, $supervisorId)) throw new RuntimeException('ویزیتور انتخاب‌شده در زیرمجموعه این سرپرست نیست.');
+        if ($visitorId && !self::assertVisitorBelongsToSupervisor($visitorId, $supervisorId)) throw new InvalidArgumentException('ویزیتور انتخاب‌شده در زیرمجموعه این سرپرست نیست.');
         $managerId = self::supervisorManagerId($supervisorId);
         Database::execute('INSERT INTO supervisor_actions(supervisor_id,sales_manager_id,sales_line,section_id,visitor_id,customer_id,title,description,action_type,priority,status,due_date,dynamic_values_json,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())', [$supervisorId,$managerId,$data['sales_line'] ?? null,(int)($data['section_id'] ?? 0) ?: null,$visitorId ?: null,(int)($data['customer_id'] ?? 0) ?: null,trim((string)$data['title']),trim((string)($data['description'] ?? '')),trim((string)($data['action_type'] ?? '')),self::validPriority($data['priority'] ?? 'normal'),self::validSupervisorStatus($data['status'] ?? 'open'),trim((string)($data['due_date'] ?? '')) ?: null,json_encode($data['dynamic_values'] ?? [], JSON_UNESCAPED_UNICODE),(int)$user['id'],(int)$user['id']]);
         $id = (int)Database::connection()->lastInsertId();
@@ -149,43 +193,80 @@ class SalesOperationsService
     {
         $user = Auth::user();
         $managerId = self::canViewAll($user) ? (int)($data['sales_manager_id'] ?? $user['id']) : (int)$user['id'];
+        $supervisorId = (int)($data['supervisor_id'] ?? 0);
+        $visitorId = (int)($data['visitor_id'] ?? 0);
+        $assignedTo = (int)($data['assigned_to'] ?? 0) ?: $managerId;
+        if (!self::canViewAll($user) && $supervisorId && !self::canAccessSupervisor($supervisorId, $user)) throw new InvalidArgumentException('سرپرست انتخاب‌شده خارج از تیم شماست.');
+        if ($visitorId) {
+            if ($supervisorId && !self::assertVisitorBelongsToSupervisor($visitorId, $supervisorId)) throw new InvalidArgumentException('ویزیتور انتخاب‌شده عضو تیم سرپرست نیست.');
+            if (!$supervisorId && !self::canAccessSalesUser($visitorId, $managerId, $user)) throw new InvalidArgumentException('ویزیتور انتخاب‌شده خارج از تیم شماست.');
+        }
+        if (!self::canAccessSalesUser($assignedTo, $managerId, $user)) throw new InvalidArgumentException('مسئول انتخاب‌شده خارج از دامنه تیم فروش است.');
         Database::execute('INSERT INTO sales_actions(source_type,source_id,sales_manager_id,supervisor_id,visitor_id,customer_id,brand_id,product_id,sales_line,assigned_to,title,description,priority,status,due_date,dynamic_values_json,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())', [$data['source_type'] ?? null,(int)($data['source_id'] ?? 0) ?: null,$managerId,(int)($data['supervisor_id'] ?? 0) ?: null,(int)($data['visitor_id'] ?? 0) ?: null,(int)($data['customer_id'] ?? 0) ?: null,(int)($data['brand_id'] ?? 0) ?: null,(int)($data['product_id'] ?? 0) ?: null,$data['sales_line'] ?? null,(int)($data['assigned_to'] ?? 0) ?: $managerId,trim((string)$data['title']),trim((string)($data['description'] ?? '')),self::validPriority($data['priority'] ?? 'normal'),self::validActionStatus($data['status'] ?? 'open'),trim((string)($data['due_date'] ?? '')) ?: null,json_encode($data['dynamic_values'] ?? [], JSON_UNESCAPED_UNICODE),(int)$user['id'],(int)$user['id']]);
         $id = (int)Database::connection()->lastInsertId();
         if (!empty($data['add_to_planner'])) self::syncSalesActionToPlanner($id);
         return $id;
     }
 
+    public static function canAccessSalesUser(int $userId, int $managerId, ?array $viewer = null): bool
+    {
+        $viewer = $viewer ?: Auth::user();
+        if ($userId < 1 || !$viewer) return false;
+        if (self::canViewAll($viewer)) return (bool)Database::fetch('SELECT id FROM users WHERE id=? AND status="active"', [$userId]);
+        if ($userId === $managerId) return true;
+        foreach (self::getSalesManagerSupervisorIds($managerId) as $supervisorId) {
+            if ($userId === $supervisorId || self::assertVisitorBelongsToSupervisor($userId, $supervisorId)) return true;
+        }
+        return false;
+    }
+
+    public static function getSalesManagerTeamUserIds(int $managerId, ?array $viewer = null): array
+    {
+        $viewer = $viewer ?: Auth::user();
+        if (self::canViewAll($viewer)) return array_map('intval',array_column(Database::fetchAll('SELECT id FROM users WHERE status="active"'),'id'));
+        $ids=[$managerId];
+        foreach(self::getSalesManagerSupervisorIds($managerId) as $supervisorId){$ids[]=$supervisorId;foreach(self::getSupervisorVisitors($supervisorId) as $visitor)$ids[]=(int)$visitor['id'];}
+        return array_values(array_unique(array_filter($ids)));
+    }
+
     public static function syncSupervisorActionToPlanner(int $actionId): ?int
     {
-        if (!Database::tableExists('work_planner_tasks')) return null;
-        $action = Database::fetch('SELECT * FROM supervisor_actions WHERE id=?', [$actionId]);
-        if (!$action) return null;
-        if (!empty($action['planner_task_id'])) return (int)$action['planner_task_id'];
-        $existing = Database::fetch('SELECT id FROM work_planner_tasks WHERE related_module="supervisor_actions" AND related_record_id=? LIMIT 1', [$actionId]);
-        if ($existing) { Database::execute('UPDATE supervisor_actions SET planner_task_id=? WHERE id=?', [(int)$existing['id'],$actionId]); return (int)$existing['id']; }
-        Database::execute('INSERT INTO work_planner_tasks(user_id,employee_id,assigned_by,title,description,task_type,priority,status,due_date,related_module,related_record_id,is_visible_on_dashboard,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,NOW(),NOW())', [(int)$action['supervisor_id'],(int)$action['supervisor_id'],(int)($action['created_by'] ?: $action['supervisor_id']),$action['title'],$action['description'],'sales_action',$action['priority'],'todo',$action['due_date'],'supervisor_actions',$actionId]);
-        $taskId = (int)Database::connection()->lastInsertId();
-        Database::execute('UPDATE supervisor_actions SET planner_task_id=? WHERE id=?', [$taskId,$actionId]);
-        return $taskId;
+        return self::syncActionToPlanner('supervisor_actions', $actionId, 'supervisor_id');
     }
 
     public static function syncSalesActionToPlanner(int $actionId): ?int
     {
-        if (!Database::tableExists('work_planner_tasks')) return null;
-        $action = Database::fetch('SELECT * FROM sales_actions WHERE id=?', [$actionId]);
-        if (!$action) return null;
-        if (!empty($action['planner_task_id'])) return (int)$action['planner_task_id'];
-        $existing = Database::fetch('SELECT id FROM work_planner_tasks WHERE related_module="sales_actions" AND related_record_id=? LIMIT 1', [$actionId]);
-        if ($existing) { Database::execute('UPDATE sales_actions SET planner_task_id=? WHERE id=?', [(int)$existing['id'],$actionId]); return (int)$existing['id']; }
-        Database::execute('INSERT INTO work_planner_tasks(user_id,employee_id,assigned_by,title,description,task_type,priority,status,due_date,related_module,related_record_id,is_visible_on_dashboard,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,NOW(),NOW())', [(int)($action['assigned_to'] ?: $action['sales_manager_id']),(int)($action['assigned_to'] ?: $action['sales_manager_id']),(int)($action['created_by'] ?: $action['sales_manager_id']),$action['title'],$action['description'],'sales_action',$action['priority'],'todo',$action['due_date'],'sales_actions',$actionId]);
-        $taskId = (int)Database::connection()->lastInsertId();
-        Database::execute('UPDATE sales_actions SET planner_task_id=? WHERE id=?', [$taskId,$actionId]);
-        return $taskId;
+        return self::syncActionToPlanner('sales_actions', $actionId, 'assigned_to');
+    }
+
+    public static function plannerAvailable(): bool
+    {
+        return Database::tableExists('work_planner_tasks') && Database::columnExists('work_planner_tasks','related_module') && Database::columnExists('work_planner_tasks','related_record_id');
+    }
+
+    private static function syncActionToPlanner(string $table, int $actionId, string $ownerField): ?int
+    {
+        if (!in_array($table, ['supervisor_actions','sales_actions'], true) || !self::plannerAvailable()) return null;
+        $pdo = Database::connection(); $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) $pdo->beginTransaction();
+        try {
+            $stmt=$pdo->prepare("SELECT * FROM {$table} WHERE id=? FOR UPDATE");$stmt->execute([$actionId]);$action=$stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$action) { if($ownsTransaction)$pdo->rollBack(); return null; }
+            if (!empty($action['planner_task_id'])) { if($ownsTransaction)$pdo->commit(); return (int)$action['planner_task_id']; }
+            $existing=Database::fetch('SELECT id FROM work_planner_tasks WHERE related_module=? AND related_record_id=? ORDER BY id LIMIT 1',[$table,$actionId]);
+            if ($existing) {$taskId=(int)$existing['id'];} else {
+                $owner=(int)($action[$ownerField]?:($action['sales_manager_id']??0));$assignedBy=(int)($action['created_by']?:$owner);
+                Database::execute('INSERT INTO work_planner_tasks(user_id,employee_id,assigned_by,title,description,task_type,priority,status,due_date,related_module,related_record_id,is_visible_on_dashboard,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,1,NOW(),NOW())',[$owner,$owner,$assignedBy,$action['title'],$action['description'],'sales_action',$action['priority'],'todo',$action['due_date'],$table,$actionId]);
+                $taskId=(int)$pdo->lastInsertId();
+            }
+            Database::execute("UPDATE {$table} SET planner_task_id=? WHERE id=?",[$taskId,$actionId]);
+            if($ownsTransaction)$pdo->commit();return $taskId;
+        } catch(Throwable $e) {if($ownsTransaction&&$pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
 
     public static function logSupervisorAction(int $actionId, string $action, mixed $old, mixed $new): void
     {
-        try { Database::execute('INSERT INTO supervisor_action_logs(action_id,action,old_value_json,new_value_json,performed_by,created_at) VALUES (?,?,?,?,?,NOW())', [$actionId,$action,json_encode($old,JSON_UNESCAPED_UNICODE),json_encode($new,JSON_UNESCAPED_UNICODE),(int)(Auth::user()['id'] ?? 0)]); } catch (Throwable $e) {}
+        try { Database::execute('INSERT INTO supervisor_action_logs(action_id,action,old_value_json,new_value_json,performed_by,created_at) VALUES (?,?,?,?,?,NOW())', [$actionId,$action,json_encode($old,JSON_UNESCAPED_UNICODE),json_encode($new,JSON_UNESCAPED_UNICODE),(int)(Auth::user()['id'] ?? 0)]); } catch (Throwable $e) { error_log('Sales action audit: '.$e->getMessage()); }
     }
 
     public static function validPriority(string $priority): string
