@@ -17,6 +17,7 @@ function admin_menu_registry(): array
             ['title' => 'خروجی گزارش فروش', 'url' => '/admin/manager-dashboard-export.php', 'permission' => 'manager_dashboard.export', 'active' => ['manager-dashboard-export.php']],
             ['title' => 'اطلاعات لاین‌ها', 'url' => '/admin/ceo-dashboard-settings.php#lines', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-lines.php']],
             ['title' => 'اطلاعات ویزیتورها', 'url' => '/admin/ceo-dashboard-settings.php#visitors', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-visitors.php']],
+            ['title' => 'ساختار فروش، لاین و مناطق', 'url' => '/admin/sales-structure.php', 'permission' => 'sales_structure', 'active' => ['sales-structure.php']],
         ]],
         'management_reports' => ['title' => 'گزارشات مدیران', 'items' => [
             ['title' => 'آماده‌سازی گزارش مدیران فروش', 'url' => '/admin/management-report-prepare.php?type=sales', 'management_report_type' => 'sales', 'active_paths' => ['/admin/management-report-prepare.php']],
