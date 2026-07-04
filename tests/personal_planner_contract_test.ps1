@@ -10,9 +10,9 @@ foreach($token in @('WHERE id=? AND user_id=?','deleted_at=NOW()','createNextRec
 $scope=($module+$service+$ajax)
 if($scope-match'(?i)\b(DROP|TRUNCATE|RENAME)\b'){throw 'Destructive SQL token found.'}
 $employeeDashboard=Get-Content(Join-Path $root 'admin/employee-dashboard.php')-Raw
-if($employeeDashboard-notmatch'work-planner-widget.php'){throw 'Work planner widget is missing from the personal dashboard.'}
+if($employeeDashboard-notmatch"redirect\('/admin/index.php'\)"){throw 'Legacy employee dashboard must redirect to the main dashboard.'}
 $mainDashboard=Get-Content(Join-Path $root 'admin/index.php')-Raw
-if($mainDashboard-match'(personal|work)-planner-widget.php'){throw 'Planner must not render in the shared management dashboard.'}
+if($mainDashboard-notmatch'work-planner-widget.php'){throw 'Planner must render at the top of the main dashboard.'}
 foreach($specialized in @('admin/ceo-dashboard.php','admin/manager-dashboard.php')){if(Test-Path(Join-Path $root $specialized)){if((Get-Content(Join-Path $root $specialized)-Raw)-match'personal-planner-widget.php'){throw "Planner must not render in specialized dashboard: $specialized"}}}
 $workPlanner=Get-Content(Join-Path $root 'employee/work-planner-simple.php')-Raw
 foreach($token in @('daily','weekly','monthly','list','moveToTomorrow','recurrence_type')){if($workPlanner-notmatch[regex]::Escape($token)){throw "Work planner behavior missing: $token"}}

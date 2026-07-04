@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/../core/Auth.php';
 require_once __DIR__.'/../core/Database.php';
+require_once __DIR__.'/../core/JalaliDate.php';
 
 class ManagementReportsRepository
 {
@@ -67,6 +68,8 @@ class ManagementReportsRepository
     public static function periods(): array
     {
         $rows=[];
+        if(Database::tableExists('management_report_periods'))$rows=Database::fetchAll('SELECT code period_key,title period_title,start_date period_start,end_date period_end FROM management_report_periods WHERE active=1 ORDER BY sort_order,start_date DESC,id DESC');
+        if($rows)return $rows;
         if(Database::tableExists('ceo_dashboard_periods'))$rows=Database::fetchAll('SELECT CONCAT("ceo-",id) period_key,title period_title,from_date period_start,to_date period_end FROM ceo_dashboard_periods WHERE active=1 ORDER BY COALESCE(to_date,from_date) DESC,id DESC LIMIT 24');
         if($rows)return $rows;
         for($i=0;$i<12;$i++){$date=(new DateTimeImmutable('first day of this month'))->modify('-'.$i.' month');$rows[]=['period_key'=>$date->format('Y-m'),'period_title'=>'دوره '.$date->format('Y-m'),'period_start'=>$date->format('Y-m-01'),'period_end'=>$date->format('Y-m-t')];}
@@ -120,7 +123,7 @@ class ManagementReportsRepository
             if($typeName==='readonly_metric'){$text=trim((string)($field['default_value']??''));$normalized[$fieldId]=['text'=>$text,'number'=>is_numeric($text)?(float)$text:null,'json'=>null];$empty=$text==='';}
             elseif(in_array($typeName,['table','repeater'],true)){$decoded=is_array($raw)?$raw:json_decode((string)$raw,true);$decoded=is_array($decoded)?array_values($decoded):[];$normalized[$fieldId]=['text'=>null,'number'=>null,'json'=>json_encode($decoded,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)];$empty=!$decoded;}
             elseif(in_array($typeName,['number','currency','percent'],true)){$empty=trim((string)$raw)==='';$clean=strtr((string)$raw,['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9','٬'=>'','،'=>'']);$clean=str_replace([',',' '],'',$clean);if(!$empty&&!is_numeric($clean))$errors[]='مقدار عددی «'.$field['label'].'» معتبر نیست.';$number=self::number($raw);if($typeName==='percent'&&($number<0||$number>100))$errors[]='مقدار «'.$field['label'].'» باید بین صفر تا صد باشد.';$normalized[$fieldId]=['text'=>null,'number'=>$number,'json'=>null];}
-            elseif($typeName==='date'){$text=trim((string)$raw);$date=$text!==''?DateTimeImmutable::createFromFormat('!Y-m-d',$text):false;if($text!==''&&(!$date||$date->format('Y-m-d')!==$text))$errors[]='تاریخ «'.$field['label'].'» معتبر نیست.';$normalized[$fieldId]=['text'=>$text,'number'=>null,'json'=>null];$empty=$text==='';}
+            elseif($typeName==='date'){$text=trim((string)$raw);if(str_contains($text,'/'))$text=JalaliDate::toGregorian($text)??'';$date=$text!==''?DateTimeImmutable::createFromFormat('!Y-m-d',$text):false;if($text!==''&&(!$date||$date->format('Y-m-d')!==$text))$errors[]='تاریخ «'.$field['label'].'» معتبر نیست.';$normalized[$fieldId]=['text'=>$text,'number'=>null,'json'=>null];$empty=$text==='';}
             elseif($typeName==='select'){$text=trim((string)$raw);$options=json_decode($field['options_json']?:'[]',true)?:[];$allowed=[];foreach($options as $option)$allowed[]=(string)(is_array($option)?($option['value']??''):$option);if($text!==''&&!in_array($text,$allowed,true))$errors[]='گزینه انتخاب‌شده برای «'.$field['label'].'» معتبر نیست.';$normalized[$fieldId]=['text'=>$text,'number'=>null,'json'=>null];$empty=$text==='';}
             elseif($typeName==='checkbox'){$checked=!empty($raw)?'1':'0';$normalized[$fieldId]=['text'=>$checked,'number'=>(float)$checked,'json'=>null];$empty=$checked==='0';}
             elseif($typeName==='file')continue;

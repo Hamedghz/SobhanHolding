@@ -42,6 +42,6 @@ class FileBackupModule
             CONSTRAINT fk_uploaded_files_backup_logs_user FOREIGN KEY(actor_user_id) REFERENCES users(id) ON DELETE SET NULL
         ){$engine}");
         $module=$pdo->prepare("INSERT INTO modules(module_key,module_title,sort_order,status,created_at) VALUES('file_backup.manage','مدیریت بکاپ فایل‌های سایت',92,'active',NOW()) ON DUPLICATE KEY UPDATE module_title=VALUES(module_title)");$module->execute();
-        $settings=[['file_backup_api_key_hash','','password'],['file_backup_allowed_ips','','text']];$stmt=$pdo->prepare('INSERT IGNORE INTO site_settings(setting_key,setting_value,setting_type,updated_at) VALUES(?,?,?,NOW())');foreach($settings as $setting)$stmt->execute($setting);
+        $settings=[['file_backup_api_key_hash','','password'],['file_backup_api_key_rotated_at','','text'],['file_backup_allowed_ips','','text']];$stmt=$pdo->prepare('INSERT IGNORE INTO site_settings(setting_key,setting_value,setting_type,updated_at) VALUES(?,?,?,NOW())');foreach($settings as $setting)$stmt->execute($setting);
     }
 }

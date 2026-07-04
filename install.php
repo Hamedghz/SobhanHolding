@@ -84,6 +84,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Fresh install only: runtime repairs/defaults are handled by core/Database.php::migrate().
             $schema = file_get_contents(__DIR__ . '/database/schema.sql');
+            // Comments may legitimately contain semicolons. Remove comment-only lines before
+            // splitting statements so their text can never be executed as SQL.
+            $schema = preg_replace('/^\s*--.*$/m', '', $schema) ?? $schema;
             foreach (array_filter(array_map('trim', explode(';', $schema))) as $statement) {
                 $pdo->exec($statement);
             }

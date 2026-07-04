@@ -6,7 +6,7 @@ final class HrAttendanceModule
     public static function repair(PDO $pdo): void
     {
         foreach (self::schema() as $sql) $pdo->exec($sql);
-        foreach (['allowed_checkin_from'=>'TIME NULL','allowed_checkin_to'=>'TIME NULL','allowed_checkout_from'=>'TIME NULL','allowed_checkout_to'=>'TIME NULL'] as $column=>$definition) self::ensureColumn($pdo,'hr_attendance_settings',$column,$definition);
+        foreach (['effective_to'=>'DATE NULL AFTER effective_from','allowed_checkin_from'=>'TIME NULL','allowed_checkin_to'=>'TIME NULL','allowed_checkout_from'=>'TIME NULL','allowed_checkout_to'=>'TIME NULL'] as $column=>$definition) self::ensureColumn($pdo,'hr_attendance_settings',$column,$definition);
         self::seed($pdo);
         try { self::repairView($pdo); } catch (Throwable $e) { error_log('HR attendance summary view: '.$e->getMessage()); }
     }
@@ -30,6 +30,7 @@ final class HrAttendanceModule
                 id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 work_group_id INT UNSIGNED NOT NULL,
                 effective_from DATE NOT NULL,
+                effective_to DATE NULL,
                 default_start_time TIME NOT NULL,
                 default_end_time TIME NOT NULL,
                 late_tolerance_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 0,

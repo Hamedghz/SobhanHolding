@@ -31,6 +31,7 @@ $showLineTable = setting('ceo_dashboard_show_line_table', '1') === '1';
 $showVisitorTable = setting('ceo_dashboard_show_visitor_table', '1') === '1';
 $pageTitle = $labels['page_title'];
 $aiDashboardEnabled=setting('sobhan_api_enabled','0')==='1'&&setting('sobhan_ai_autofill_enabled','0')==='1';$dashboardCache=Database::fetch('SELECT source,updated_at FROM dashboard_data_cache WHERE dashboard_key="ceo_dashboard" AND scope_key="all" LIMIT 1');$dashboardSource=$aiDashboardEnabled?($dashboardCache['source']??'Windows Server API - در انتظار بروزرسانی'):'دستی / دیتابیس';
+$showAiChat=setting('ceo_dashboard_show_ai_chat','1')==='1';
 
 $latestDateRow = Database::fetch(
     'SELECT MAX(report_date) latest_date FROM (
@@ -832,7 +833,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
     </section><?php endif; ?>
 <?php endif; ?>
 
-<?php if (Auth::can('use_ai_assistant')): ?>
+<?php if ($showAiChat && Auth::can('use_ai_assistant')): ?>
 <section class="card sobhan-ai-panel">
     <h2>دستیار هوش مصنوعی <span class="badge">منبع: هوش مصنوعی</span></h2>
     <?php if ($aiAutofillEnabled): ?>

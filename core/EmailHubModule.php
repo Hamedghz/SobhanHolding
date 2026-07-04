@@ -52,6 +52,7 @@ class EmailHubModule
         if (!$user) return false;
         if (in_array($user['role'] ?? '', ['admin','super_admin'], true)) return true;
         $uid=(int)$user['id']; $unit=(int)($user['org_unit_id']??0); $role=(int)($user['org_role_id']??0);
+        if($action==='manage'&&(int)($account['created_by']??0)===$uid)return true;
         if(in_array($action,['send','reply','forward'],true)&&(int)($account['send_enabled']??0)!==1)return false;
         $base = (($account['account_scope']??'')==='personal' && (int)$account['owner_user_id']===$uid)
             || (($account['account_scope']??'')==='department' && $unit>0 && (int)$account['department_id']===$unit)
@@ -77,6 +78,12 @@ class EmailHubModule
         Auth::requireLogin(); $account=self::account($id);
         if(!$account||!self::access($account,$action)){http_response_code(403);throw new RuntimeException('email_account_access_denied');}
         return $account;
+    }
+
+    public static function validateConnectionConfig(array $account,string $channel): void
+    {
+        if($channel==='imap'&&trim((string)($account['imap_host']??''))==='')throw new InvalidArgumentException('نشانی سرور IMAP تنظیم نشده است. ابتدا سرویس‌دهنده ایمیل را تکمیل کنید.');
+        if($channel==='smtp'&&trim((string)($account['smtp_host']??''))==='')throw new InvalidArgumentException('نشانی سرور SMTP تنظیم نشده است. ابتدا سرویس‌دهنده ایمیل را تکمیل کنید.');
     }
 
     public static function credentials(array $account): array

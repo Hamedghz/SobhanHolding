@@ -38,7 +38,7 @@ final class HrAttendanceRepository
 
     public static function latestSettings(): array
     {
-        $out=[]; foreach(self::settingsHistory() as $row) if(!isset($out[$row['group_code']]))$out[$row['group_code']]=$row; return $out;
+        $rows=Database::fetchAll('SELECT s.*,g.title group_title,g.code group_code FROM hr_attendance_settings s JOIN hr_work_groups g ON g.id=s.work_group_id WHERE s.active=1 AND s.effective_from<=CURDATE() AND (s.effective_to IS NULL OR s.effective_to>=CURDATE()) ORDER BY s.effective_from DESC,s.id DESC');$out=[];foreach($rows as $row)if(!isset($out[$row['group_code']]))$out[$row['group_code']]=$row;return $out;
     }
 
     public static function saveSettings(array $data,int $by): void
@@ -46,7 +46,8 @@ final class HrAttendanceRepository
         if(!self::canSettings())throw new DomainException('دسترسی تنظیمات ساعات کاری را ندارید.');
         $groupId=(int)($data['work_group_id']??0); $group=Database::fetch('SELECT * FROM hr_work_groups WHERE id=? AND active=1',[$groupId]);
         if(!$group)throw new InvalidArgumentException('گروه کاری معتبر نیست.');
-        $effective=self::date($data['effective_from']??''); $start=self::time($data['default_start_time']??''); $end=self::time($data['default_end_time']??'');
+        $effective=self::date($data['effective_from']??'');$effectiveTo=trim((string)($data['effective_to']??''))!==''?self::date($data['effective_to']):null;if($effectiveTo!==null&&$effectiveTo<$effective)throw new InvalidArgumentException('پایان اجرا نمی‌تواند قبل از شروع اجرا باشد.');
+        if(Database::fetch('SELECT id FROM hr_attendance_settings WHERE work_group_id=? AND active=1 AND effective_from<>? AND effective_from<=COALESCE(?,"9999-12-31") AND COALESCE(effective_to,"9999-12-31")>=? LIMIT 1',[$groupId,$effective,$effectiveTo,$effective]))throw new InvalidArgumentException('این بازه با یک نسخه فعال دیگر هم‌پوشانی دارد.');$start=self::time($data['default_start_time']??''); $end=self::time($data['default_end_time']??'');
         if(self::minutes($end)<=self::minutes($start))throw new InvalidArgumentException('ساعت خروج باید بعد از ساعت ورود باشد.');
         $late=self::boundedInt($data['late_tolerance_minutes']??0,0,180,'تلورانس تأخیر');
         $early=self::boundedInt($data['early_leave_tolerance_minutes']??0,0,180,'تلورانس تعجیل');
@@ -55,8 +56,7 @@ final class HrAttendanceRepository
         if($checkoutFrom&&$checkoutTo&&self::minutes($checkoutTo)<self::minutes($checkoutFrom))throw new InvalidArgumentException('پایان بازه خروج باید بعد از شروع آن باشد.');
         $pdo=Database::connection();$pdo->beginTransaction();
         try{
-            Database::execute('UPDATE hr_attendance_settings SET active=0,updated_at=NOW() WHERE work_group_id=?',[$groupId]);
-            Database::execute('INSERT INTO hr_attendance_settings(work_group_id,effective_from,default_start_time,default_end_time,late_tolerance_minutes,early_leave_tolerance_minutes,allowed_checkin_from,allowed_checkin_to,allowed_checkout_from,allowed_checkout_to,allow_before_shift_overtime,allow_after_shift_overtime,require_overtime_approval,active,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,NOW(),NOW()) ON DUPLICATE KEY UPDATE default_start_time=VALUES(default_start_time),default_end_time=VALUES(default_end_time),late_tolerance_minutes=VALUES(late_tolerance_minutes),early_leave_tolerance_minutes=VALUES(early_leave_tolerance_minutes),allowed_checkin_from=VALUES(allowed_checkin_from),allowed_checkin_to=VALUES(allowed_checkin_to),allowed_checkout_from=VALUES(allowed_checkout_from),allowed_checkout_to=VALUES(allowed_checkout_to),allow_before_shift_overtime=VALUES(allow_before_shift_overtime),allow_after_shift_overtime=VALUES(allow_after_shift_overtime),require_overtime_approval=VALUES(require_overtime_approval),active=1,updated_at=NOW()',[$groupId,$effective,$start,$end,$late,$early,$checkinFrom,$checkinTo,$checkoutFrom,$checkoutTo,!empty($data['allow_before_shift_overtime'])?1:0,!empty($data['allow_after_shift_overtime'])?1:0,!empty($data['require_overtime_approval'])?1:0,$by]);
+            Database::execute('INSERT INTO hr_attendance_settings(work_group_id,effective_from,effective_to,default_start_time,default_end_time,late_tolerance_minutes,early_leave_tolerance_minutes,allowed_checkin_from,allowed_checkin_to,allowed_checkout_from,allowed_checkout_to,allow_before_shift_overtime,allow_after_shift_overtime,require_overtime_approval,active,created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,NOW(),NOW()) ON DUPLICATE KEY UPDATE effective_to=VALUES(effective_to),default_start_time=VALUES(default_start_time),default_end_time=VALUES(default_end_time),late_tolerance_minutes=VALUES(late_tolerance_minutes),early_leave_tolerance_minutes=VALUES(early_leave_tolerance_minutes),allowed_checkin_from=VALUES(allowed_checkin_from),allowed_checkin_to=VALUES(allowed_checkin_to),allowed_checkout_from=VALUES(allowed_checkout_from),allowed_checkout_to=VALUES(allowed_checkout_to),allow_before_shift_overtime=VALUES(allow_before_shift_overtime),allow_after_shift_overtime=VALUES(allow_after_shift_overtime),require_overtime_approval=VALUES(require_overtime_approval),active=1,updated_at=NOW()',[$groupId,$effective,$effectiveTo,$start,$end,$late,$early,$checkinFrom,$checkinTo,$checkoutFrom,$checkoutTo,!empty($data['allow_before_shift_overtime'])?1:0,!empty($data['allow_after_shift_overtime'])?1:0,!empty($data['require_overtime_approval'])?1:0,$by]);
             $pdo->commit();Auth::log($by,'hr_attendance_settings_saved','hr_attendance_settings');
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     }
@@ -202,7 +202,7 @@ final class HrAttendanceRepository
         return $zero;
     }
 
-    private static function settingForDate(int $groupId,string $date): ?array { return Database::fetch('SELECT * FROM hr_attendance_settings WHERE work_group_id=? AND effective_from<=? ORDER BY effective_from DESC,id DESC LIMIT 1',[$groupId,$date])?:null; }
+    private static function settingForDate(int $groupId,string $date): ?array { return Database::fetch('SELECT * FROM hr_attendance_settings WHERE work_group_id=? AND active=1 AND effective_from<=? AND (effective_to IS NULL OR effective_to>=?) ORDER BY effective_from DESC,id DESC LIMIT 1',[$groupId,$date,$date])?:null; }
     private static function holidayForDate(string $date,string $groupCode): ?array { $scope=$groupCode==='SALES'?'sales':'admin_warehouse';return Database::fetch('SELECT * FROM hr_month_holidays WHERE holiday_date=? AND active=1 AND applies_to_group IN("all",?) ORDER BY applies_to_group="all" ASC,id DESC LIMIT 1',[$date,$scope])?:null; }
     private static function employeeGroupCode(array $employee): string { return trim((string)($employee['sales_line']??''))!==''||(int)($employee['is_sales_role']??0)===1?'SALES':'ADMIN_WAREHOUSE'; }
     private static function accessibleEmployeeIds(array $u): array { if(Auth::isAdmin()||Auth::can('hr_attendance','edit')||Auth::can('hr_attendance','create'))return array_map('intval',array_column(Database::fetchAll('SELECT id FROM users WHERE status="active"'),'id'));return OrgAccess::accessibleUserIds($u); }

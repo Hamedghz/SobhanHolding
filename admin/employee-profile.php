@@ -1,5 +1,2 @@
 <?php
-require_once __DIR__ . '/../core/Auth.php';require_once __DIR__ . '/../core/Response.php';require_once __DIR__ . '/../lib/OrgAccess.php';Auth::requireLogin();if(!Auth::isAdmin()&&!(int)(Auth::user()['employee_panel_enabled']??0)){http_response_code(403);exit('پنل کارمندی برای این حساب فعال نیست.');}$pageTitle='پروفایل سازمانی من';$profile=OrgAccess::userContext((int)Auth::user()['id']);require __DIR__ . '/../views/partials/admin-header.php';
-?>
-<section class="card"><h1><?=e($profile['name']??'')?></h1><dl class="profile-details"><div><dt>شماره پرسنلی</dt><dd><?=e($profile['employee_no']?:'-')?></dd></div><div><dt>واحد سازمانی</dt><dd><?=e($profile['org_unit_title']?:($profile['department']?:'-'))?></dd></div><div><dt>نقش سازمانی</dt><dd><?=e($profile['org_role_title']?:($profile['role_key']?:'-'))?></dd></div><div><dt>مدیر مستقیم</dt><dd><?=e($profile['parent_name']?:'-')?></dd></div><div><dt>لاین فروش</dt><dd><?=e($profile['sales_line']?:'-')?></dd></div></dl></section>
-<?php require __DIR__ . '/../views/partials/admin-footer.php'; ?>
+require_once __DIR__ . '/../core/Auth.php';require_once __DIR__ . '/../core/Response.php';Auth::requireLogin();redirect('/admin/index.php#profile');

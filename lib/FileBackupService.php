@@ -62,8 +62,10 @@ class FileBackupService
     }
 
     public static function apiKeyHash(): string{return (string)(Database::fetch('SELECT setting_value FROM site_settings WHERE setting_key="file_backup_api_key_hash"')['setting_value']??'');}
+    public static function apiKeyRotatedAt(): string{return (string)(Database::fetch('SELECT setting_value FROM site_settings WHERE setting_key="file_backup_api_key_rotated_at"')['setting_value']??'');}
+    public static function apiKeyFingerprint(): string{$hash=self::apiKeyHash();return strlen($hash)>=12?substr($hash,0,6).'…'.substr($hash,-6):'';}
     public static function allowedIps(): string{return (string)(Database::fetch('SELECT setting_value FROM site_settings WHERE setting_key="file_backup_allowed_ips"')['setting_value']??'');}
-    public static function setApiKey(string $plain): void{Database::execute('INSERT INTO site_settings(setting_key,setting_value,setting_type,updated_at) VALUES("file_backup_api_key_hash",?,"password",NOW()) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),setting_type="password",updated_at=NOW()',[hash('sha256',$plain)]);}
+    public static function setApiKey(string $plain): void{$pdo=Database::connection();$pdo->beginTransaction();try{Database::execute('INSERT INTO site_settings(setting_key,setting_value,setting_type,updated_at) VALUES("file_backup_api_key_hash",?,"password",NOW()) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),setting_type="password",updated_at=NOW()',[hash('sha256',$plain)]);Database::execute('INSERT INTO site_settings(setting_key,setting_value,setting_type,updated_at) VALUES("file_backup_api_key_rotated_at",NOW(),"text",NOW()) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_at=NOW()');$pdo->commit();}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}}
     public static function setAllowedIps(string $value): void{Database::execute('INSERT INTO site_settings(setting_key,setting_value,setting_type,updated_at) VALUES("file_backup_allowed_ips",?,"text",NOW()) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_at=NOW()',[$value]);}
 
     public static function ipAllowed(string $ip,string $rules): bool

@@ -6,6 +6,9 @@ class ManagementReportsModule
     {
         $engine = ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
         $schema = [
+            "CREATE TABLE IF NOT EXISTS management_report_periods (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(190) NOT NULL,code VARCHAR(80) NOT NULL,start_date DATE NOT NULL,end_date DATE NOT NULL,active TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_management_report_period_code(code),INDEX idx_management_report_period_active(active,sort_order,start_date)
+            ){$engine}",
             "CREATE TABLE IF NOT EXISTS management_report_templates (
                 id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 report_type VARCHAR(40) NOT NULL,

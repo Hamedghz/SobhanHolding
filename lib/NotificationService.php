@@ -272,7 +272,7 @@ class NotificationService
         if (!$recipient) return null;
 
         $actor = $options['actor_user'] ?? Auth::user();
-        $systemAuthorized = !empty($options['system_authorized']) && $eventType === 'forwarded_report';
+        $systemAuthorized = !empty($options['system_authorized']) && ($eventType === 'forwarded_report' || str_starts_with($eventType, 'ticket_'));
         if (!$systemAuthorized && !self::canCreateForUser($userId, is_array($actor) ? $actor : null)) return null;
 
         $settings = self::settings($userId);
@@ -395,22 +395,22 @@ class NotificationService
 
     public static function notifyTicketAssigned(int $userId, int $ticketId, string $ticketTitle): ?int
     {
-        return self::create($userId, 'ticket_assigned', 'تیکت جدید برای شما ثبت شد', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک تیکت جدید به شما تخصیص داده شد.']);
+        return self::create($userId, 'ticket_assigned', 'تیکت جدید برای شما ثبت شد', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک تیکت جدید به شما تخصیص داده شد.', 'system_authorized'=>true]);
     }
 
     public static function notifyTicketReply(int $userId, int $ticketId, string $ticketTitle): ?int
     {
-        return self::create($userId, 'ticket_reply', 'پاسخ جدید روی تیکت', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک پاسخ جدید روی تیکت شما ثبت شد.']);
+        return self::create($userId, 'ticket_reply', 'پاسخ جدید روی تیکت', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک پاسخ جدید روی تیکت شما ثبت شد.', 'system_authorized'=>true]);
     }
 
     public static function notifyTicketStatusChanged(int $userId, int $ticketId, string $status): ?int
     {
-        return self::create($userId, 'ticket_status_changed', 'وضعیت تیکت تغییر کرد', 'وضعیت جدید: ' . $status, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'وضعیت یکی از تیکت‌های شما تغییر کرد.']);
+        return self::create($userId, 'ticket_status_changed', 'وضعیت تیکت تغییر کرد', 'وضعیت جدید: ' . $status, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'وضعیت یکی از تیکت‌های شما تغییر کرد.', 'system_authorized'=>true]);
     }
 
     public static function notifyTicketReassigned(int $userId, int $ticketId, string $ticketTitle): ?int
     {
-        return self::create($userId, 'ticket_reassigned', 'تیکت به شما ارجاع شد', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک تیکت به شما ارجاع شد.']);
+        return self::create($userId, 'ticket_reassigned', 'تیکت به شما ارجاع شد', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک تیکت به شما ارجاع شد.', 'system_authorized'=>true]);
     }
 
     public static function notifyCartableItem(int $userId, int $itemId, string $title, string $actionUrl): ?int

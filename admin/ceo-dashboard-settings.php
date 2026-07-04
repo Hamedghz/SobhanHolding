@@ -33,6 +33,7 @@ $settingFields = [
     'ceo_dashboard_show_charts' => ['label' => 'نمایش نمودارها', 'type' => 'boolean', 'default' => '1'],
     'ceo_dashboard_show_line_table' => ['label' => 'نمایش جدول لاین‌ها', 'type' => 'boolean', 'default' => '1'],
     'ceo_dashboard_show_visitor_table' => ['label' => 'نمایش جدول ویزیتورها', 'type' => 'boolean', 'default' => '1'],
+    'ceo_dashboard_show_ai_chat' => ['label' => 'نمایش چت هوشمند در پنل مدیرعامل', 'type' => 'boolean', 'default' => '1'],
 ];
 
 function ceo_setting_rows(array $settingFields): array

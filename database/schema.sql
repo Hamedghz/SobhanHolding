@@ -935,6 +935,20 @@ CREATE TABLE IF NOT EXISTS management_report_fields (
   INDEX idx_management_report_fields_linked(linked_source_key), CONSTRAINT fk_management_report_fields_section FOREIGN KEY(section_id) REFERENCES management_report_sections(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS management_report_periods (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(190) NOT NULL,
+  code VARCHAR(80) NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_management_report_period_code(code),
+  INDEX idx_management_report_period_active(active,sort_order,start_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS management_report_submissions (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, template_id INT UNSIGNED NOT NULL, report_type VARCHAR(40) NOT NULL,
   period_key VARCHAR(80) NOT NULL, period_title VARCHAR(190) NOT NULL, period_start DATE NULL, period_end DATE NULL,
@@ -1145,6 +1159,7 @@ CREATE TABLE IF NOT EXISTS hr_attendance_settings (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   work_group_id INT UNSIGNED NOT NULL,
   effective_from DATE NOT NULL,
+  effective_to DATE NULL,
   default_start_time TIME NOT NULL,
   default_end_time TIME NOT NULL,
   late_tolerance_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 0,
@@ -1251,7 +1266,7 @@ SELECT employee_id,YEAR(attendance_date) AS `year`,MONTH(attendance_date) AS `mo
 FROM hr_attendance_entries
 GROUP BY employee_id,YEAR(attendance_date),MONTH(attendance_date);
 
--- Independent ticketing module. Additive only; existing messenger tables are intentionally unrelated.
+-- Independent ticketing module. Additive only, existing messenger tables are intentionally unrelated.
 CREATE TABLE IF NOT EXISTS ticket_categories (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(190) NOT NULL,description TEXT NULL,assigned_unit_id INT UNSIGNED NULL,default_assignee_user_id INT UNSIGNED NULL,active TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX idx_ticket_category_active(active,sort_order)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS tickets (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,ticket_no VARCHAR(40) NULL,subject VARCHAR(255) NOT NULL,category_id INT UNSIGNED NOT NULL,priority ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal',requester_user_id INT UNSIGNED NOT NULL,assigned_user_id INT UNSIGNED NULL,assigned_unit_id INT UNSIGNED NULL,due_at DATETIME NULL,status ENUM('open','assigned','in_progress','waiting_user','waiting_admin','resolved','closed','cancelled') NOT NULL DEFAULT 'open',last_message_at DATETIME NULL,resolved_at DATETIME NULL,closed_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_ticket_no(ticket_no),INDEX idx_ticket_requester(requester_user_id,status),INDEX idx_ticket_assignee(assigned_user_id,status),INDEX idx_ticket_unit(assigned_unit_id,status),INDEX idx_ticket_due(status,due_at),CONSTRAINT fk_ticket_category FOREIGN KEY(category_id) REFERENCES ticket_categories(id) ON DELETE RESTRICT,CONSTRAINT fk_ticket_requester FOREIGN KEY(requester_user_id) REFERENCES users(id) ON DELETE RESTRICT,CONSTRAINT fk_ticket_assignee FOREIGN KEY(assigned_user_id) REFERENCES users(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS ticket_messages (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,ticket_id BIGINT UNSIGNED NOT NULL,user_id INT UNSIGNED NOT NULL,message TEXT NOT NULL,is_internal TINYINT(1) NOT NULL DEFAULT 0,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,INDEX idx_ticket_message(ticket_id,created_at),CONSTRAINT fk_ticket_message_ticket FOREIGN KEY(ticket_id) REFERENCES tickets(id) ON DELETE RESTRICT,CONSTRAINT fk_ticket_message_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE RESTRICT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

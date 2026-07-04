@@ -1,3 +1,2 @@
 <?php
-require_once __DIR__.'/../core/Auth.php';require_once __DIR__.'/../core/Response.php';Auth::requireLogin();$pageTitle='پنل شخصی';$adminExtraStylesheets=['/assets/css/personal-planner.css'];require __DIR__.'/../views/partials/admin-header.php';?>
-<div class="section-heading-row"><div><h1>پنل شخصی من</h1><p class="muted">دسترسی سریع به برنامه کاری و اطلاعات شخصی</p></div></div><?php require __DIR__.'/../views/partials/work-planner-widget.php';?><div class="grid grid-3"><a class="card" href="/admin/employee-profile.php"><h2>پروفایل من</h2></a><a class="card" href="/admin/employee-tests.php"><h2>آزمون‌های من</h2></a><a class="card" href="/admin/employee-kpi.php"><h2>نتایج KPI من</h2></a></div><?php require __DIR__.'/../views/partials/admin-footer.php';?>
+require_once __DIR__.'/../core/Auth.php';require_once __DIR__.'/../core/Response.php';Auth::requireLogin();redirect('/admin/index.php');

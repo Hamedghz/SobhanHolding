@@ -2,6 +2,7 @@
 require_once __DIR__.'/../core/Auth.php';
 require_once __DIR__.'/../core/Response.php';
 require_once __DIR__.'/../core/Upload.php';
+require_once __DIR__.'/../core/JalaliDate.php';
 require_once __DIR__.'/../lib/ManagementReportsRepository.php';
 Auth::requireLogin();
 $type=(string)($_GET['type']??$_POST['report_type']??'');
@@ -45,7 +46,7 @@ $pageTitle='آماده‌سازی '.ManagementReportsRepository::TYPES[$type];$a
 <?php if($field['linked_source_key']):?><code class="mr-linked"><?=e($field['linked_source_key'])?></code><?php endif?>
 <?php if($fieldType==='textarea'):?><textarea name="values[<?=$fieldId?>]" rows="6" placeholder="<?=e($field['placeholder'])?>"><?=e($raw)?></textarea>
 <?php elseif(in_array($fieldType,['number','currency','percent'],true)):?><input type="number" step="any" name="values[<?=$fieldId?>]" value="<?=e($raw)?>" placeholder="<?=e($field['placeholder'])?>" <?=$field['is_required']?'required':''?>>
-<?php elseif($fieldType==='date'):?><input type="date" name="values[<?=$fieldId?>]" value="<?=e($raw)?>" <?=$field['is_required']?'required':''?>>
+<?php elseif($fieldType==='date'):?><input class="jalali-date-input" name="values[<?=$fieldId?>]" value="<?=e($raw?JalaliDate::toJalali($raw):'')?>" <?=$field['is_required']?'required':''?>>
 <?php elseif($fieldType==='select'):?><select name="values[<?=$fieldId?>]" <?=$field['is_required']?'required':''?>><option value="">انتخاب کنید</option><?php foreach($field['options'] as $option):$ov=is_array($option)?($option['value']??''):($option);$ol=is_array($option)?($option['label']??$ov):$option;?><option value="<?=e((string)$ov)?>" <?=$raw==(string)$ov?'selected':''?>><?=e((string)$ol)?></option><?php endforeach?></select>
 <?php elseif($fieldType==='checkbox'):?><span class="mr-checkbox"><input type="checkbox" name="values[<?=$fieldId?>]" value="1" <?=$raw==='1'?'checked':''?>> تأیید می‌کنم</span>
 <?php elseif(in_array($fieldType,['table','repeater'],true)):$columns=$field['options']['columns']??[['key'=>'value','label'=>'مقدار']];?><div class="mr-repeater" data-repeater data-columns="<?=e(json_encode($columns,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES))?>"><input type="hidden" name="values[<?=$fieldId?>]" value="<?=e($raw?:'[]')?>"><table><thead><tr><?php foreach($columns as $column):?><th><?=e($column['label']??$column['key']??'مقدار')?></th><?php endforeach?><th>عملیات</th></tr></thead><tbody></tbody></table><footer><button class="btn btn-small" type="button" data-add-row>افزودن ردیف</button></footer></div>

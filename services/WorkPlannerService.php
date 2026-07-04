@@ -36,10 +36,33 @@ class WorkPlannerService
 
     public static function getDashboardTasks(int $userId): array
     {
+        self::ensureOccurrencesForUser($userId,date('Y-m-d'),date('Y-m-d'));
         $prefs=self::getUserPlannerPreferences($userId);if(!(int)$prefs['dashboard_widget_enabled'])return ['enabled'=>false,'counts'=>[],'tasks'=>[],'completion'=>0];
         $rows=Database::fetchAll('SELECT * FROM work_planner_tasks WHERE user_id=? AND is_visible_on_dashboard=1 AND status NOT IN("done","cancelled") ORDER BY CASE WHEN due_date<CURDATE() THEN 0 WHEN priority="urgent" THEN 1 WHEN status="in_progress" THEN 2 WHEN due_date=CURDATE() THEN 3 ELSE 4 END,due_date,id LIMIT 5',[$userId]);
         $counts=Database::fetch('SELECT SUM(due_date=CURDATE() AND status NOT IN("done","cancelled")) today_count,SUM(status="in_progress") in_progress_count,SUM(due_date<CURDATE() AND status NOT IN("done","cancelled")) overdue_count,SUM(priority="urgent" AND status NOT IN("done","cancelled")) urgent_count,SUM(due_date=CURDATE()) today_total,SUM(due_date=CURDATE() AND status="done") today_done FROM work_planner_tasks WHERE user_id=?',[$userId])?:[];
         $total=(int)($counts['today_total']??0);$completion=$total?round((int)($counts['today_done']??0)/$total*100):0;return ['enabled'=>true,'counts'=>$counts,'tasks'=>$rows,'completion'=>$completion];
+    }
+
+    public static function createPersonalTask(int $userId,array $input,string $defaultDate): int
+    {
+        $title=trim((string)($input['title']??''));
+        if($title==='')throw new InvalidArgumentException('عنوان وظیفه الزامی است.');
+        $due=trim((string)($input['due_date']??''))?:$defaultDate;
+        if(!self::validDate($due))throw new InvalidArgumentException('تاریخ وظیفه معتبر نیست.');
+        $priority=in_array($input['priority']??'',['low','normal','high','urgent'],true)?$input['priority']:'normal';
+        $recurrence=in_array($input['recurrence_type']??'none',['none','daily','weekly','monthly'],true)?$input['recurrence_type']:'none';
+        $interval=max(1,min(365,(int)($input['recurrence_interval']??1)));
+        Database::execute('INSERT INTO work_planner_tasks(user_id,employee_id,assigned_by,title,description,task_type,priority,status,start_date,due_date,progress_percent,is_locked,is_personal,is_visible_on_dashboard,recurrence_type,recurrence_interval,created_at,updated_at) VALUES(?,?,?,?,?,"custom",?,"todo",?, ?,0,0,1,1,?,?,NOW(),NOW())',[$userId,$userId,$userId,mb_substr($title,0,190),trim((string)($input['description']??'')),$priority,$due,$due,$recurrence,$interval]);
+        $id=(int)Database::lastInsertId();self::logTaskAction($id,$userId,'created',null,['personal'=>true,'due_date'=>$due]);return $id;
+    }
+
+    public static function ensureOccurrencesForUser(int $userId,string $fromDate,string $toDate): int
+    {
+        if(!self::validDate($fromDate)||!self::validDate($toDate)||$fromDate>$toDate)return 0;
+        $parents=Database::fetchAll('SELECT * FROM work_planner_tasks WHERE user_id=? AND is_personal=1 AND parent_task_id IS NULL AND recurrence_type IN("daily","weekly","monthly") AND due_date IS NOT NULL AND due_date<=?',[$userId,$toDate]);$created=0;
+        foreach($parents as $parent){$cursor=new DateTimeImmutable((string)$parent['due_date']);$end=new DateTimeImmutable($toDate);$interval=max(1,(int)($parent['recurrence_interval']??1));while($cursor<=$end){$due=$cursor->format('Y-m-d');if($due>=$fromDate&&$due!==$parent['due_date']){$key=(int)$parent['id'].':'.$due;try{Database::execute('INSERT INTO work_planner_tasks(user_id,employee_id,assigned_by,title,description,task_type,priority,status,start_date,due_date,progress_percent,parent_task_id,recurrence_key,is_locked,is_personal,is_visible_on_dashboard,recurrence_type,recurrence_interval,created_at,updated_at) VALUES(?,?,?, ?,?,"custom",?,"todo",?,?,0,?,?,0,1,1,?,?,NOW(),NOW())',[$userId,$userId,$userId,$parent['title'],$parent['description'],$parent['priority'],$due,$due,(int)$parent['id'],$key,$parent['recurrence_type'],$interval]);self::logTaskAction((int)Database::lastInsertId(),$userId,'recurrence_created',['source_task_id'=>(int)$parent['id']],['due_date'=>$due]);$created++;}catch(PDOException $e){if(!str_contains($e->getMessage(),'Duplicate'))throw $e;}}
+                $cursor=self::nextOccurrenceDate($cursor,(string)$parent['recurrence_type'],$interval,(int)date('j',strtotime((string)$parent['due_date'])));
+            }}return $created;
     }
 
     public static function getUserPlannerPreferences(int $userId): array
@@ -51,7 +74,7 @@ class WorkPlannerService
     public static function updateTaskStatus(int $taskId,string $status,int $userId): bool
     {
         if(!in_array($status,['todo','in_progress','waiting','blocked','done','cancelled','overdue'],true)||!self::canUserAccessTask($userId,$taskId))return false;$task=Database::fetch('SELECT status,progress_percent,user_id,is_locked FROM work_planner_tasks WHERE id=?',[$taskId]);if(!$task)return false;$actor=Database::fetch('SELECT role FROM users WHERE id=?',[$userId]);if($status==='cancelled'&&(int)$task['is_locked']&&($actor['role']??'')!=='super_admin')return false;
-        Database::execute('UPDATE work_planner_tasks SET status=?,progress_percent=IF(?="done",100,progress_percent),completed_at=IF(?="done",NOW(),NULL),updated_at=NOW() WHERE id=?',[$status,$status,$status,$taskId]);self::logTaskAction($taskId,$userId,$status==='done'?'completed':'status_changed',['status'=>$task['status']],['status'=>$status]);if($status==='done'&&$task['status']!=='done')self::createNextRecurrence($taskId,$userId);return true;
+        Database::execute('UPDATE work_planner_tasks SET status=?,progress_percent=IF(?="done",100,progress_percent),completed_at=IF(?="done",NOW(),NULL),updated_at=NOW() WHERE id=?',[$status,$status,$status,$taskId]);self::logTaskAction($taskId,$userId,$status==='done'?'completed':'status_changed',['status'=>$task['status']],['status'=>$status]);return true;
     }
 
     public static function moveToTomorrow(int $taskId,int $userId): bool
@@ -68,6 +91,14 @@ class WorkPlannerService
     {
         $task=Database::fetch('SELECT * FROM work_planner_tasks WHERE id=?',[$taskId]);if(!$task)return;$type=(string)($task['recurrence_type']??'none');if($type==='none')return;$interval=max(1,(int)($task['recurrence_interval']??1));$modifier=match($type){'daily'=>"+{$interval} day",'weekly'=>"+{$interval} week",'monthly'=>"+{$interval} month",default=>null};if(!$modifier)return;$base=$task['due_date']?:date('Y-m-d');$due=(new DateTimeImmutable($base))->modify($modifier)->format('Y-m-d');if(Database::fetch('SELECT id FROM work_planner_tasks WHERE parent_task_id=? AND due_date=? LIMIT 1',[$taskId,$due]))return;Database::execute('INSERT INTO work_planner_tasks(user_id,employee_id,assigned_by,title,description,task_type,priority,status,start_date,due_date,progress_percent,parent_task_id,is_locked,is_personal,is_visible_on_dashboard,recurrence_type,recurrence_interval,created_at,updated_at) VALUES(?,?,?, ?,?,"custom",?,"todo",CURDATE(),?,0,?,0,1,1,?,?,NOW(),NOW())',[(int)$task['user_id'],(int)$task['user_id'],$userId,$task['title'],$task['description'],$task['priority'],$due,$taskId,$type,$interval]);self::logTaskAction((int)Database::lastInsertId(),$userId,'recurrence_created',['source_task_id'=>$taskId],['due_date'=>$due]);
     }
+
+    private static function nextOccurrenceDate(DateTimeImmutable $date,string $type,int $interval,int $monthDay): DateTimeImmutable
+    {
+        if($type==='daily')return $date->modify("+{$interval} day");if($type==='weekly')return $date->modify("+{$interval} week");
+        $target=$date->modify('first day of +'.$interval.' month');$last=(int)$target->format('t');return $target->setDate((int)$target->format('Y'),(int)$target->format('m'),min($monthDay,$last));
+    }
+
+    private static function validDate(string $date): bool{$parsed=DateTimeImmutable::createFromFormat('!Y-m-d',$date);return $parsed&&$parsed->format('Y-m-d')===$date;}
 
     public static function updateTaskProgress(int $taskId,int $progress,int $userId): bool
     {
