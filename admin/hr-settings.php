@@ -99,18 +99,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $parentId = (int)($_POST['parent_user_id'] ?? 0) ?: null;
             $target = Database::fetch('SELECT id FROM users WHERE id=?', [$userId]);
             if (!OrgAccess::canAccessUser(Auth::user(),$userId)) throw new InvalidArgumentException('برای ویرایش این کاربر دسترسی ندارید.');
-            $unit = $unitId ? Database::fetch('SELECT id,title,unit_type FROM org_units WHERE id=? AND active=1', [$unitId]) : null;
-            $role = $roleId ? Database::fetch('SELECT id,title,code,is_sales_role,hierarchy_level FROM org_roles WHERE id=? AND active=1', [$roleId]) : null;
+            if (!$target) throw new InvalidArgumentException('کاربر انتخاب‌شده معتبر نیست.');
+            $organization = OrgModule::normalizeUserOrganization([
+                'org_unit_id' => $unitId,
+                'org_role_id' => $roleId,
+                'parent_user_id' => $parentId,
+                'supervisor_id' => $parentId,
+                'organization_manager_id' => $parentId,
+                'sales_line' => $_POST['sales_line'] ?? '',
+            ], $userId);
+            if ($organization['errors']) throw new InvalidArgumentException(implode(' ', $organization['errors']));
+            $unit = $organization['org_unit'];
+            $role = $organization['org_role'];
+            $parentId = $organization['parent_user_id'];
             $parent = $parentId ? OrgAccess::userContext($parentId) : null;
-            if (!$target || ($unitId && !$unit) || ($roleId && !$role) || ($parentId && (!$parent || $parentId === $userId || !OrgAccess::canAccessUser(Auth::user(),$parentId)))) throw new InvalidArgumentException('ارتباط سازمانی انتخاب‌شده معتبر نیست.');
-            if (($role['code'] ?? '') === 'VISITOR' && ($parent['org_role_code'] ?? '') !== 'SALES_SUPERVISOR') throw new InvalidArgumentException('ویزیتور باید یک سرپرست فروش مستقیم داشته باشد.');
-            if (($role['code'] ?? '') === 'SALES_SUPERVISOR' && ($parent['org_role_code'] ?? '') !== 'SALES_MANAGER') throw new InvalidArgumentException('سرپرست فروش باید یک مدیر فروش مستقیم داشته باشد.');
+            if ($parentId && (!$parent || !OrgAccess::canAccessUser(Auth::user(), $parentId))) throw new InvalidArgumentException('مدیر مستقیم معتبر نیست.');
             if ($role && !(int)$role['is_sales_role'] && $parent && (int)($parent['parent_user_id'] ?? 0) > 0) throw new InvalidArgumentException('عمق ارتباط مستقیم در واحدهای غیر فروش بیشتر از دو سطح مجاز نیست.');
             $scope = in_array($_POST['access_scope'] ?? '', ['self','team','unit','all'], true) ? $_POST['access_scope'] : 'self';
             if ($scope === 'all' && !Auth::isAdmin()) $scope = 'self';
-            $salesLine = trim((string)($_POST['sales_line'] ?? ''));
-            $supervisorId = ($role['code'] ?? '') === 'VISITOR' ? $parentId : null;
-            $managerId = ($role['code'] ?? '') === 'SALES_SUPERVISOR' ? $parentId : (($role['code'] ?? '') === 'VISITOR' ? (int)($parent['parent_user_id'] ?? 0) ?: null : $parentId);
+            $salesLine = $organization['sales_line'];
+            $supervisorId = $organization['supervisor_id'];
+            $managerId = $organization['organization_manager_id'];
             Database::execute('UPDATE users SET org_unit_id=?,org_role_id=?,parent_user_id=?,department=?,role_key=?,sales_line=?,supervisor_id=?,organization_manager_id=?,access_scope=?,employee_panel_enabled=?,admin_panel_enabled=?,display_order=?,description=?,updated_at=NOW() WHERE id=?', [$unitId,$roleId,$parentId,$unit['title'] ?? '',$role['code'] ?? '',$salesLine,$supervisorId,$managerId,$scope,isset($_POST['employee_panel_enabled'])?1:0,isset($_POST['admin_panel_enabled'])?1:0,max(0,(int)($_POST['display_order'] ?? 0)),trim((string)($_POST['description'] ?? '')),$userId]);
             Database::execute('DELETE FROM manager_employees WHERE employee_id=?', [$userId]);
             if ($parentId) Database::execute('INSERT IGNORE INTO manager_employees(manager_id,employee_id,assigned_by,created_at) VALUES (?,?,?,NOW())', [$parentId,$userId,(int)Auth::user()['id']]);

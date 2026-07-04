@@ -40,6 +40,7 @@ try {
     <link rel="stylesheet" href="/assets/css/app.css">
     <link rel="stylesheet" href="/assets/css/admin.css">
     <link rel="stylesheet" href="/assets/css/hr.css">
+    <link rel="stylesheet" href="/assets/css/ui-modernization.css">
     <?php foreach ($adminExtraStylesheets as $stylesheet): ?><link rel="stylesheet" href="<?= e($stylesheet) ?>"><?php endforeach; ?>
     <link rel="stylesheet" href="/assets/css/admin-theme-profiles.css">
 </head>

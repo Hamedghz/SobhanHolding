@@ -10,6 +10,7 @@ class ThemeProfile
     public static function profiles(): array
     {
         return [
+            'aion_neon_glass' => ['label' => 'AION Neon Glass', 'description' => 'داشبورد تیره شیشه‌ای با گرادیان بنفش و افکت نئون آرام'],
             'white_neon' => ['label' => 'سفید نئون', 'description' => 'پس‌زمینه سفید شیشه‌ای با تاکید نئون'],
             'frost' => ['label' => 'یخی آرام', 'description' => 'سطوح سرد و کم‌کنتراست برای کار طولانی'],
             'minimal' => ['label' => 'سفید مینیمال', 'description' => 'ساده‌ترین حالت با کمترین افکت بصری'],

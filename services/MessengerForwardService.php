@@ -44,7 +44,7 @@ class MessengerForwardService
             ]);
             $shareId = (int)Database::lastInsertId();
             $payload = sales_snapshot_json(['share_id'=>$shareId,'preview_text'=>self::preview($built['snapshot']),'attachment_path'=>$attachment['path'] ?? null,'created_at'=>date('c')]);
-            Database::execute('INSERT INTO messenger_messages(sender_user_id,message_type,title,body,payload_json,created_at,updated_at) VALUES(?,"forwarded_report",?,?,?,?,NOW())', [
+            Database::execute('INSERT INTO messenger_messages(sender_user_id,message_type,title,body,payload_json,created_at,updated_at) VALUES(?,"report_card",?,?,?,?,NOW())', [
                 (int)$sender['id'], $built['snapshot']['title'], $description, $payload, date('Y-m-d H:i:s'),
             ]);
             $messageId = (int)Database::lastInsertId();

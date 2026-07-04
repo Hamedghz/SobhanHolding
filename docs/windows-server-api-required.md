@@ -42,3 +42,6 @@ All endpoints must require `X-API-Key`, return JSON, accept no command or execut
 ```
 
 Do not return API keys, commands, Windows paths, stack traces, or raw database errors.
+# Pull Sync وب‌سایت به Reporting Server
+
+مرجع اجرایی Phase 10 در [sync-erp-ai.md](sync-erp-ai.md) است. Windows Server باید client باشد و با `X-API-Key` مسیرهای `/api/sync/health.php`, `pending.php`, `record.php`, `ack.php` و `error.php` را فراخوانی کند. هیچ endpoint اجازه SQL، نام جدول آزاد یا dump کامل نمی‌دهد و وب‌سایت نباید به شبکه داخلی callback بزند.

@@ -9,6 +9,9 @@ $pwaFavicon = Pwa::asset('pwa_favicon');
 $pwaAppleIcon = Pwa::asset('pwa_icon_192');
 $publicUser = Auth::user();
 $publicTheme = $publicUser ? ThemeProfile::forUser((int)$publicUser['id']) : ThemeProfile::defaults();
+$sitePrimary = strtoupper(trim((string)setting('primary_color', '#2563EB')));
+if (!preg_match('/^#[0-9A-F]{6}$/', $sitePrimary)) $sitePrimary = '#2563EB';
+$publicThemeStyle = ThemeProfile::inlineStyle($publicTheme) . '--primary:' . $sitePrimary . ';';
 ?>
 <!doctype html>
 <html lang="fa" dir="rtl">
@@ -24,7 +27,7 @@ $publicTheme = $publicUser ? ThemeProfile::forUser((int)$publicUser['id']) : The
     <link rel="stylesheet" href="/assets/css/app.css">
     <link rel="stylesheet" href="/assets/css/admin-theme-profiles.css">
 </head>
-<body class="<?= e(implode(' ', ThemeProfile::bodyClasses($publicTheme))) ?>" style="<?= e(ThemeProfile::inlineStyle($publicTheme)) ?>">
+<body class="<?= e(implode(' ', ThemeProfile::bodyClasses($publicTheme))) ?>" style="<?= e($publicThemeStyle) ?>">
 <header class="site-header">
     <a class="brand" href="/">
         <?php if (setting('logo_path')): ?><img src="<?= e(setting('logo_path')) ?>" alt="لوگو"><?php endif; ?>

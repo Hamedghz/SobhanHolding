@@ -303,6 +303,8 @@ class Database
         HrAttendanceModule::repair($pdo);
         require_once __DIR__ . '/FileBackupModule.php';
         FileBackupModule::repair($pdo);
+        require_once __DIR__ . '/SyncModule.php';
+        SyncModule::repair($pdo);
         require_once __DIR__ . '/MessengerModule.php';
         MessengerModule::repair($pdo);
         require_once __DIR__ . '/../lib/NotificationService.php';

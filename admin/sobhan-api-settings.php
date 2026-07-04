@@ -4,6 +4,7 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/SobhanApiClient.php';
 require_once __DIR__ . '/../core/AiUpdateService.php';
+require_once __DIR__ . '/../core/SyncQueueService.php';
 
 Auth::requireLogin();
 if (!Auth::can('view_sobhan_api_settings') && !Auth::can('manage_sobhan_api_settings') && !Auth::can('view_data_source_settings') && !Auth::can('manage_data_source_settings')) {
@@ -35,6 +36,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Auth::verifyCsrf($_POST['csrf_token'] ?? '')) {
         flash('درخواست نامعتبر است.', 'danger');
         redirect('/admin/sobhan-api-settings.php');
+    }
+
+    if (in_array($action, ['save_sync','generate_sync_key'], true)) {
+        if (!Auth::can('manage_sobhan_api_settings', 'edit')) {
+            flash('برای مدیریت Pull Sync دسترسی ندارید.', 'danger');
+            redirect('/admin/sobhan-api-settings.php#pull-sync');
+        }
+        try {
+            if ($action === 'generate_sync_key') {
+                $key = 'sbh_sync_' . bin2hex(random_bytes(32));
+                SyncQueueService::setApiKey($key);
+                Auth::start();
+                $_SESSION['sync_api_key_once'] = $key;
+                flash('کلید جدید ساخته شد؛ آن را همین حالا در Windows Server ذخیره کنید.');
+            } else {
+                SyncQueueService::saveSettings($_POST);
+                flash('تنظیمات Pull Sync ذخیره شد.');
+            }
+        } catch (Throwable $e) {
+            error_log('Sync settings: '.$e->getMessage());
+            flash('ذخیره تنظیمات همگام‌سازی انجام نشد.', 'danger');
+        }
+        redirect('/admin/sobhan-api-settings.php#pull-sync');
     }
 
     if ($action === 'save_data_source') {
@@ -107,6 +131,9 @@ $aiOverwriteManual = setting('sobhan_ai_overwrite_manual_data', '0') === '1';
 $canManageApi = Auth::can('manage_sobhan_api_settings', 'edit');
 $aiJobs = Database::fetchAll('SELECT j.*,u.name requested_by_name FROM ai_update_jobs j LEFT JOIN users u ON u.id=j.requested_by ORDER BY j.id DESC LIMIT 30');
 $windowsEnabled=setting('sobhan_windows_api_enabled',setting('sobhan_api_enabled','0'))==='1';$reportingEnabledValue=setting('sobhan_reporting_api_enabled',setting('sobhan_api_enabled','0'))==='1';$aiModelEnabledValue=setting('sobhan_ai_model_api_enabled','0')==='1';
+Auth::start();$syncPlainKey=$_SESSION['sync_api_key_once']??null;unset($_SESSION['sync_api_key_once']);
+$syncCounts=['pending'=>0,'error'=>0];foreach(Database::fetchAll('SELECT status,COUNT(*) count FROM sync_queue WHERE status IN ("pending","error") GROUP BY status') as $row)$syncCounts[$row['status']]=(int)$row['count'];
+$syncLast=Database::fetch('SELECT MAX(synced_at) synced_at FROM sync_queue WHERE status="synced"');
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
 <form class="card admin-form" method="post" autocomplete="off">
@@ -184,6 +211,21 @@ require __DIR__ . '/../views/partials/admin-header.php';
     <?php endif; ?>
 </form>
 <?php if(Auth::isAdmin()||Auth::can('ai_updates')):?><section class="card" id="ai-update-runner"><div class="section-heading-row"><div><h2>تست و بروزرسانی سرویس‌ها</h2><p class="muted">همه درخواست‌ها در PHP سرور اجرا و در دیتابیس ثبت می‌شوند.</p></div></div><input type="hidden" id="aiJobCsrf" value="<?=e(Auth::csrfToken())?>"><div class="actions"><button type="button" class="btn" data-ai-job="test_windows">تست Windows Server API</button><button type="button" class="btn" data-ai-job="test_reporting">تست Reporting API</button><button type="button" class="btn" data-ai-job="test_ai">تست AI Model API</button><button type="button" class="btn" data-ai-job="test_all">تست کامل همه سرویس‌ها</button><button type="button" class="btn btn-primary" data-ai-job="full_update" <?=!$aiModelEnabledValue?'disabled title="AI Model API غیرفعال است"':''?>>بروزرسانی کامل</button><button type="button" class="btn" data-ai-job="dashboard_ceo_update" <?=!$reportingEnabledValue?'disabled':''?>>بروزرسانی داشبورد مدیرعامل</button><button type="button" class="btn" data-ai-job="dashboard_manager_update" <?=!$reportingEnabledValue?'disabled':''?>>بروزرسانی داشبورد مدیران</button><button type="button" class="btn" data-ai-job="hr_kpi_update" <?=!$reportingEnabledValue?'disabled':''?>>بروزرسانی KPI منابع انسانی</button></div><div class="ai-job-status" id="aiJobStatus" hidden><strong id="aiJobMessage">در حال اجرا</strong><div class="progress"><span id="aiJobProgress" style="width:0"></span></div><small id="aiJobPercent">۰٪</small></div><details class="manager-history" open><summary>مشاهده لاگ اجرا</summary><div class="table-wrap"><table><thead><tr><th>#</th><th>نوع عملیات</th><th>وضعیت</th><th>پیشرفت</th><th>پیام</th><th>endpoint</th><th>مدت</th><th>کاربر</th><th>شروع</th><th>پایان</th><?php if(Auth::isSuperAdmin()):?><th>جزئیات فنی</th><?php endif?></tr></thead><tbody><?php foreach($aiJobs as $job):?><tr><td><?=e($job['id'])?></td><td><?=e($job['job_type'])?></td><td><?=e($job['status'])?></td><td><?=e($job['progress'])?>٪</td><td><?=e($job['message'])?></td><td dir="ltr"><?=e($job['endpoint']?:'-')?></td><td><?=e($job['duration_ms']!==null?$job['duration_ms'].' ms':'-')?></td><td><?=e($job['requested_by_name']?:'-')?></td><td><?=e($job['started_at']?:$job['created_at'])?></td><td><?=e($job['finished_at']?:'-')?></td><?php if(Auth::isSuperAdmin()):?><td><details><summary>نمایش</summary><?=e($job['technical_details']?:'-')?></details></td><?php endif?></tr><?php endforeach?></tbody></table></div></details></section><?php endif?>
+<section class="card" id="pull-sync">
+    <h2>Pull Sync امن برای AI / ERP</h2>
+    <p class="muted">Windows Server فقط از API سایت داده کنترل‌شده دریافت می‌کند؛ سایت به شبکه داخلی، ERP یا SQL Server متصل نمی‌شود.</p>
+    <?php if($syncPlainKey):?><div class="alert alert-warning"><strong>نمایش یک‌باره کلید:</strong> <code dir="ltr"><?=e($syncPlainKey)?></code></div><?php endif?>
+    <div class="grid grid-3"><div><strong>در انتظار</strong><p><?=e((string)$syncCounts['pending'])?></p></div><div><strong>خطادار</strong><p><?=e((string)$syncCounts['error'])?></p></div><div><strong>آخرین همگام‌سازی</strong><p><?=e($syncLast['synced_at']??'هنوز انجام نشده')?></p></div></div>
+    <form method="post" class="admin-form"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><div class="grid grid-2">
+        <label class="checkbox-item"><input type="checkbox" name="sync_api_enabled" value="1" <?=SyncQueueService::enabled()?'checked':''?> <?=$canManageApi?'':'disabled'?>> فعال‌سازی Pull Sync</label>
+        <label class="form-field"><span>IPهای مجاز (اختیاری)</span><input dir="ltr" name="sync_ip_allowlist" value="<?=e(SyncQueueService::setting('sync_ip_allowlist'))?>" <?=$canManageApi?'':'disabled'?>></label>
+        <label class="form-field"><span>اندازه batch پیش‌فرض</span><input type="number" min="1" max="100" name="sync_batch_default" value="<?=e(SyncQueueService::setting('sync_batch_default','50'))?>" <?=$canManageApi?'':'disabled'?>></label>
+        <label class="form-field"><span>حداکثر batch</span><input type="number" min="1" max="500" name="sync_batch_max" value="<?=e(SyncQueueService::setting('sync_batch_max','100'))?>" <?=$canManageApi?'':'disabled'?>></label>
+        <label class="form-field"><span>حداکثر تلاش</span><input type="number" min="1" max="20" name="sync_max_attempts" value="<?=e(SyncQueueService::setting('sync_max_attempts','5'))?>" <?=$canManageApi?'':'disabled'?>></label>
+        <div class="form-field"><span>موجودیت‌های مجاز</span><?php foreach(['users'=>'کاربران','reports'=>'گزارشات مدیریت'] as $key=>$label):?><label class="checkbox-item"><input type="checkbox" name="sync_allowed_entities[]" value="<?=$key?>" <?=in_array($key,SyncQueueService::allowedEntities(),true)?'checked':''?> <?=$canManageApi?'':'disabled'?>> <?=$label?></label><?php endforeach?></div>
+    </div><?php if($canManageApi):?><div class="form-actions"><button class="btn btn-primary" name="action" value="save_sync">ذخیره تنظیمات Sync</button><button class="btn" name="action" value="generate_sync_key">ساخت/تعویض کلید</button><a class="btn" href="/docs/sync-erp-ai.md">مستندات</a></div><?php endif?></form>
+    <p><code dir="ltr">/api/sync/health.php</code></p>
+</section>
 <section class="card">
     <h2>نکات امنیتی</h2>
     <p class="muted">کلید API پس از ذخیره نمایش داده نمی‌شود و فقط درخواست‌های PHP سرور از آن استفاده می‌کنند.</p>

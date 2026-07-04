@@ -1,4 +1,52 @@
 <?php
+function json_envelope(bool $success, mixed $data = null, string $message = '', ?string $error = null, array $meta = []): array
+{
+    return [
+        'success' => $success,
+        'ok' => $success,
+        'data' => $success ? $data : null,
+        'meta' => $meta ?: new stdClass(),
+        'message' => $message,
+        'error' => $success ? null : ($error ?: 'REQUEST_FAILED'),
+    ];
+}
+
+function json_response(array $payload, int $status = 200): never
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    header('X-Content-Type-Options: nosniff');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+function json_success(mixed $data = [], string $message = '', array $meta = [], int $status = 200): never
+{
+    json_response(json_envelope(true, $data, $message, null, $meta), $status);
+}
+
+function json_error(string $message, string $error = 'REQUEST_FAILED', int $status = 400, ?Throwable $technicalError = null, string $logContext = 'api'): never
+{
+    if ($technicalError) error_log($logContext . ': ' . $technicalError->getMessage());
+    json_response(json_envelope(false, null, $message, $error), $status);
+}
+
+function json_require_method(string $method): void
+{
+    if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== strtoupper($method)) {
+        json_error('روش درخواست معتبر نیست.', 'METHOD_NOT_ALLOWED', 405);
+    }
+}
+
+function json_require_csrf(array $input = []): void
+{
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($input['csrf_token'] ?? $input['_csrf'] ?? null);
+    if (!class_exists('Auth') || !Auth::verifyCsrf(is_string($token) ? $token : null)) {
+        json_error('اعتبار درخواست منقضی شده است.', 'CSRF_EXPIRED', 419);
+    }
+}
+
 function e(?string $value): string
 {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');

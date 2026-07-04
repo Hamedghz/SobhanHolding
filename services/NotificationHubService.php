@@ -6,7 +6,7 @@ require_once __DIR__.'/../core/Response.php';
 
 class NotificationHubService
 {
-    public const MODULES=['cartable','ticketing','messenger','messenger_group','messenger_channel','approval','hr','sales','management','system'];
+    public const MODULES=['cartable','ticketing','messenger','messenger_group','messenger_channel','approval','planner','hr','sales','management','system'];
 
     public static function createPairingCode(int $userId): array
     {
@@ -44,11 +44,11 @@ class NotificationHubService
 
     public static function authenticate(array $headers): array
     {
-        $uid=trim((string)($headers['x-device-uid']??''));$token=trim((string)($headers['x-device-token']??''));
-        if($uid===''||$token==='')throw new RuntimeException('device_auth_required');
+        $uid=trim((string)($headers['x-device-uid']??''));$token=trim((string)($headers['x-device-token']??''));$version=self::text((string)($headers['x-app-version']??''),30);
+        if($uid===''||$token===''||$version==='')throw new RuntimeException('device_auth_required');
         $device=Database::fetch('SELECT d.*,u.name display_name,u.role,u.department,u.org_unit_id,ou.title unit_name,r.title role_title FROM sobhan_notification_devices d JOIN users u ON u.id=d.user_id LEFT JOIN org_units ou ON ou.id=u.org_unit_id LEFT JOIN org_roles r ON r.id=u.org_role_id WHERE d.device_uid=? AND d.active=1 AND u.status="active" LIMIT 1',[$uid]);
         if(!$device||!hash_equals((string)$device['token_hash'],hash('sha256',$token)))throw new RuntimeException('device_auth_invalid');
-        Database::execute('UPDATE sobhan_notification_devices SET last_seen_at=NOW(),app_version=?,updated_at=NOW() WHERE id=?',[self::text((string)($headers['x-app-version']??$device['app_version']),30),(int)$device['id']]);
+        Database::execute('UPDATE sobhan_notification_devices SET last_seen_at=NOW(),app_version=?,updated_at=NOW() WHERE id=?',[$version,(int)$device['id']]);
         return $device;
     }
 
@@ -100,13 +100,15 @@ class NotificationHubService
 
     public static function action(array $device,int $notificationId,string $action,?string $reply): array
     {
-        $notification=self::assertNotification($device,$notificationId);$config=self::clientConfig($device);$module=self::module((string)($notification['module']?:$notification['event_type']));$allowed=array_column(self::allowedActions($notification,$config['modules'][$module]??[]),'id');
-        if(!in_array($action,$allowed,true))throw new RuntimeException('action_not_allowed');$reply=self::text((string)$reply,2000);
-        if(in_array($action,['mark_read','open','view_ticket','view_cartable'],true))Database::execute('UPDATE sobhan_notifications SET status="read",is_read=1,read_at=COALESCE(read_at,NOW()),updated_at=NOW() WHERE id=?',[$notificationId]);
-        elseif($action==='reply'){if($module!=='messenger'||$reply==='')throw new RuntimeException('reply_not_allowed');if(!is_callable('sobhan_messenger_quick_reply'))throw new RuntimeException('action_not_supported');call_user_func('sobhan_messenger_quick_reply',$notification,$reply,(int)$device['user_id']);}
-        elseif(in_array($action,['approve','reject','mute','comment'],true)){if(!is_callable('sobhan_notification_direct_action'))throw new RuntimeException('action_not_supported');call_user_func('sobhan_notification_direct_action',$notification,$action,(int)$device['user_id']);}
-        Database::execute('INSERT INTO sobhan_notification_delivery_logs(notification_id,device_id,status,action,reply_text,delivered_at,clicked_at,created_at) VALUES(?,?,"acted",?,?,NOW(),NOW(),NOW()) ON DUPLICATE KEY UPDATE status="acted",action=VALUES(action),reply_text=VALUES(reply_text),clicked_at=NOW()',[$notificationId,(int)$device['id'],$action,$reply?:null]);
-        return ['action'=>$action,'action_url'=>in_array($action,['open','view_ticket','view_cartable'],true)?self::absoluteUrl((string)$notification['action_url']):null];
+        $notification=self::assertNotification($device,$notificationId);$reply=self::text((string)$reply,2000);
+        try{$config=self::clientConfig($device);$module=self::module((string)($notification['module']?:$notification['event_type']));$allowed=array_column(self::allowedActions($notification,$config['modules'][$module]??[]),'id');
+            if(!in_array($action,$allowed,true))throw new RuntimeException('action_not_allowed');
+            if(in_array($action,['mark_read','open','view_ticket','view_cartable'],true))Database::execute('UPDATE sobhan_notifications SET status="read",is_read=1,read_at=COALESCE(read_at,NOW()),updated_at=NOW() WHERE id=?',[$notificationId]);
+            elseif($action==='reply'){if($module!=='messenger'||$reply==='')throw new RuntimeException('reply_not_allowed');if(!is_callable('sobhan_messenger_quick_reply'))throw new RuntimeException('action_not_supported');call_user_func('sobhan_messenger_quick_reply',$notification,$reply,(int)$device['user_id']);}
+            elseif(in_array($action,['approve','reject','mute','comment'],true)){if(!is_callable('sobhan_notification_direct_action'))throw new RuntimeException('action_not_supported');call_user_func('sobhan_notification_direct_action',$notification,$action,(int)$device['user_id']);}
+            Database::execute('INSERT INTO sobhan_notification_delivery_logs(notification_id,device_id,status,action,reply_text,delivered_at,clicked_at,created_at) VALUES(?,?,"acted",?,?,NOW(),NOW(),NOW()) ON DUPLICATE KEY UPDATE status="acted",action=VALUES(action),reply_text=VALUES(reply_text),clicked_at=NOW()',[$notificationId,(int)$device['id'],$action,$reply?:null]);
+            return ['action'=>$action,'action_url'=>in_array($action,['open','view_ticket','view_cartable'],true)?self::absoluteUrl((string)$notification['action_url']):null];
+        }catch(Throwable $e){$code=preg_match('/^[a-z0-9_.-]+$/i',$e->getMessage())?$e->getMessage():'action_failed';Database::execute('INSERT INTO sobhan_notification_delivery_logs(notification_id,device_id,status,action,error_message,created_at) VALUES(?,?,"action_failed",?,?,NOW()) ON DUPLICATE KEY UPDATE status="action_failed",action=VALUES(action),error_message=VALUES(error_message)',[$notificationId,(int)$device['id'],self::text($action,40),$code]);throw $e;}
     }
 
     public static function unregister(array $device): void{Database::execute('UPDATE sobhan_notification_devices SET active=0,revoked_at=NOW(),updated_at=NOW() WHERE id=?',[(int)$device['id']]);}
@@ -116,7 +118,7 @@ class NotificationHubService
     private static function allowedActions(array $row,array $config): array{$actions=json_decode((string)($row['actions_json']??''),true);if(!is_array($actions))$actions=[['id'=>'open','label'=>'باز کردن'],['id'=>'mark_read','label'=>'خوانده شد']];$out=[];foreach($actions as $a){$id=(string)($a['id']??'');if($id==='reply'&&empty($config['allow_quick_reply']))continue;if(in_array($id,['approve','reject'],true)&&empty($config['direct_action_enabled']))continue;if(in_array($id,['open','mark_read','reply','approve','reject','mute','comment','view_cartable','view_ticket'],true))$out[]=['id'=>$id,'label'=>self::text((string)($a['label']??$id),60)];}return array_slice($out,0,5);}
     public static function module(string $event): string{$event=strtolower($event);return match(true){str_contains($event,'ticket'),str_contains($event,'sla')=>'ticketing',str_contains($event,'cartable')=>'cartable',str_contains($event,'approval')=>'approval',str_contains($event,'messenger_group'),str_contains($event,'group_message')=>'messenger_group',str_contains($event,'channel')=>'messenger_channel',str_contains($event,'message'),str_contains($event,'messenger'),str_contains($event,'forwarded_report')=>'messenger',str_contains($event,'hr'),str_contains($event,'assessment'),str_contains($event,'payroll')=>'hr',str_contains($event,'sale'),str_contains($event,'manager_dashboard')=>'sales',str_contains($event,'management'),str_contains($event,'meeting'),str_contains($event,'resolution'),str_contains($event,'finance')=>'management',default=>'system'};}
     private static function apiPriority(string $priority): string{return in_array($priority,['urgent','high'],true)?'important':($priority==='low'?'low':'normal');}
-    private static function absoluteUrl(string $url): string{if($url==='')return '';if(preg_match('#^https://#i',$url))return $url;$base=rtrim((string)(Config::app()['url']??''),'/');return $base.($url[0]==='/'?'':'/').$url;}
+    private static function absoluteUrl(string $url): string{if($url==='')return '';$base=rtrim((string)(Config::app()['url']??''),'/');if($base==='')return '';if(preg_match('#^https://#i',$url)){return parse_url($url,PHP_URL_HOST)===parse_url($base,PHP_URL_HOST)?$url:'';}return $base.($url[0]==='/'?'':'/').$url;}
     private static function boolSetting(string $key): bool{return setting($key,'0')==='1';}private static function intSetting(string $key,int $default,int $min,int $max): int{return max($min,min($max,(int)setting($key,(string)$default)));}
     private static function text(string $value,int $max): string{return mb_substr(trim(strip_tags($value)),0,$max);}private static function token(): string{return rtrim(strtr(base64_encode(random_bytes(32)),'+/','-_'),'=');}private static function uuid(): string{$d=random_bytes(16);$d[6]=chr((ord($d[6])&0x0f)|0x40);$d[8]=chr((ord($d[8])&0x3f)|0x80);return vsprintf('%s%s-%s-%s-%s-%s%s%s',str_split(bin2hex($d),4));}
 }

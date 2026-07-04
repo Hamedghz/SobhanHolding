@@ -7,6 +7,7 @@ require_once __DIR__ . '/PushNotificationService.php';
 class NotificationService
 {
     public const EVENTS = [
+        'ticket_created' => 'ثبت تیکت جدید',
         'ticket_assigned' => 'ثبت یا تخصیص تیکت',
         'ticket_reply' => 'پاسخ جدید تیکت',
         'ticket_status_changed' => 'تغییر وضعیت تیکت',
@@ -21,6 +22,14 @@ class NotificationService
         'messenger_message' => 'پیام جدید پیام‌رسان',
         'messenger_official_notice' => 'اطلاعیه رسمی پیام‌رسان',
         'personal_planner_reminder' => 'یادآوری برنامه کاری من',
+        'work_planner_reminder' => 'یادآوری برنامه کاری شخصی',
+        'meeting_followup_assigned' => 'تخصیص پیگیری مصوبه',
+        'decision_overdue' => 'تأخیر در انجام مصوبه',
+        'rule_published' => 'انتشار قانون مصوب',
+        'assessment_test_assigned' => 'تخصیص آزمون سازمانی',
+        'assessment_completed' => 'تکمیل ارزیابی سازمانی',
+        'kpi_score_submitted' => 'ثبت امتیاز KPI',
+        'payroll_slip_published' => 'انتشار فیش حقوقی',
         'forwarded_report' => 'گزارش فورواردشده',
         'due_date_reminder' => 'یادآوری مهلت انجام',
         'test' => 'اعلان آزمایشی',
@@ -398,6 +407,61 @@ class NotificationService
         return self::create($userId, 'ticket_assigned', 'تیکت جدید برای شما ثبت شد', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک تیکت جدید به شما تخصیص داده شد.']);
     }
 
+    public static function notifyTicketCreated(int $userId, int $ticketId, string $ticketTitle): ?int
+    {
+        return self::create($userId, 'ticket_created', 'تیکت شما ثبت شد', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['module' => 'ticketing', 'related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'تیکت جدید شما در سامانه ثبت شد.']);
+    }
+
+    public static function notifyMessengerMessage(int $userId, int $messageId, int $conversationId, string $body = '', bool $official = false): ?int
+    {
+        return self::create($userId, $official ? 'messenger_official_notice' : 'messenger_message', $official ? 'اطلاعیه رسمی جدید' : 'پیام سازمانی جدید', $body, '/employee/messenger.php?conversation=' . $conversationId, ['module' => 'messenger', 'related_type' => 'messenger_message', 'related_id' => $messageId, 'conversation_id' => $conversationId, 'priority' => $official ? 'high' : 'normal', 'safe_push_body' => $official ? 'یک اطلاعیه رسمی جدید دریافت کردید.' : 'یک پیام سازمانی جدید دریافت کردید.']);
+    }
+
+    public static function notifyPlannerReminder(int $userId, int $taskId, string $title, string $date): ?int
+    {
+        return self::create($userId, 'personal_planner_reminder', 'یادآوری برنامه کاری', $title, '/admin/personal-planner.php?date=' . rawurlencode($date), ['module' => 'planner', 'related_type' => 'personal_planner_task', 'related_id' => $taskId, 'priority' => 'high', 'safe_push_body' => 'یادآوری جدیدی در برنامه کاری شما ثبت شده است.']);
+    }
+
+    public static function notifyWorkPlannerReminder(int $userId, int $taskId, string $title, string $date): ?int
+    {
+        return self::create($userId, 'work_planner_reminder', 'یادآوری برنامه کاری', $title, '/employee/work-planner.php?view=daily&date=' . rawurlencode($date), ['module' => 'planner', 'related_type' => 'work_planner_task', 'related_id' => $taskId, 'priority' => 'high', 'safe_push_body' => 'یادآوری جدیدی در برنامه کاری شما ثبت شده است.']);
+    }
+
+    public static function notifyMeetingFollowupAssigned(int $userId, int $decisionId, string $title): ?int
+    {
+        return self::create($userId, 'meeting_followup_assigned', 'پیگیری مصوبه به شما واگذار شد', $title, '/admin/management-decision-view.php?id=' . $decisionId, ['module' => 'management', 'related_type' => 'management_decision', 'related_id' => $decisionId, 'priority' => 'high', 'safe_push_body' => 'یک پیگیری مدیریتی جدید به شما واگذار شد.']);
+    }
+
+    public static function notifyDecisionOverdue(int $userId, int $decisionId, string $title): ?int
+    {
+        return self::create($userId, 'decision_overdue', 'مصوبه دارای تأخیر است', $title, '/admin/management-decision-view.php?id=' . $decisionId, ['module' => 'management', 'related_type' => 'management_decision', 'related_id' => $decisionId, 'priority' => 'urgent', 'safe_push_body' => 'مهلت یکی از پیگیری‌های مدیریتی شما گذشته است.']);
+    }
+
+    public static function notifyRulePublished(int $userId, int $ruleId, string $title): ?int
+    {
+        return self::create($userId, 'rule_published', 'قانون مصوب منتشر شد', $title, '/admin/management-rules.php', ['module'=>'management','related_type'=>'management_rule','related_id'=>$ruleId,'priority'=>'high','safe_push_body'=>'یک قانون مصوب جدید منتشر شد.']);
+    }
+
+    public static function notifyTestAssigned(int $userId, int $assignmentId, string $testTitle): ?int
+    {
+        return self::create($userId, 'assessment_test_assigned', 'آزمون سازمانی جدید', $testTitle, '/admin/employee-test-run.php?assignment_id=' . $assignmentId, ['module' => 'hr', 'related_type' => 'assessment_assignment', 'related_id' => $assignmentId, 'safe_push_body' => 'یک آزمون سازمانی جدید برای شما فعال شد.']);
+    }
+
+    public static function notifyAssessmentCompleted(int $userId, int $assignmentId, string $testTitle): ?int
+    {
+        return self::create($userId, 'assessment_completed', 'ارزیابی سازمانی تکمیل شد', $testTitle, '/admin/employee-test-run.php?assignment_id='.$assignmentId, ['module'=>'hr','related_type'=>'assessment_assignment','related_id'=>$assignmentId,'safe_push_body'=>'ثبت نهایی ارزیابی سازمانی شما انجام شد.']);
+    }
+
+    public static function notifyKpiScoreSubmitted(int $userId, int $templateId, int $periodId): ?int
+    {
+        return self::create($userId, 'kpi_score_submitted', 'امتیاز KPI شما ثبت شد', 'نتیجه ارزیابی جدید در پنل شما قابل مشاهده است.', '/admin/employee-kpi.php', ['module' => 'hr', 'related_type' => 'kpi_template', 'related_id' => $templateId, 'type' => 'kpi_score_submitted', 'safe_push_body' => 'نتیجه ارزیابی KPI جدیدی برای شما ثبت شد.', 'period_id' => $periodId]);
+    }
+
+    public static function notifyPayrollSlipPublished(int $userId, int $slipId, string $periodTitle): ?int
+    {
+        return self::create($userId, 'payroll_slip_published', 'فیش حقوقی جدید منتشر شد', $periodTitle, '/employee/payroll.php', ['module' => 'hr', 'related_type' => 'payroll_slip', 'related_id' => $slipId, 'safe_push_body' => 'فیش حقوقی جدید شما منتشر شد.']);
+    }
+
     public static function notifyTicketReply(int $userId, int $ticketId, string $ticketTitle): ?int
     {
         return self::create($userId, 'ticket_reply', 'پاسخ جدید روی تیکت', $ticketTitle, '/employee/ticket-view.php?id=' . $ticketId, ['related_type' => 'ticket', 'related_id' => $ticketId, 'safe_push_body' => 'یک پاسخ جدید روی تیکت شما ثبت شد.']);
@@ -485,7 +549,7 @@ class NotificationService
             str_contains($event,'ticket'),str_contains($event,'sla')=>'ticketing',str_contains($event,'cartable')=>'cartable',
             str_contains($event,'approval')=>'approval',str_contains($event,'group_message')=>'messenger_group',str_contains($event,'channel')=>'messenger_channel',
             str_contains($event,'message'),str_contains($event,'messenger'),str_contains($event,'forwarded_report')=>'messenger',
-            str_contains($event,'hr'),str_contains($event,'assessment'),str_contains($event,'payroll')=>'hr',str_contains($event,'sale')=>'sales',
+            str_contains($event,'planner')=>'planner',str_contains($event,'hr'),str_contains($event,'assessment'),str_contains($event,'payroll'),str_contains($event,'kpi')=>'hr',str_contains($event,'sale')=>'sales',
             str_contains($event,'management'),str_contains($event,'meeting'),str_contains($event,'resolution'),str_contains($event,'finance')=>'management',default=>'system',
         };
     }
@@ -493,7 +557,9 @@ class NotificationService
     private static function hubActions(string $module, string $event): array
     {
         $actions=[['id'=>'open','label'=>'باز کردن'],['id'=>'mark_read','label'=>'خوانده شد']];
+        if($module==='ticketing')$actions[]=['id'=>'view_ticket','label'=>'مشاهده تیکت'];
         if($module==='messenger'&&str_contains($event,'message'))$actions[]=['id'=>'reply','label'=>'پاسخ سریع'];
+        if($module==='approval'){$actions[]=['id'=>'approve','label'=>'تأیید'];$actions[]=['id'=>'reject','label'=>'رد'];}
         return $actions;
     }
 

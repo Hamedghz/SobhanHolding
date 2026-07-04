@@ -3,14 +3,16 @@ require_once __DIR__.'/../core/Auth.php';
 require_once __DIR__.'/../core/Database.php';
 require_once __DIR__.'/../core/Response.php';
 require_once __DIR__.'/../core/HrModule.php';
+require_once __DIR__.'/../lib/NotificationService.php';
 Auth::requirePermission('hr_kpi.score');
 $pageTitle='ثبت امتیاز KPI';$user=Auth::user();$ids=HrModule::accessibleEmployeeIds($user);if(!$ids)$ids=[-1];$ph=implode(',',array_fill(0,count($ids),'?'));
 $employeeId=(int)($_REQUEST['employee_id']??0);$templateId=(int)($_REQUEST['template_id']??0);$periodId=(int)($_REQUEST['period_id']??0);
 if($employeeId&&!in_array($employeeId,$ids,true)){http_response_code(403);exit('دسترسی غیرمجاز است.');}
 if($_SERVER['REQUEST_METHOD']==='POST'){
     if(!Auth::verifyCsrf($_POST['csrf_token']??'')){http_response_code(419);exit('درخواست نامعتبر است.');}
-    $criteria=Database::fetchAll('SELECT * FROM hr_kpi_criteria WHERE template_id=? AND active=1',[$templateId]);$pdo=Database::connection();
+    $pdo=Database::connection();
     try{
+        $target=Database::fetch('SELECT org_unit_id,org_role_id,sales_line FROM users WHERE id=? AND status="active"',[$employeeId]);$template=Database::fetch('SELECT t.id FROM hr_kpi_templates t WHERE t.id=? AND t.active=1 AND (t.org_unit_id IS NULL OR t.org_unit_id=?) AND (t.sales_line IS NULL OR t.sales_line="" OR t.sales_line=?) AND (NOT EXISTS(SELECT 1 FROM hr_kpi_template_roles x WHERE x.template_id=t.id AND x.active=1) OR EXISTS(SELECT 1 FROM hr_kpi_template_roles x WHERE x.template_id=t.id AND x.role_id=? AND x.active=1))',[$templateId,(int)($target['org_unit_id']??0),(string)($target['sales_line']??''),(int)($target['org_role_id']??0)]);if(!$target||!$template)throw new InvalidArgumentException('قالب KPI برای ساختار سازمانی این کاربر معتبر نیست.');$criteria=Database::fetchAll('SELECT * FROM hr_kpi_criteria WHERE template_id=? AND active=1',[$templateId]);if(!$criteria)throw new InvalidArgumentException('برای قالب انتخاب‌شده معیار فعالی وجود ندارد.');
         $pdo->beginTransaction();
         foreach($criteria as $c){
             $score=(float)($_POST['score'][$c['id']]??-1);if($score<0||$score>(float)$c['max_score'])throw new RuntimeException('invalid_score');
@@ -19,12 +21,12 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             else{Database::execute('INSERT INTO hr_kpi_scores(employee_id,template_id,criteria_id,period_id,score,notes,scored_by,scored_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,NOW(),NOW(),NOW())',[$employeeId,$templateId,$c['id'],$periodId,$score,$notes,(int)$user['id']]);$sid=(int)Database::lastInsertId();Database::execute('INSERT INTO hr_kpi_score_logs(score_id,action,new_value,performed_by,created_at) VALUES (?,"create",?,?,NOW())',[$sid,json_encode(['score'=>$score],JSON_UNESCAPED_UNICODE),(int)$user['id']]);}
         }
         Database::execute('INSERT INTO hr_kpi_employee_assignments(employee_id,template_id,department,role_key,sales_line,supervisor_id,manager_id,assigned_by,active,created_at,updated_at) SELECT id,?,?,?,sales_line,supervisor_id,organization_manager_id,?,1,NOW(),NOW() FROM users WHERE id=? ON DUPLICATE KEY UPDATE active=1,updated_at=NOW()',[$templateId,trim($_POST['department']??''),trim($_POST['role_key']??''),(int)$user['id'],$employeeId]);
-        $pdo->commit();flash('عملیات با موفقیت انجام شد.');
-    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();error_log('KPI score save: '.$e->getMessage());flash($e->getMessage()==='invalid_score'?'امتیاز باید در بازه مجاز باشد.':'خطا در ذخیره‌سازی اطلاعات. لطفاً مجدد تلاش کنید.','danger');}
+        $pdo->commit();try{NotificationService::notifyKpiScoreSubmitted($employeeId,$templateId,$periodId);}catch(Throwable $notificationError){error_log('KPI score notification: '.$notificationError->getMessage());}flash('عملیات با موفقیت انجام شد.');
+    }catch(InvalidArgumentException $e){if($pdo->inTransaction())$pdo->rollBack();flash($e->getMessage(),'danger');}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();error_log('KPI score save: '.$e->getMessage());flash($e->getMessage()==='invalid_score'?'امتیاز باید در بازه مجاز باشد.':'خطا در ذخیره‌سازی اطلاعات. لطفاً مجدد تلاش کنید.','danger');}
     redirect('/admin/hr-kpi-scores.php?employee_id='.$employeeId.'&template_id='.$templateId.'&period_id='.$periodId);
 }
-$employees=Database::fetchAll("SELECT id,name,department,role_key FROM users WHERE id IN ($ph) AND status='active' ORDER BY name",$ids);$selectedEmployee=null;foreach($employees as $employee)if((int)$employee['id']===$employeeId)$selectedEmployee=$employee;
-$templates=Database::fetchAll('SELECT * FROM hr_kpi_templates WHERE active=1 ORDER BY sort_order');$periods=Database::fetchAll('SELECT * FROM hr_kpi_periods WHERE active=1 ORDER BY sort_order');
+$employees=Database::fetchAll("SELECT id,name,department,role_key,org_unit_id,org_role_id,sales_line FROM users WHERE id IN ($ph) AND status='active' ORDER BY name",$ids);$selectedEmployee=null;foreach($employees as $employee)if((int)$employee['id']===$employeeId)$selectedEmployee=$employee;
+if($selectedEmployee){$templates=Database::fetchAll('SELECT DISTINCT t.* FROM hr_kpi_templates t LEFT JOIN hr_kpi_template_roles tr ON tr.template_id=t.id AND tr.active=1 WHERE t.active=1 AND (t.org_unit_id IS NULL OR t.org_unit_id=?) AND (t.sales_line IS NULL OR t.sales_line="" OR t.sales_line=?) AND (NOT EXISTS(SELECT 1 FROM hr_kpi_template_roles x WHERE x.template_id=t.id AND x.active=1) OR tr.role_id=?) ORDER BY t.sort_order',[(int)($selectedEmployee['org_unit_id']??0),(string)($selectedEmployee['sales_line']??''),(int)($selectedEmployee['org_role_id']??0)]);}else{$templates=Database::fetchAll('SELECT * FROM hr_kpi_templates WHERE active=1 ORDER BY sort_order');}$periods=Database::fetchAll('SELECT * FROM hr_kpi_periods WHERE active=1 ORDER BY sort_order');
 $criteria=$templateId?Database::fetchAll('SELECT c.*,s.score,s.notes FROM hr_kpi_criteria c LEFT JOIN hr_kpi_scores s ON s.criteria_id=c.id AND s.employee_id=? AND s.period_id=? WHERE c.template_id=? AND c.active=1 ORDER BY c.sort_order',[$employeeId,$periodId,$templateId]):[];
 $previous=[];if($employeeId&&$templateId&&$periodId){$prev=Database::fetch('SELECT id FROM hr_kpi_periods WHERE id<? ORDER BY sort_order DESC,id DESC LIMIT 1',[$periodId]);if($prev)$previous=Database::fetchAll('SELECT criteria_id,score FROM hr_kpi_scores WHERE employee_id=? AND template_id=? AND period_id=?',[$employeeId,$templateId,$prev['id']]);}$previous=array_column($previous,'score','criteria_id');
 require __DIR__.'/../views/partials/admin-header.php';?>

@@ -29,7 +29,7 @@ $profiles = ThemeProfile::profiles();
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
 <section class="card theme-settings-panel">
-    <div class="section-heading-row"><div><h1>ظاهر پنل</h1><p class="muted">این انتخاب فقط برای حساب کاربری شما اعمال می‌شود.</p></div></div>
+    <div class="section-heading-row"><div><h1>ظاهر پنل</h1><p class="muted">این انتخاب فقط برای حساب کاربری شما اعمال می‌شود و رنگ سایت یا PWA را تغییر نمی‌دهد.</p></div></div>
     <form method="post">
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
         <fieldset class="theme-profile-grid"><legend>پروفایل تم</legend>

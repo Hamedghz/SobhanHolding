@@ -161,6 +161,19 @@ class ManagementReportsRepository
         $stats=array_fill_keys(array_keys(self::STATUSES),0);foreach($rows as $row)if(isset($stats[$row['status']]))$stats[$row['status']]++;return $stats;
     }
 
+    public static function messengerRecipients(): array
+    {
+        return Database::fetchAll('SELECT DISTINCT u.id,u.name FROM users u LEFT JOIN user_permissions p ON p.user_id=u.id AND p.module_key IN ("management_reports.review","management_reports.aggregate") WHERE u.status="active" AND (u.role IN ("admin","super_admin") OR UPPER(COALESCE(u.role_key,"")) IN ("CEO","INTERNAL_MANAGER") OR COALESCE(p.can_view,0)=1 OR COALESCE(p.can_edit,0)=1) ORDER BY u.name');
+    }
+
+    public static function forwardSalesReport(int $submissionId,array $recipientIds): array
+    {
+        $report=self::submission($submissionId);if(!$report||$report['report_type']!=='sales'||!in_array($report['status'],['approved','archived'],true))throw new DomainException('فقط گزارش فروش تأییدشده قابل ارسال است.');
+        $allowed=array_map('intval',array_column(self::messengerRecipients(),'id'));$recipients=array_values(array_unique(array_intersect($allowed,array_filter(array_map('intval',$recipientIds)))));if(!$recipients)throw new InvalidArgumentException('حداقل یک گیرنده مجاز انتخاب کنید.');
+        $preview=[];foreach($report['values'] as $value){$text=trim((string)($value['value_text']??$value['value_number']??''));if($text!=='')$preview[]=$value['label'].': '.mb_substr($text,0,120);if(count($preview)>=3)break;}
+        require_once __DIR__.'/messenger/MessengerService.php';$messages=MessengerService::sendReportCardToUsers($recipients,['share_id'=>null,'title'=>'گزارش فروش — '.$report['period_title'],'description'=>'گزارش تأییدشده '.$report['submitter_name'],'preview_text'=>implode(' | ',$preview),'report_url'=>'/admin/management-report-view.php?id='.$submissionId,'attachment_url'=>null,'source'=>'management_reports','submission_id'=>$submissionId],Auth::user());Auth::log((int)Auth::user()['id'],'management_report_forwarded','management_report_submissions',$submissionId);return $messages;
+    }
+
     private static function reviewLog(int $submissionId,string $action,?string $old,?string $new,?string $note,int $userId): void
     {Database::execute('INSERT INTO management_report_reviews(submission_id,action,old_status,new_status,note,created_by,created_at) VALUES(?,?,?,?,?,?,NOW())',[$submissionId,$action,$old,$new,$note,$userId]);}
     private static function number(mixed $value): float

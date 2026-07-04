@@ -41,7 +41,7 @@ $subscriptions = NotificationService::activeSubscriptions($userId);
 $notifications = NotificationService::listForUser($userId, 20);
 $pushSupported = PushNotificationService::hasSupport();
 $hubModuleSettings = NotificationHubService::moduleSettings($userId);
-$hubModuleLabels=['cartable'=>'کارتابل','ticketing'=>'تیکتینگ و SLA','messenger'=>'پیام خصوصی','messenger_group'=>'گروه پیام‌رسان','messenger_channel'=>'کانال پیام‌رسان','approval'=>'درخواست تأیید','hr'=>'منابع انسانی','sales'=>'فروش','management'=>'مدیریتی و مصوبات','system'=>'سیستمی'];
+$hubModuleLabels=['cartable'=>'کارتابل','ticketing'=>'تیکتینگ و SLA','messenger'=>'پیام خصوصی','messenger_group'=>'گروه پیام‌رسان','messenger_channel'=>'کانال پیام‌رسان','approval'=>'درخواست تأیید','planner'=>'برنامه‌ریز و یادآوری‌ها','hr'=>'منابع انسانی','sales'=>'فروش','management'=>'مدیریتی و مصوبات','system'=>'سیستمی'];
 
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>

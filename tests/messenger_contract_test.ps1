@@ -17,7 +17,9 @@ foreach ($token in @('is_uploaded_file','finfo','realpath','hash_equals','Messen
 $api = Get-Content (Join-Path $root 'api/messenger/bootstrap.php') -Raw
 foreach ($token in @('Auth::user','MessengerSecurity::csrf','JSON_UNESCAPED_UNICODE','error')) { if ($api -notmatch [regex]::Escape($token)) { throw "API contract missing: $token" } }
 $forward=Get-Content (Join-Path $root 'services/MessengerForwardService.php') -Raw
-if($forward-notmatch'SendReportCardToUsers' -or $scope-notmatch'report_card'){throw 'Forwarded sales reports are not bridged to chat report cards.'}
+if($forward-notmatch'SendReportCardToUsers' -or $scope-notmatch'report_card' -or $forward-notmatch'"report_card"'){throw 'Forwarded sales reports are not bridged to report cards.'}
+$search=Get-Content (Join-Path $root 'api/messenger/search.php') -Raw
+foreach($token in @('p.left_at IS NULL','c.deleted_at IS NULL','c.is_active=1')){if($search-notmatch[regex]::Escape($token)){throw "Messenger search membership contract missing: $token"}}
 $legacy=Get-Content (Join-Path $root 'messenger/index.php') -Raw
 if($legacy-notmatch'آرشیو گزارش‌های فورواردشده'){throw 'Legacy messenger route is not clearly named as an archive.'}
 Write-Output "Sobhan Messenger contract checks passed ($($required.Count) required files)."

@@ -196,6 +196,9 @@ class ManagementReportsModule
                 $fieldStmt->execute([$first,'sales_gross_amount','فروش ناخالص','readonly_metric',null,'آماده اتصال به منبع داده فروش.',null,'sales_gross_amount',0,1]);
                 $fieldStmt->execute([$first,'sales_net_amount','فروش خالص','readonly_metric',null,'آماده اتصال به منبع داده فروش.',null,'sales_net_amount',0,2]);
                 $fieldStmt->execute([$first,'target_achievement_percent','درصد تحقق تارگت','percent','برای مثال ۸۵',null,null,'target_achievement_percent',0,3]);
+                $fieldStmt->execute([$first,'sales_what','چه اتفاقی افتاد؟ (What)','textarea','نتیجه و واقعیت قابل سنجش را بنویسید.','خلاصه روشن وضعیت یا تغییر اصلی.',null,null,1,30]);
+                $fieldStmt->execute([$first,'sales_why','چرا اتفاق افتاد؟ (Why)','textarea','علت‌ها و شواهد را بنویسید.','علت ریشه‌ای را از حدس جدا کنید.',null,null,1,40]);
+                $fieldStmt->execute([$first,'sales_action','اقدام بعدی چیست؟ (Action)','repeater',null,'اقدام، مسئول و مهلت را ثبت کنید.',json_encode(['columns'=>[['key'=>'action','label'=>'اقدام'],['key'=>'owner','label'=>'مسئول'],['key'=>'due','label'=>'مهلت']]],JSON_UNESCAPED_UNICODE),null,1,50]);
             }
         } else {
             $first=(int)$pdo->query("SELECT id FROM management_report_sections WHERE template_id={$templateId} ORDER BY sort_order,id LIMIT 1")->fetchColumn();

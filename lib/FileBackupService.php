@@ -38,7 +38,12 @@ class FileBackupService
 
     public static function pending(int $limit=100): array
     {
-        $limit=max(1,min(500,$limit));return Database::fetchAll("SELECT id,relative_path,file_size,file_hash,original_name,mime_type FROM uploaded_files_backup WHERE backup_status IN ('pending','error') AND deleted_from_host=0 ORDER BY CASE backup_status WHEN 'pending' THEN 0 ELSE 1 END,updated_at,id LIMIT {$limit}");
+        $max=max(1,min(500,(int)self::setting('file_backup_batch_max','100')));$attempts=max(1,(int)self::setting('file_backup_max_attempts','5'));$limit=max(1,min($max,$limit));return Database::fetchAll("SELECT id queue_id,id file_id,file_key storage_key,file_size,file_hash checksum,original_name,mime_type,backup_status status,download_attempts attempts,created_at FROM uploaded_files_backup WHERE (backup_status='pending' OR (backup_status='error' AND download_attempts<{$attempts})) AND deleted_from_host=0 ORDER BY CASE backup_status WHEN 'pending' THEN 0 ELSE 1 END,updated_at,id LIMIT {$limit}");
+    }
+
+    public static function metadata(int $id): array
+    {
+        $row=Database::fetch('SELECT id file_id,original_name,file_key storage_key,mime_type,file_size,file_hash checksum,created_at,updated_at,backup_status status,deleted_from_host FROM uploaded_files_backup WHERE id=?',[$id]);if(!$row)throw new RuntimeException('file_not_registered');if((int)$row['deleted_from_host'])throw new RuntimeException('file_deleted_from_host');unset($row['deleted_from_host']);return $row;
     }
 
     public static function markDownloadAttempt(int $id): array
@@ -53,7 +58,7 @@ class FileBackupService
 
     public static function markError(int $id,string $message): string
     {
-        $row=Database::fetch('SELECT id,backup_status FROM uploaded_files_backup WHERE id=?',[$id]);if(!$row)throw new RuntimeException('file_not_registered');$message=mb_substr(trim($message),0,2000);if($message==='')$message='خطای نامشخص در دریافت فایل';if($row['backup_status']==='synced'){self::log($id,'error_ignored','synced','خطای دیرهنگام پس از تأیید بکاپ نادیده گرفته شد: '.$message,'api');return 'synced';}Database::execute('UPDATE uploaded_files_backup SET backup_status="error",last_error=?,updated_at=NOW() WHERE id=?',[$message,$id]);self::log($id,'error','error',$message,'api');return 'error';
+        $row=Database::fetch('SELECT id,backup_status FROM uploaded_files_backup WHERE id=?',[$id]);if(!$row)throw new RuntimeException('file_not_registered');$message=mb_substr(trim($message),0,2000);if($message==='')$message='خطای نامشخص در دریافت فایل';if($row['backup_status']==='synced'){self::log($id,'error_ignored','synced','خطای دیرهنگام پس از تأیید بکاپ نادیده گرفته شد.','api');return 'synced';}Database::execute('UPDATE uploaded_files_backup SET backup_status="error",download_attempts=download_attempts+1,last_error=?,updated_at=NOW() WHERE id=?',[$message,$id]);self::log($id,'error','error','خطای worker ثبت شد.','api');return 'error';
     }
 
     public static function deleteFromHost(int $id,int $adminUserId): void
@@ -63,6 +68,8 @@ class FileBackupService
 
     public static function apiKeyHash(): string{return (string)(Database::fetch('SELECT setting_value FROM site_settings WHERE setting_key="file_backup_api_key_hash"')['setting_value']??'');}
     public static function allowedIps(): string{return (string)(Database::fetch('SELECT setting_value FROM site_settings WHERE setting_key="file_backup_allowed_ips"')['setting_value']??'');}
+    public static function setting(string $key,string $default=''): string{return (string)(Database::fetch('SELECT setting_value FROM site_settings WHERE setting_key=?',[$key])['setting_value']??$default);}
+    public static function enabled(): bool{return self::setting('file_backup_enabled','0')==='1';}
     public static function setApiKey(string $plain): void{Database::execute('INSERT INTO site_settings(setting_key,setting_value,setting_type,updated_at) VALUES("file_backup_api_key_hash",?,"password",NOW()) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),setting_type="password",updated_at=NOW()',[hash('sha256',$plain)]);}
     public static function setAllowedIps(string $value): void{Database::execute('INSERT INTO site_settings(setting_key,setting_value,setting_type,updated_at) VALUES("file_backup_allowed_ips",?,"text",NOW()) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_at=NOW()',[$value]);}
 

@@ -8,6 +8,8 @@ X-Device-Token: SECRET
 X-App-Version: 1.0.0
 ```
 
+نبود هر یک از این headerها پاسخ 401 کنترل‌شده می‌دهد. token خام در log، تنظیمات یا پاسخ‌های بعدی نمایش داده نمی‌شود.
+
 APIها:
 
 - `POST /api/notify/pair-device.php` — اتصال با کد موقت
@@ -54,3 +56,13 @@ sobhan_notification_direct_action(array $notification, string $action, int $user
 ```
 
 نبودن handler باعث پاسخ کنترل‌شده `action_not_supported` می‌شود و هیچ اکشنی صرفاً در کلاینت نهایی نخواهد شد.
+
+## تحویل، Ack و Action
+
+- `pending` فقط اعلان‌های user همان device، بعد از `since_id` و مطابق تنظیم module را برمی‌گرداند.
+- `ack` یکی از وضعیت‌های `delivered`, `displayed`, `failed` را ثبت می‌کند.
+- `action` فقط `open`, `mark_read`, `view_ticket`, `view_cartable`, `reply`, `approve`, `reject`, `mute`, `comment` را پس از تطبیق با actionهای اعلان می‌پذیرد.
+- action موفق و action ناموفق هر دو در delivery log ثبت می‌شوند. failureهای ناشناخته با code عمومی `request_failed` پاسخ داده می‌شوند.
+- URL بازگشتی باید HTTPS و هم‌مبدأ با `app.url` باشد؛ URL خارجی رد می‌شود.
+
+Moduleهای قابل تنظیم شامل `planner` نیز هستند. HR و management به‌صورت پیش‌فرض body حساس را مخفی می‌کنند.

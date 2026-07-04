@@ -3,6 +3,8 @@ require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/Validator.php';
+require_once __DIR__ . '/../core/OrgModule.php';
+require_once __DIR__ . '/../core/SyncQueueService.php';
 require_once __DIR__ . '/../lib/OrgAccess.php';
 
 Auth::requirePermission('users', 'view');
@@ -59,44 +61,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($employeeNo && Database::fetch('SELECT id FROM users WHERE employee_no=? AND id<>? LIMIT 1', [$employeeNo,$id])) $errors['employee_no'] = 'شماره پرسنلی قبلاً ثبت شده است.';
     $department = trim((string)($_POST['department'] ?? ''));
     $roleKey = trim((string)($_POST['role_key'] ?? ''));
-    $salesLine = trim((string)($_POST['sales_line'] ?? ''));
-    $supervisorId = (int)($_POST['supervisor_id'] ?? 0) ?: null;
-    $organizationManagerId = (int)($_POST['organization_manager_id'] ?? 0) ?: null;
     $orgUnitId = (int)($_POST['org_unit_id'] ?? 0) ?: null;
     $orgRoleId = (int)($_POST['org_role_id'] ?? 0) ?: null;
-    $parentUserId = (int)($_POST['parent_user_id'] ?? 0) ?: null;
     $accessScope = in_array($_POST['access_scope'] ?? '', ['self','team','unit','all'], true) ? $_POST['access_scope'] : 'self';
     if ($accessScope === 'all' && !Auth::isAdmin()) $accessScope = 'self';
-    $orgUnit = $orgUnitId ? Database::fetch('SELECT id,title,unit_type FROM org_units WHERE id=? AND active=1', [$orgUnitId]) : null;
-    $orgRole = $orgRoleId ? Database::fetch('SELECT id,code,is_sales_role FROM org_roles WHERE id=? AND active=1', [$orgRoleId]) : null;
-    $isSalesUnit = $orgUnitId ? OrgModule::salesBranch($orgUnitId) : false;
-    $roleCode = (string)($orgRole['code'] ?? '');
-    if ($isSalesUnit && $roleCode === 'VISITOR') $parentUserId = $supervisorId;
-    if ($isSalesUnit && $roleCode === 'SALES_SUPERVISOR') $parentUserId = $organizationManagerId;
+    $organization = OrgModule::normalizeUserOrganization($_POST, $id);
+    $orgUnit = $organization['org_unit'];
+    $orgRole = $organization['org_role'];
+    $salesLine = $organization['sales_line'];
+    $supervisorId = $organization['supervisor_id'];
+    $organizationManagerId = $organization['organization_manager_id'];
+    $parentUserId = $organization['parent_user_id'];
+    $errors = array_merge($errors, $organization['errors']);
     $parentContext = $parentUserId ? OrgAccess::userContext($parentUserId) : null;
-    if ($orgUnitId && !$orgUnit) $errors['org_unit_id'] = 'واحد سازمانی معتبر نیست.';
-    if ($orgRoleId && !$orgRole) $errors['org_role_id'] = 'نقش سازمانی معتبر نیست.';
-    if ($parentUserId && (!$parentContext || $parentUserId === $id || !OrgAccess::canAccessUser($currentUser,$parentUserId))) $errors['parent_user_id'] = 'مدیر مستقیم معتبر نیست.';
-    if ($isSalesUnit && in_array($roleCode, ['VISITOR','SALES_SUPERVISOR'], true) && $salesLine === '') $errors['sales_line'] = 'برای ویزیتور و سرپرست واحد فروش، انتخاب لاین فروش الزامی است.';
-    if ($isSalesUnit && $roleCode === 'VISITOR' && ($parentContext['org_role_code'] ?? '') !== 'SALES_SUPERVISOR') $errors['supervisor_id'] = 'برای ویزیتور واحد فروش، انتخاب سرپرست فروش فعال الزامی است.';
-    if ($isSalesUnit && $roleCode === 'SALES_SUPERVISOR' && ($parentContext['org_role_code'] ?? '') !== 'SALES_MANAGER') $errors['organization_manager_id'] = 'برای سرپرست واحد فروش، انتخاب مدیر فروش فعال الزامی است.';
+    if ($parentUserId && (!$parentContext || $parentUserId === $id || !OrgAccess::canAccessUser($currentUser, $parentUserId))) {
+        $errors['parent_user_id'] = 'مدیر مستقیم معتبر نیست.';
+    }
     if ($orgUnit) $department = $orgUnit['title'];
     if ($orgRole) $roleKey = $orgRole['code'];
-    if (!$isSalesUnit) {
-        $salesLine = '';
-        $supervisorId = null;
-        $organizationManagerId = null;
-    } elseif ($roleCode === 'VISITOR') {
-        $supervisorId = $parentUserId;
-        $organizationManagerId = (int)($parentContext['parent_user_id'] ?? 0) ?: null;
-    } elseif ($roleCode === 'SALES_SUPERVISOR') {
-        $supervisorId = null;
-        $organizationManagerId = $parentUserId;
-    } elseif ($roleCode === 'SALES_MANAGER') {
-        $supervisorId = null;
-        $organizationManagerId = null;
-        $parentUserId = null;
-    }
 
     if (!$id && trim((string)($_POST['password'] ?? '')) === '') {
         $errors['password'] = 'رمز عبور برای کاربر جدید ضروری است.';
@@ -169,9 +151,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo->commit();
+        try { SyncQueueService::enqueueOnce('users', $id ?: (int)Database::lastInsertId()); } catch (Throwable $syncError) { error_log('User sync queue: '.$syncError->getMessage()); }
         flash('کاربر ذخیره شد.');
     } catch (Throwable $e) {
         $pdo->rollBack();
+        error_log('User save failed: ' . $e->getMessage());
         flash('خطا در ذخیره کاربر. ایمیل یا نام کاربری ممکن است تکراری باشد.', 'danger');
     }
     redirect('/admin/users.php');
@@ -389,7 +373,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
 
 <form class="card admin-form" method="get"><h2>فیلتر کاربران</h2><div class="grid grid-3"><label class="form-field"><span>واحد</span><select name="org_unit_id"><option value="">همه</option><?php foreach($orgUnits as $unit):?><option value="<?=$unit['id']?>" <?=(int)($_GET['org_unit_id']??0)===(int)$unit['id']?'selected':''?>><?=e($unit['title'])?></option><?php endforeach?></select></label><label class="form-field"><span>نقش سازمانی</span><select name="org_role_id"><option value="">همه</option><?php foreach($orgRoles as $item):?><option value="<?=$item['id']?>" <?=(int)($_GET['org_role_id']??0)===(int)$item['id']?'selected':''?>><?=e($item['title'])?></option><?php endforeach?></select></label><label class="form-field"><span>نقش سیستمی</span><select name="role"><option value="">همه</option><?php foreach($roleLabels as $value=>$label):?><option value="<?=$value?>" <?=($_GET['role']??'')===$value?'selected':''?>><?=e($label)?></option><?php endforeach?></select></label><label class="form-field"><span>مدیر مستقیم</span><select name="parent_user_id"><option value="">همه</option><?php foreach($parentUsers as $parent):?><option value="<?=$parent['id']?>" <?=(int)($_GET['parent_user_id']??0)===(int)$parent['id']?'selected':''?>><?=e($parent['name'])?></option><?php endforeach?></select></label><label class="form-field"><span>لاین فروش</span><input name="sales_line" value="<?=e($_GET['sales_line']??'')?>"></label><label class="form-field"><span>وضعیت</span><select name="status"><option value="">همه</option><option value="active" <?=($_GET['status']??'')==='active'?'selected':''?>>فعال</option><option value="disabled" <?=($_GET['status']??'')==='disabled'?'selected':''?>>غیرفعال</option></select></label></div><div class="form-actions"><button class="btn btn-primary">اعمال فیلتر</button><a class="btn" href="/admin/users.php">پاکسازی</a><a class="btn" href="/admin/hr-settings.php">ساختار سازمانی</a></div></form>
 <div class="table-wrap">
-    <table>
+    <table data-progressive-table data-export-name="users">
         <thead><tr><th>نام / شماره پرسنلی</th><th>واحد</th><th>نقش سازمانی</th><th>نقش سیستمی</th><th>مدیر مستقیم</th><th>لاین</th><th>زیرمجموعه</th><th>آخرین ورود</th><th>وضعیت</th><th>عملیات</th></tr></thead>
         <tbody>
         <?php foreach ($users as $u): ?>

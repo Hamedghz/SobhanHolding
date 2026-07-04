@@ -24,6 +24,30 @@ class OrgModule
             }
         }
 
+        if (Database::tableExists('users')) {
+            $userIndexes = [
+                'idx_users_org_unit' => 'org_unit_id',
+                'idx_users_org_role' => 'org_role_id',
+                'idx_users_parent' => 'parent_user_id',
+                'idx_users_supervisor' => 'supervisor_id',
+                'idx_users_organization_manager' => 'organization_manager_id',
+                'idx_users_sales_line' => 'sales_line',
+            ];
+            $indexExists = $pdo->prepare('SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME="users" AND COLUMN_NAME=? AND SEQ_IN_INDEX=1');
+            foreach ($userIndexes as $index => $column) {
+                $indexExists->execute([$column]);
+                if (!(int)$indexExists->fetchColumn()) {
+                    $pdo->exec("ALTER TABLE users ADD INDEX `{$index}` (`{$column}`)");
+                }
+            }
+
+            $employeeNoIndex = $pdo->prepare('SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME="users" AND COLUMN_NAME="employee_no"');
+            $employeeNoIndex->execute();
+            if (!(int)$employeeNoIndex->fetchColumn()) {
+                $pdo->exec('ALTER TABLE users ADD INDEX `idx_users_employee_no` (`employee_no`)');
+            }
+        }
+
         $assignmentColumns = [
             'batch_key' => 'VARCHAR(80) NULL',
             'scope_type' => 'VARCHAR(40) NULL',
@@ -141,5 +165,75 @@ class OrgModule
             $unitId = (int)($row['parent_id'] ?? 0) ?: null;
         }
         return false;
+    }
+
+    public static function normalizeUserOrganization(array $input, int $userId = 0): array
+    {
+        $errors = [];
+        $orgUnitId = (int)($input['org_unit_id'] ?? 0) ?: null;
+        $orgRoleId = (int)($input['org_role_id'] ?? 0) ?: null;
+        $parentUserId = (int)($input['parent_user_id'] ?? 0) ?: null;
+        $supervisorId = (int)($input['supervisor_id'] ?? 0) ?: null;
+        $organizationManagerId = (int)($input['organization_manager_id'] ?? 0) ?: null;
+        $salesLine = trim((string)($input['sales_line'] ?? ''));
+
+        $unit = $orgUnitId ? Database::fetch('SELECT id,title,unit_type FROM org_units WHERE id=? AND active=1', [$orgUnitId]) : null;
+        $role = $orgRoleId ? Database::fetch('SELECT id,code,is_sales_role FROM org_roles WHERE id=? AND active=1', [$orgRoleId]) : null;
+        if ($orgUnitId && !$unit) $errors['org_unit_id'] = 'واحد سازمانی معتبر نیست.';
+        if ($orgRoleId && !$role) $errors['org_role_id'] = 'نقش سازمانی معتبر نیست.';
+
+        $roleCode = (string)($role['code'] ?? '');
+        $isSalesUser = $unit && $role && self::salesBranch($orgUnitId) && (int)$role['is_sales_role'] === 1;
+        if (!$isSalesUser) {
+            return [
+                'org_unit' => $unit, 'org_role' => $role, 'role_code' => $roleCode,
+                'sales_line' => '', 'supervisor_id' => null, 'organization_manager_id' => null,
+                'parent_user_id' => $parentUserId, 'errors' => $errors,
+            ];
+        }
+
+        if (in_array($roleCode, ['VISITOR', 'SALES_SUPERVISOR'], true) && $salesLine === '') {
+            $errors['sales_line'] = 'انتخاب لاین فروش الزامی است.';
+        }
+
+        if ($roleCode === 'VISITOR') {
+            $supervisorId = $supervisorId ?: $parentUserId;
+            $supervisor = self::activeSalesUser($supervisorId, 'SALES_SUPERVISOR');
+            if (!$supervisor || $supervisorId === $userId) {
+                $errors['supervisor_id'] = 'برای ویزیتور واحد فروش، انتخاب سرپرست فروش فعال الزامی است.';
+            } else {
+                $parentUserId = $supervisorId;
+                $managerId = (int)($supervisor['parent_user_id'] ?? 0) ?: (int)($supervisor['organization_manager_id'] ?? 0) ?: null;
+                $organizationManagerId = self::activeSalesUser($managerId, 'SALES_MANAGER') ? $managerId : null;
+            }
+        } elseif ($roleCode === 'SALES_SUPERVISOR') {
+            $organizationManagerId = $organizationManagerId ?: $parentUserId;
+            $manager = self::activeSalesUser($organizationManagerId, 'SALES_MANAGER');
+            if (!$manager || $organizationManagerId === $userId) {
+                $errors['organization_manager_id'] = 'برای سرپرست واحد فروش، انتخاب مدیر فروش فعال الزامی است.';
+            } else {
+                $parentUserId = $organizationManagerId;
+            }
+            $supervisorId = null;
+        } elseif ($roleCode === 'SALES_MANAGER') {
+            $parentUserId = null;
+            $supervisorId = null;
+            $organizationManagerId = null;
+        }
+
+        return [
+            'org_unit' => $unit, 'org_role' => $role, 'role_code' => $roleCode,
+            'sales_line' => $salesLine, 'supervisor_id' => $supervisorId,
+            'organization_manager_id' => $organizationManagerId, 'parent_user_id' => $parentUserId,
+            'errors' => $errors,
+        ];
+    }
+
+    private static function activeSalesUser(?int $userId, string $roleCode): ?array
+    {
+        if (!$userId) return null;
+        $user = Database::fetch('SELECT u.*,r.code org_role_code,r.is_sales_role FROM users u JOIN org_roles r ON r.id=u.org_role_id AND r.active=1 WHERE u.id=? AND u.status="active" AND r.code=? AND r.is_sales_role=1', [$userId, $roleCode]);
+        if (!$user || !self::salesBranch((int)($user['org_unit_id'] ?? 0))) return null;
+        return $user;
     }
 }

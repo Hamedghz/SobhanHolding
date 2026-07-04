@@ -1,3 +1,6 @@
+CREATE TABLE IF NOT EXISTS sync_queue (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,entity_type VARCHAR(100) NOT NULL,entity_id BIGINT UNSIGNED NOT NULL,operation VARCHAR(20) NOT NULL DEFAULT 'upsert',status VARCHAR(20) NOT NULL DEFAULT 'pending',attempts INT UNSIGNED NOT NULL DEFAULT 0,last_error TEXT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,synced_at DATETIME NULL,locked_at DATETIME NULL,locked_by VARCHAR(100) NULL,INDEX idx_sync_status(status),INDEX idx_sync_entity(entity_type,entity_id),INDEX idx_sync_created(created_at),INDEX idx_sync_retry(status,attempts,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS sync_api_logs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,endpoint VARCHAR(100) NOT NULL,method VARCHAR(10) NOT NULL,remote_ip VARCHAR(64) NULL,entity_type VARCHAR(100) NULL,entity_id BIGINT UNSIGNED NULL,queue_id BIGINT UNSIGNED NULL,status_code INT NULL,success TINYINT(1) NOT NULL DEFAULT 0,error_message TEXT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,INDEX idx_sync_log_created(created_at),INDEX idx_sync_log_queue(queue_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS users (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(150) NOT NULL,
@@ -26,7 +29,13 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at DATETIME NULL,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_users_employee_no(employee_no)
+  UNIQUE KEY uq_users_employee_no(employee_no),
+  INDEX idx_users_org_unit(org_unit_id),
+  INDEX idx_users_org_role(org_role_id),
+  INDEX idx_users_parent(parent_user_id),
+  INDEX idx_users_supervisor(supervisor_id),
+  INDEX idx_users_organization_manager(organization_manager_id),
+  INDEX idx_users_sales_line(sales_line)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS user_theme_preferences (
@@ -1105,10 +1114,10 @@ CREATE TABLE IF NOT EXISTS management_decisions (
  decision_type VARCHAR(50) NOT NULL DEFAULT 'decision',category VARCHAR(100) NULL,responsible_user_id INT UNSIGNED NULL,responsible_unit_id INT UNSIGNED NULL,
  supervisor_user_id INT UNSIGNED NULL,priority VARCHAR(20) NOT NULL DEFAULT 'normal',due_date DATE NULL,followup_status VARCHAR(30) NOT NULL DEFAULT 'not_started',
  progress_percent TINYINT UNSIGNED NOT NULL DEFAULT 0,latest_followup_note TEXT NULL,is_rule TINYINT(1) NOT NULL DEFAULT 0,rule_effective_date DATE NULL,
- rule_expire_date DATE NULL,closed_at DATETIME NULL,closed_by INT UNSIGNED NULL,verified_by INT UNSIGNED NULL,verification_status VARCHAR(30) NULL,
+ rule_expire_date DATE NULL,closed_at DATETIME NULL,closed_by INT UNSIGNED NULL,verified_by INT UNSIGNED NULL,verification_status VARCHAR(30) NULL,overdue_notified_at DATETIME NULL,
  created_by INT UNSIGNED NOT NULL,updated_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
  INDEX idx_decision_meeting(meeting_id),INDEX idx_decision_responsible(responsible_user_id),INDEX idx_decision_unit(responsible_unit_id),
- INDEX idx_decision_status(followup_status),INDEX idx_decision_due(due_date),INDEX idx_decision_rule(is_rule),
+ INDEX idx_decision_status(followup_status),INDEX idx_decision_due(due_date),INDEX idx_decision_overdue_notice(followup_status,due_date,overdue_notified_at),INDEX idx_decision_rule(is_rule),
  CONSTRAINT fk_decision_meeting FOREIGN KEY(meeting_id) REFERENCES management_meetings(id) ON DELETE RESTRICT,
  CONSTRAINT fk_decision_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
