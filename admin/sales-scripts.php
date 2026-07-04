@@ -3,23 +3,22 @@ require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../services/SalesOperationsService.php';
-SalesOperationsService::boot(); SalesOperationsService::ensureSalesManagerAccess();
+SalesOperationsService::boot(); SalesOperationsService::requireSalesManagerPermission('sales_manager.scripts.manage');
 $user=Auth::user(); $errors=[];
 if($_SERVER['REQUEST_METHOD']==='POST'){
  try{
   if(!Auth::verifyCsrf($_POST['csrf_token']??null)) throw new RuntimeException('درخواست نامعتبر است.');
   $title=trim((string)($_POST['title']??''));$code=trim((string)($_POST['script_code']??''));$body=trim((string)($_POST['script_body']??''));
   if($title===''||$code===''||$body==='') throw new RuntimeException('عنوان، کد و متن اسکریپت اجباری هستند.');
-  $id=(int)($_POST['id']??0);$params=[$title,$code,$body,$_POST['target_scope']??'sales_line',$_POST['sales_line']??null,(int)($_POST['supervisor_id']??0)?:null,(int)($_POST['visitor_id']??0)?:null,(int)($_POST['brand_id']??0)?:null,(int)($_POST['product_id']??0)?:null,$_POST['customer_type']??null,!empty($_POST['active'])?1:0,(int)$user['id']];
+  $id=(int)($_POST['id']??0);$supervisorId=(int)($_POST['supervisor_id']??0);$visitorId=(int)($_POST['visitor_id']??0);if($supervisorId&&!SalesOperationsService::canAccessSupervisor($supervisorId,$user))throw new InvalidArgumentException('سرپرست انتخاب‌شده خارج از تیم شماست.');if($visitorId&&!SalesOperationsService::canAccessSalesUser($visitorId,(int)$user['id'],$user))throw new InvalidArgumentException('ویزیتور انتخاب‌شده خارج از تیم شماست.');if($id&&!SalesOperationsService::canViewAll($user)){ $owned=Database::fetch('SELECT id FROM sales_scripts WHERE id=? AND created_by=?',[$id,(int)$user['id']]);if(!$owned)throw new InvalidArgumentException('دسترسی ویرایش این اسکریپت را ندارید.');}$params=[$title,$code,$body,$_POST['target_scope']??'sales_line',$_POST['sales_line']??null,$supervisorId?:null,$visitorId?:null,(int)($_POST['brand_id']??0)?:null,(int)($_POST['product_id']??0)?:null,$_POST['customer_type']??null,!empty($_POST['active'])?1:0,(int)$user['id']];
   if($id){Database::execute('UPDATE sales_scripts SET title=?,script_code=?,script_body=?,target_scope=?,sales_line=?,supervisor_id=?,visitor_id=?,brand_id=?,product_id=?,customer_type=?,active=?,created_by=COALESCE(created_by,?),updated_at=NOW() WHERE id=?',array_merge($params,[$id]));}
   else{Database::execute('INSERT INTO sales_scripts(title,script_code,script_body,target_scope,sales_line,supervisor_id,visitor_id,brand_id,product_id,customer_type,active,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',$params);}
   flash('اسکریپت فروش ذخیره شد.');redirect('/admin/sales-scripts.php');
- }catch(Throwable $e){$errors[]=$e->getMessage();}
+ }catch(Throwable $e){$errors[]=SalesOperationsService::uiError($e,'ذخیره اسکریپت فروش انجام نشد.');}
 }
-$editId=(int)($_GET['edit']??0);$edit=$editId?Database::fetch('SELECT * FROM sales_scripts WHERE id=?',[$editId]):null;
-$scripts=Database::fetchAll('SELECT s.*,u.name creator_name FROM sales_scripts s LEFT JOIN users u ON u.id=s.created_by ORDER BY s.created_at DESC LIMIT 200');
-$supervisors=Database::fetchAll('SELECT id,name,sales_line FROM users WHERE status="active" AND (role_key IN ("SALES_SUPERVISOR","supervisor") OR id IN (SELECT supervisor_id FROM sales_team_assignments WHERE active=1)) ORDER BY name');
-$visitors=Database::fetchAll('SELECT id,name,sales_line FROM users WHERE status="active" AND (role_key IN ("VISITOR","visitor") OR supervisor_id IS NOT NULL) ORDER BY name LIMIT 500');
+$editId=(int)($_GET['edit']??0);$edit=$editId?(SalesOperationsService::canViewAll($user)?Database::fetch('SELECT * FROM sales_scripts WHERE id=?',[$editId]):Database::fetch('SELECT * FROM sales_scripts WHERE id=? AND created_by=?',[$editId,(int)$user['id']])):null;
+$scripts=SalesOperationsService::canViewAll($user)?Database::fetchAll('SELECT s.*,u.name creator_name FROM sales_scripts s LEFT JOIN users u ON u.id=s.created_by ORDER BY s.created_at DESC LIMIT 200'):Database::fetchAll('SELECT s.*,u.name creator_name FROM sales_scripts s LEFT JOIN users u ON u.id=s.created_by WHERE s.created_by=? ORDER BY s.created_at DESC LIMIT 200',[(int)$user['id']]);
+$supervisorIds=SalesOperationsService::getSalesManagerSupervisorIds((int)$user['id']);if(SalesOperationsService::canViewAll($user)){$supervisors=Database::fetchAll('SELECT id,name,sales_line FROM users WHERE status="active" AND (role_key IN ("SALES_SUPERVISOR","supervisor") OR id IN (SELECT supervisor_id FROM sales_team_assignments WHERE active=1)) ORDER BY name');$visitors=Database::fetchAll('SELECT id,name,sales_line FROM users WHERE status="active" AND (role_key IN ("VISITOR","visitor") OR supervisor_id IS NOT NULL) ORDER BY name LIMIT 500');}else{$supPh=implode(',',array_fill(0,max(1,count($supervisorIds)),'?'));$supervisors=$supervisorIds?Database::fetchAll("SELECT id,name,sales_line FROM users WHERE id IN ({$supPh}) ORDER BY name",$supervisorIds):[];$teamIds=SalesOperationsService::getSalesManagerTeamUserIds((int)$user['id'],$user);$teamPh=implode(',',array_fill(0,count($teamIds),'?'));$visitors=Database::fetchAll("SELECT id,name,sales_line FROM users WHERE status=\"active\" AND id IN ({$teamPh}) AND id<>? ORDER BY name LIMIT 500",array_merge($teamIds,[(int)$user['id']]));}
 $pageTitle='اسکریپت‌های فروش';require __DIR__ . '/../views/partials/admin-header.php';
 ?>
 <div class="section-heading-row"><div><h1>اسکریپت‌های فروش</h1><p class="muted">تعریف متن اسکریپت، placeholderها و محدوده تخصیص برای سرپرستان، ویزیتورها و لاین فروش.</p></div><div class="actions"><a class="btn" href="/admin/sales-script-fields.php">فیلدهای داینامیک</a></div></div>

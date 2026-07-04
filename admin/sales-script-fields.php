@@ -3,8 +3,10 @@ require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../services/SalesOperationsService.php';
-SalesOperationsService::boot(); SalesOperationsService::ensureSalesManagerAccess();
+SalesOperationsService::boot(); SalesOperationsService::requireSalesManagerPermission('sales_manager.scripts.manage');
 $scriptId=(int)($_GET['script_id']??($_POST['script_id']??0));$errors=[];
+$script=$scriptId?(SalesOperationsService::canViewAll(Auth::user())?Database::fetch('SELECT * FROM sales_scripts WHERE id=?',[$scriptId]):Database::fetch('SELECT * FROM sales_scripts WHERE id=? AND created_by=?',[$scriptId,(int)Auth::user()['id']])):null;
+if($scriptId&&!$script){http_response_code(403);exit('دسترسی غیرمجاز');}
 if($_SERVER['REQUEST_METHOD']==='POST'){
  try{
   if(!Auth::verifyCsrf($_POST['csrf_token']??null)) throw new RuntimeException('درخواست نامعتبر است.');
@@ -15,10 +17,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   $allowed=['text','textarea','number','date','select','multi_select','status','customer','product','brand','user','file']; if(!in_array($type,$allowed,true))$type='text';
   Database::execute('INSERT INTO sales_script_fields(script_id,field_key,field_label,field_type,options_json,default_value,required,visible_to_supervisor,visible_to_sales_manager,sort_order,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,1,NOW(),NOW()) ON DUPLICATE KEY UPDATE field_label=VALUES(field_label),field_type=VALUES(field_type),options_json=VALUES(options_json),default_value=VALUES(default_value),required=VALUES(required),visible_to_supervisor=VALUES(visible_to_supervisor),visible_to_sales_manager=VALUES(visible_to_sales_manager),sort_order=VALUES(sort_order),active=1,updated_at=NOW()',[$scriptId,$key,$label,$type,trim((string)($_POST['options_json']??''))?:null,trim((string)($_POST['default_value']??''))?:null,!empty($_POST['required'])?1:0,!empty($_POST['visible_to_supervisor'])?1:0,!empty($_POST['visible_to_sales_manager'])?1:0,(int)($_POST['sort_order']??0)]);
   flash('فیلد داینامیک ذخیره شد.');redirect('/admin/sales-script-fields.php?script_id='.$scriptId);
- }catch(Throwable $e){$errors[]=$e->getMessage();}
+ }catch(Throwable $e){$errors[]=SalesOperationsService::uiError($e,'ذخیره فیلد اسکریپت انجام نشد.');}
 }
-$scripts=Database::fetchAll('SELECT id,title,script_code FROM sales_scripts ORDER BY title');
-$script=$scriptId?Database::fetch('SELECT * FROM sales_scripts WHERE id=?',[$scriptId]):null;
+$scripts=SalesOperationsService::canViewAll(Auth::user())?Database::fetchAll('SELECT id,title,script_code FROM sales_scripts ORDER BY title'):Database::fetchAll('SELECT id,title,script_code FROM sales_scripts WHERE created_by=? ORDER BY title',[(int)Auth::user()['id']]);
 $fields=$scriptId?Database::fetchAll('SELECT * FROM sales_script_fields WHERE script_id=? ORDER BY sort_order,id',[$scriptId]):[];
 $pageTitle='فیلدهای داینامیک اسکریپت';require __DIR__ . '/../views/partials/admin-header.php';
 ?>

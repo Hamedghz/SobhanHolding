@@ -4,7 +4,7 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../services/SalesOperationsService.php';
 SalesOperationsService::boot();
-SalesOperationsService::ensureSalesManagerAccess();
+SalesOperationsService::requireSalesManagerPermission('sales_manager.supervisors.view');
 $user=Auth::user(); [$from,$to]=SalesOperationsService::dateFilters($_GET);
 $summaryRows=SalesOperationsService::getSalesManagerSupervisorSummary((int)$user['id'],['from'=>$from,'to'=>$to]);
 $supervisorId=(int)($_GET['supervisor_id']??0);
@@ -12,13 +12,14 @@ if($supervisorId){$summaryRows=array_values(array_filter($summaryRows,fn($r)=>(i
 if($_SERVER['REQUEST_METHOD']==='POST'){
  if(!Auth::verifyCsrf($_POST['csrf_token']??null)){http_response_code(419);exit('درخواست نامعتبر است.');}
  try{
+  if(!SalesOperationsService::canViewAll($user)&&!Auth::can('sales_manager.supervisor_actions.review'))throw new InvalidArgumentException('مجوز بررسی اقدامات سرپرستان را ندارید.');
   $actionId=(int)($_POST['action_id']??0);$note=trim((string)($_POST['manager_note']??''));$status=(string)($_POST['review_status']??'needs_manager_review');
   $row=Database::fetch('SELECT * FROM supervisor_actions WHERE id=?',[$actionId]);
   if(!$row || !SalesOperationsService::canAccessSupervisor((int)$row['supervisor_id'],$user)) throw new RuntimeException('دسترسی بررسی این اقدام وجود ندارد.');
   Database::execute('UPDATE supervisor_actions SET manager_note=?, status=?, updated_by=?, updated_at=NOW() WHERE id=?',[$note,SalesOperationsService::validSupervisorStatus($status),(int)$user['id'],$actionId]);
   SalesOperationsService::logSupervisorAction($actionId,'manager_review',null,['note'=>$note,'status'=>$status]);
   flash('نظر مدیر فروش ثبت شد.'); redirect('/admin/sales-manager-supervisor-reports.php');
- }catch(Throwable $e){flash($e->getMessage(),'danger');redirect('/admin/sales-manager-supervisor-reports.php');}
+ }catch(Throwable $e){flash(SalesOperationsService::uiError($e,'ثبت بررسی مدیر فروش انجام نشد.'),'danger');redirect('/admin/sales-manager-supervisor-reports.php');}
 }
 $allSupervisorIds=array_map(fn($r)=>(int)$r['supervisor']['id'],$summaryRows);
 $actions=[];$reports=[];

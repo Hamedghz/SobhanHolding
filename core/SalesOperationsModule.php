@@ -8,9 +8,24 @@ class SalesOperationsModule
         foreach (self::schema() as $sql) {
             $pdo->exec($sql);
         }
+        self::repairColumnsAndIndexes($pdo);
         self::seedModules($pdo);
         self::seedSupervisorSections($pdo);
         self::seedDefaultFields($pdo);
+    }
+
+    private static function repairColumnsAndIndexes(PDO $pdo): void
+    {
+        $columns=[
+            'sales_team_assignments'=>['sales_manager_id'=>'INT UNSIGNED NULL','sales_line'=>'VARCHAR(50) NULL','active'=>'TINYINT(1) NOT NULL DEFAULT 1'],
+            'supervisor_actions'=>['sales_manager_id'=>'INT UNSIGNED NULL','sales_line'=>'VARCHAR(50) NULL','visitor_id'=>'INT UNSIGNED NULL','planner_task_id'=>'BIGINT UNSIGNED NULL'],
+            'sales_actions'=>['sales_manager_id'=>'INT UNSIGNED NULL','supervisor_id'=>'INT UNSIGNED NULL','visitor_id'=>'INT UNSIGNED NULL','assigned_to'=>'INT UNSIGNED NULL','planner_task_id'=>'BIGINT UNSIGNED NULL'],
+        ];
+        $columnCheck=$pdo->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?');
+        foreach($columns as $table=>$definitions)foreach($definitions as $column=>$definition){$columnCheck->execute([$table,$column]);if(!(int)$columnCheck->fetchColumn())$pdo->exec("ALTER TABLE `{$table}` ADD `{$column}` {$definition}");}
+        $indexes=['sales_team_assignments'=>['idx_sales_team_manager'=>'(sales_manager_id,active)'],'supervisor_actions'=>['idx_supervisor_actions_manager'=>'(sales_manager_id,status,due_date)'],'sales_actions'=>['idx_sales_actions_manager'=>'(sales_manager_id,status,due_date)','idx_sales_actions_assigned'=>'(assigned_to,status,due_date)']];
+        $indexCheck=$pdo->prepare('SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME=?');
+        foreach($indexes as $table=>$definitions)foreach($definitions as $index=>$definition){$indexCheck->execute([$table,$index]);if(!(int)$indexCheck->fetchColumn())$pdo->exec("ALTER TABLE `{$table}` ADD INDEX `{$index}` {$definition}");}
     }
 
     public static function schema(): array

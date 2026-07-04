@@ -4,7 +4,7 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../services/SalesOperationsService.php';
 SalesOperationsService::boot();
-SalesOperationsService::ensureSupervisorAccess();
+SalesOperationsService::requireSupervisorPermission('supervisor.actions.manage');
 $user=Auth::user();$supervisorId=(int)$user['id'];$errors=[];
 if($_SERVER['REQUEST_METHOD']==='POST'){
  try{
@@ -12,7 +12,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   $title=trim((string)($_POST['title']??'')); if($title==='') throw new RuntimeException('عنوان اقدام اجباری است.');
   SalesOperationsService::createSupervisorAction(['supervisor_id'=>$supervisorId,'section_id'=>(int)($_POST['section_id']??0),'visitor_id'=>(int)($_POST['visitor_id']??0),'title'=>$title,'description'=>$_POST['description']??'','action_type'=>$_POST['action_type']??'','priority'=>$_POST['priority']??'normal','status'=>$_POST['status']??'open','due_date'=>$_POST['due_date']??null,'add_to_planner'=>!empty($_POST['add_to_planner']),'dynamic_values'=>$_POST['dynamic']??[]]);
   flash('اقدام با موفقیت ثبت شد.'); redirect('/admin/supervisor-actions.php');
- }catch(Throwable $e){$errors[]=$e->getMessage();}
+ }catch(Throwable $e){$errors[]=SalesOperationsService::uiError($e,'ثبت اقدام انجام نشد. لطفاً دوباره تلاش کنید.');}
 }
 $sections=Database::fetchAll('SELECT * FROM supervisor_script_sections WHERE active=1 ORDER BY sort_order,id');
 $visitors=SalesOperationsService::getSupervisorVisitors($supervisorId);
@@ -21,6 +21,7 @@ $actions=Database::fetchAll('SELECT a.*,s.title section_title,u.name visitor_nam
 $pageTitle='اسکریپت فروش و اقدامات سرپرست'; require __DIR__ . '/../views/partials/admin-header.php';
 ?>
 <div class="section-heading-row"><div><h1>اسکریپت فروش و اقدامات</h1><p class="muted">ثبت اقدامات روزانه و اتصال اختیاری به پلنر کاری.</p></div><div class="actions"><a class="btn" href="/admin/supervisor-dashboard.php">داشبورد</a></div></div>
+<?php if(!SalesOperationsService::plannerAvailable()):?><div class="alert alert-warning">ماژول پلنر در حال حاضر در دسترس نیست؛ اقدام بدون وظیفه پلنر ذخیره می‌شود.</div><?php endif?>
 <?php foreach($errors as $error):?><div class="alert alert-danger"><?=e($error)?></div><?php endforeach;?>
 <section class="card"><h2>اسکریپت‌های تخصیص‌یافته</h2><?php if($scripts):?><div class="grid grid-2"><?php foreach($scripts as $script):?><div class="card"><h3><?=e($script['title'])?></h3><p class="muted"><?=nl2br(e($script['script_body']))?></p><small>کد: <?=e($script['script_code'])?></small></div><?php endforeach;?></div><?php else:?><p class="muted">اسکریپت فعالی برای شما تخصیص داده نشده است.</p><?php endif;?></section>
 <form class="card admin-form" method="post"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><h2>ثبت اقدام جدید</h2><div class="grid grid-3"><label class="form-field"><span>بخش اسکریپت</span><select name="section_id" required><?php foreach($sections as $section):?><option value="<?=(int)$section['id']?>"><?=e($section['title'])?></option><?php endforeach;?></select></label><label class="form-field"><span>ویزیتور مرتبط</span><select name="visitor_id"><option value="0">بدون ویزیتور مشخص</option><?php foreach($visitors as $visitor):?><option value="<?=(int)$visitor['id']?>"><?=e($visitor['name'])?></option><?php endforeach;?></select></label><label class="form-field"><span>نوع اقدام</span><select name="action_type"><option value="sales">فروش</option><option value="collection">وصول</option><option value="training">آموزش</option><option value="customer">مشتری</option><option value="market">بازار</option><option value="other">سایر</option></select></label><label class="form-field"><span>عنوان اقدام</span><input name="title" required maxlength="190"></label><label class="form-field"><span>مهلت انجام</span><input type="date" name="due_date"></label><label class="form-field"><span>اولویت</span><select name="priority"><option value="normal">متوسط</option><option value="high">بالا</option><option value="urgent">فوری</option><option value="low">پایین</option></select></label><label class="form-field"><span>وضعیت</span><select name="status"><option value="open">باز</option><option value="in_progress">در حال پیگیری</option><option value="needs_manager_review">نیازمند بررسی مدیر فروش</option><option value="done">انجام‌شده</option></select></label></div><label class="form-field"><span>توضیحات</span><textarea name="description" rows="4"></textarea></label><div class="grid grid-2"><label class="form-field"><span>علت مشکل</span><textarea name="dynamic[problem_reason]" rows="3"></textarea></label><label class="form-field"><span>نتیجه اقدام</span><textarea name="dynamic[result_note]" rows="3"></textarea></label></div><label><input type="checkbox" name="add_to_planner" value="1"> اضافه شدن به پلنر</label><div class="form-actions"><button class="btn btn-primary">ثبت اقدام</button></div></form>
