@@ -309,6 +309,10 @@ class Database
         NotificationService::repair($pdo);
         require_once __DIR__ . '/WindowsNotificationHubModule.php';
         WindowsNotificationHubModule::repair($pdo);
+        require_once __DIR__ . '/SalesOfferBudgetModule.php';
+        SalesOfferBudgetModule::repair($pdo);
+        require_once __DIR__ . '/SalesDataSchema.php';
+        SalesDataSchema::repair($pdo);
 
         if (self::tableExists('users')) {
             if (!self::columnExists('users', 'description')) {

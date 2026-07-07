@@ -949,6 +949,133 @@ CREATE TABLE IF NOT EXISTS management_report_periods (
   INDEX idx_management_report_period_active(active,sort_order,start_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Sales data foundation (Stage 01: schema only; no parser, sync or dashboard migration)
+CREATE TABLE IF NOT EXISTS sales_import_batches (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, source_type VARCHAR(30) NOT NULL, source_module VARCHAR(50) NOT NULL,
+  file_name VARCHAR(255) NULL, file_hash VARCHAR(128) NULL, detected_sheet VARCHAR(255) NULL, detected_table VARCHAR(255) NULL,
+  import_mode VARCHAR(30) NOT NULL DEFAULT 'skip_duplicates', status VARCHAR(30) NOT NULL DEFAULT 'uploaded',
+  total_rows INT NOT NULL DEFAULT 0, valid_rows INT NOT NULL DEFAULT 0, invalid_rows INT NOT NULL DEFAULT 0,
+  duplicate_rows INT NOT NULL DEFAULT 0, imported_rows INT NOT NULL DEFAULT 0, updated_rows INT NOT NULL DEFAULT 0, skipped_rows INT NOT NULL DEFAULT 0,
+  started_by BIGINT UNSIGNED NULL, started_at DATETIME NULL, finished_at DATETIME NULL, error_message TEXT NULL, metadata_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_sales_import_batches_status(status), INDEX idx_sales_import_batches_source_type(source_type),
+  INDEX idx_sales_import_batches_source_module(source_module), INDEX idx_sales_import_batches_file_hash(file_hash),
+  INDEX idx_sales_import_batches_started_by(started_by), INDEX idx_sales_import_batches_created_at(created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_import_errors (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NOT NULL, source_module VARCHAR(50) NOT NULL,
+  `row_number` INT NULL, error_code VARCHAR(100) NULL, error_message TEXT NOT NULL, raw_json LONGTEXT NULL, normalized_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_sales_import_errors_batch(import_batch_id), INDEX idx_sales_import_errors_source(source_module), INDEX idx_sales_import_errors_code(error_code),
+  CONSTRAINT fk_sales_import_errors_batch FOREIGN KEY(import_batch_id) REFERENCES sales_import_batches(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_import_column_mappings (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, source_module VARCHAR(50) NOT NULL, source_header VARCHAR(255) NOT NULL,
+  normalized_key VARCHAR(191) NOT NULL, required TINYINT(1) NOT NULL DEFAULT 0, data_type VARCHAR(50) NOT NULL DEFAULT 'string',
+  active TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  UNIQUE KEY uq_sales_import_mapping_source_header(source_module,source_header), INDEX idx_sales_import_mappings_source(source_module),
+  INDEX idx_sales_import_mappings_key(normalized_key), INDEX idx_sales_import_mappings_active(active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS staging_sales_data (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NOT NULL, source_module VARCHAR(50) NOT NULL,
+  `row_number` INT NOT NULL, raw_json LONGTEXT NOT NULL, normalized_json LONGTEXT NULL,
+  validation_status VARCHAR(30) NOT NULL DEFAULT 'pending', validation_errors_json LONGTEXT NULL, source_unique_key VARCHAR(191) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_staging_sales_batch(import_batch_id), INDEX idx_staging_sales_source(source_module),
+  INDEX idx_staging_sales_validation(validation_status), INDEX idx_staging_sales_unique_key(source_unique_key),
+  CONSTRAINT fk_staging_sales_batch FOREIGN KEY(import_batch_id) REFERENCES sales_import_batches(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_aggregate_rows (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
+  unique_code VARCHAR(191) NULL, invoice_type VARCHAR(100) NULL, invoice_number VARCHAR(100) NULL, sub_invoice_number VARCHAR(100) NULL,
+  invoice_date_raw VARCHAR(100) NULL, invoice_date DATE NULL, customer_code VARCHAR(100) NULL, customer_name VARCHAR(255) NULL,
+  product_code VARCHAR(100) NULL, product_name VARCHAR(255) NULL, visitor_code VARCHAR(100) NULL, line_code VARCHAR(100) NULL,
+  quantity DECIMAL(18,4) NULL, gross_amount DECIMAL(20,2) NULL, discount_amount DECIMAL(20,2) NULL, net_amount DECIMAL(20,2) NULL,
+  return_quantity DECIMAL(18,4) NULL, return_amount DECIMAL(20,2) NULL, raw_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_sales_aggregate_batch(import_batch_id), UNIQUE KEY uq_sales_aggregate_source_key(source_unique_key), INDEX idx_sales_aggregate_date(invoice_date),
+  INDEX idx_sales_aggregate_customer(customer_code), INDEX idx_sales_aggregate_product(product_code), INDEX idx_sales_aggregate_visitor(visitor_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS inventory_aggregate_rows (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
+  snapshot_date DATE NULL, warehouse_code VARCHAR(100) NULL, product_code VARCHAR(100) NULL, product_name VARCHAR(255) NULL,
+  quantity DECIMAL(18,4) NULL, inventory_value DECIMAL(20,2) NULL, raw_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_inventory_aggregate_batch(import_batch_id), INDEX idx_inventory_aggregate_unique_key(source_unique_key),
+  INDEX idx_inventory_aggregate_snapshot(snapshot_date), INDEX idx_inventory_aggregate_product(product_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_team_members (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
+  user_id INT UNSIGNED NULL, personnel_code VARCHAR(100) NULL, full_name VARCHAR(255) NULL, role_type VARCHAR(50) NULL,
+  line_code VARCHAR(100) NULL, supervisor_code VARCHAR(100) NULL, sales_manager_code VARCHAR(100) NULL, region_code VARCHAR(100) NULL,
+  share_percent DECIMAL(8,4) NULL, active TINYINT(1) NOT NULL DEFAULT 1, raw_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_sales_team_batch(import_batch_id), INDEX idx_sales_team_unique_key(source_unique_key), INDEX idx_sales_team_user(user_id),
+  INDEX idx_sales_team_line(line_code), INDEX idx_sales_team_role(role_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_customer_class_coefficients (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
+  customer_class_code VARCHAR(100) NULL, customer_class_title VARCHAR(255) NULL, coefficient DECIMAL(12,6) NULL,
+  effective_from DATE NULL, effective_to DATE NULL, active TINYINT(1) NOT NULL DEFAULT 1, raw_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_sales_coeff_batch(import_batch_id), INDEX idx_sales_coeff_unique_key(source_unique_key), INDEX idx_sales_coeff_class(customer_class_code),
+  INDEX idx_sales_coeff_effective(effective_from,effective_to)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS product_priorities (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
+  product_code VARCHAR(100) NULL, product_name VARCHAR(255) NULL, brand_code VARCHAR(100) NULL, brand_name VARCHAR(255) NULL,
+  priority_code VARCHAR(100) NULL, priority_rank INT NULL, inventory_quantity DECIMAL(18,4) NULL, inventory_value DECIMAL(20,2) NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1, raw_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_product_priorities_batch(import_batch_id), INDEX idx_product_priorities_unique_key(source_unique_key),
+  INDEX idx_product_priorities_product(product_code), INDEX idx_product_priorities_brand(brand_code), INDEX idx_product_priorities_priority(priority_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_targets (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
+  target_year SMALLINT NULL, target_month TINYINT NULL, line_code VARCHAR(100) NULL, product_code VARCHAR(100) NULL,
+  priority_code VARCHAR(100) NULL, visitor_code VARCHAR(100) NULL, supervisor_code VARCHAR(100) NULL,
+  target_quantity DECIMAL(18,4) NULL, target_amount DECIMAL(20,2) NULL, raw_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_sales_targets_batch(import_batch_id), INDEX idx_sales_targets_unique_key(source_unique_key), INDEX idx_sales_targets_period(target_year,target_month),
+  INDEX idx_sales_targets_line(line_code), INDEX idx_sales_targets_product(product_code), INDEX idx_sales_targets_visitor(visitor_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS commission_formula_settings (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, formula_key VARCHAR(100) NOT NULL, title VARCHAR(255) NULL, formula_expression TEXT NULL,
+  settings_json LONGTEXT NULL, version_no INT NOT NULL DEFAULT 1, status VARCHAR(30) NOT NULL DEFAULT 'draft',
+  effective_from DATE NULL, effective_to DATE NULL, created_by BIGINT UNSIGNED NULL, published_by BIGINT UNSIGNED NULL,
+  published_at DATETIME NULL, raw_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  UNIQUE KEY uq_commission_formula_version(formula_key,version_no), INDEX idx_commission_formula_status(status),
+  INDEX idx_commission_formula_effective(effective_from,effective_to)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS commission_calculation_runs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, run_key VARCHAR(100) NOT NULL, period_year SMALLINT NULL, period_month TINYINT NULL,
+  formula_version VARCHAR(100) NULL, status VARCHAR(30) NOT NULL DEFAULT 'pending', started_by BIGINT UNSIGNED NULL,
+  started_at DATETIME NULL, finished_at DATETIME NULL, input_summary_json LONGTEXT NULL, result_summary_json LONGTEXT NULL,
+  error_message TEXT NULL, raw_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  UNIQUE KEY uq_commission_run_key(run_key), INDEX idx_commission_runs_period(period_year,period_month),
+  INDEX idx_commission_runs_status(status), INDEX idx_commission_runs_started_by(started_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS commission_calculation_results (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, calculation_run_id BIGINT UNSIGNED NOT NULL, result_type VARCHAR(30) NOT NULL,
+  subject_key VARCHAR(191) NULL, user_id INT UNSIGNED NULL, gross_commission DECIMAL(20,2) NULL, reduction_amount DECIMAL(20,2) NULL,
+  reward_amount DECIMAL(20,2) NULL, penalty_amount DECIMAL(20,2) NULL, final_commission DECIMAL(20,2) NULL,
+  breakdown_json LONGTEXT NULL, raw_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_commission_results_run(calculation_run_id), INDEX idx_commission_results_type(result_type),
+  INDEX idx_commission_results_subject(subject_key), INDEX idx_commission_results_user(user_id),
+  CONSTRAINT fk_commission_results_run FOREIGN KEY(calculation_run_id) REFERENCES commission_calculation_runs(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS management_report_submissions (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, template_id INT UNSIGNED NOT NULL, report_type VARCHAR(40) NOT NULL,
   period_key VARCHAR(80) NOT NULL, period_title VARCHAR(190) NOT NULL, period_start DATE NULL, period_end DATE NULL,
@@ -1274,3 +1401,16 @@ CREATE TABLE IF NOT EXISTS ticket_attachments (id BIGINT UNSIGNED AUTO_INCREMENT
 CREATE TABLE IF NOT EXISTS ticket_status_logs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,ticket_id BIGINT UNSIGNED NOT NULL,actor_user_id INT UNSIGNED NULL,old_status VARCHAR(30) NULL,new_status VARCHAR(30) NOT NULL,note TEXT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,INDEX idx_ticket_status_log(ticket_id,created_at),CONSTRAINT fk_ticket_status_ticket FOREIGN KEY(ticket_id) REFERENCES tickets(id) ON DELETE RESTRICT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS ticket_assignments (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,ticket_id BIGINT UNSIGNED NOT NULL,assigned_user_id INT UNSIGNED NULL,assigned_unit_id INT UNSIGNED NULL,assigned_by INT UNSIGNED NOT NULL,note TEXT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,ended_at DATETIME NULL,INDEX idx_ticket_assignment(ticket_id,created_at),CONSTRAINT fk_ticket_assignment_ticket FOREIGN KEY(ticket_id) REFERENCES tickets(id) ON DELETE RESTRICT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS ticket_sla_rules (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,category_id INT UNSIGNED NULL,priority ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal',first_response_minutes INT UNSIGNED NOT NULL DEFAULT 480,resolution_minutes INT UNSIGNED NOT NULL DEFAULT 2880,active TINYINT(1) NOT NULL DEFAULT 1,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_ticket_sla(category_id,priority),CONSTRAINT fk_ticket_sla_category FOREIGN KEY(category_id) REFERENCES ticket_categories(id) ON DELETE RESTRICT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS sales_offer_budget_requests (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, request_code VARCHAR(50) NOT NULL, requested_by BIGINT UNSIGNED NOT NULL,
+  sales_manager_id BIGINT UNSIGNED NULL, sales_line VARCHAR(100) NULL, period_key VARCHAR(50) NULL, date_from DATE NULL, date_to DATE NULL,
+  product_code VARCHAR(100) NULL, product_name VARCHAR(255) NULL, brand_name VARCHAR(255) NULL, supplier_name VARCHAR(255) NULL,
+  purchase_price DECIMAL(18,2) NOT NULL DEFAULT 0, requested_offer_qty DECIMAL(18,3) NOT NULL DEFAULT 0, sold_qty DECIMAL(18,3) NOT NULL DEFAULT 0,
+  sold_amount DECIMAL(18,2) NOT NULL DEFAULT 0, provisional_offer_rate DECIMAL(10,4) NOT NULL DEFAULT 0, provisional_budget DECIMAL(18,2) NOT NULL DEFAULT 0,
+  formula_version VARCHAR(50) NOT NULL DEFAULT 'provisional_v1', formula_snapshot_json JSON NULL, status VARCHAR(30) NOT NULL DEFAULT 'draft',
+  manager_note TEXT NULL, admin_note TEXT NULL, reviewed_by BIGINT UNSIGNED NULL, reviewed_at DATETIME NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL, UNIQUE KEY uq_offer_budget_code(request_code), INDEX idx_offer_budget_status(status), INDEX idx_offer_budget_manager(sales_manager_id),
+  INDEX idx_offer_budget_product(product_code), INDEX idx_offer_budget_period(period_key), INDEX idx_offer_budget_dates(date_from,date_to)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS sales_offer_budget_logs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,request_id BIGINT UNSIGNED NOT NULL,action VARCHAR(50) NOT NULL,performed_by BIGINT UNSIGNED NULL,old_value_json JSON NULL,new_value_json JSON NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,INDEX idx_offer_budget_log_request(request_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS sales_offer_formula_settings (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,formula_key VARCHAR(100) NOT NULL UNIQUE,title VARCHAR(255) NOT NULL,formula_version VARCHAR(50) NOT NULL,settings_json JSON NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

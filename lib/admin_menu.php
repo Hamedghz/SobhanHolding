@@ -20,9 +20,24 @@ function admin_menu_registry(): array
             ['title' => 'اسکریپت‌های فروش', 'url' => '/admin/sales-scripts.php', 'permission' => 'sales_manager.scripts.manage', 'active_paths' => ['/admin/sales-scripts.php','/admin/sales-script-fields.php']],
             ['title' => 'اقدامات فروش', 'url' => '/admin/sales-actions.php', 'permission' => 'sales_manager.actions.manage', 'active_paths' => ['/admin/sales-actions.php']],
             ['title' => 'پیشنهاد اردر خرید', 'url' => '/admin/sales-purchase-suggestions.php', 'permission' => 'sales_manager.purchase_suggestions.manage', 'active_paths' => ['/admin/sales-purchase-suggestions.php']],
+            ['title' => 'استعلام بودجه آفر', 'url' => '/admin/sales-offer-budget.php', 'permission' => 'sales_manager.offer_budget.manage', 'active_paths' => ['/admin/sales-offer-budget.php','/admin/sales-offer-budget-view.php']],
             ['title' => 'گزارش‌کار روزانه مدیر فروش', 'url' => '/admin/sales-manager-daily-work-log.php', 'permission' => 'sales_manager.daily_logs.manage', 'active_paths' => ['/admin/sales-manager-daily-work-log.php']],
             ['title' => 'اطلاعات لاین‌ها', 'url' => '/admin/ceo-dashboard-settings.php#lines', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-lines.php']],
             ['title' => 'اطلاعات ویزیتورها', 'url' => '/admin/ceo-dashboard-settings.php#visitors', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-visitors.php']],
+            ['title' => 'ساختار فروش، لاین و مناطق', 'url' => '/admin/sales-structure.php', 'permission' => 'sales_structure', 'active' => ['sales-structure.php']],
+        ]],
+        'sales_data' => ['title' => 'مدیریت داده فروش', 'items' => [
+            ['title' => 'ورود اطلاعات فروش تجمیعی', 'url' => '/admin/sales-aggregate-import.php', 'permission' => 'sales_data_import', 'active' => ['sales-aggregate-import.php']],
+            ['title' => 'آپدیت موجودی انبار', 'url' => '/admin/sales-data-index.php?source=inventory', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'inventory']],
+            ['title' => 'ورود اطلاعات ویزیتورها', 'url' => '/admin/sales-data-index.php?source=sales_team', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'sales_team']],
+            ['title' => 'ورود ضرایب صنف', 'url' => '/admin/sales-data-index.php?source=customer_coefficients', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'customer_coefficients']],
+            ['title' => 'ورود اولویت کالا', 'url' => '/admin/sales-data-index.php?source=product_priorities', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'product_priorities']],
+            ['title' => 'ورود تارگت فروش', 'url' => '/admin/sales-data-index.php?source=sales_targets', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'sales_targets']],
+            ['title' => 'تاریخچه ایمپورت‌ها', 'url' => '/admin/sales-data-batches.php', 'permission' => 'sales_data_view', 'active' => ['sales-data-batches.php']],
+            ['title' => 'خطاهای ورود اطلاعات', 'url' => '/admin/sales-data-errors.php', 'permission' => 'sales_data_view_errors', 'active' => ['sales-data-errors.php']],
+            ['title' => 'نگاشت ستون‌ها', 'url' => '/admin/sales-data-mapping.php', 'permission' => 'sales_data_manage_mapping', 'active' => ['sales-data-mapping.php']],
+            ['title' => 'وضعیت اتصال SobhanAI', 'url' => '/admin/sales-data-index.php?section=ai', 'permission' => 'sales_data_sync_ai', 'query_equals' => ['section' => 'ai']],
+            ['title' => 'Viewهای گزارش‌گیری', 'url' => '/admin/sales-data-index.php?section=views', 'permission' => 'sales_data_view_reports', 'query_equals' => ['section' => 'views']],
         ]],
         'sales_supervisor' => ['title' => 'پنل سرپرست فروش', 'items' => [
             ['title' => 'داشبورد سرپرست', 'url' => '/admin/supervisor-dashboard.php', 'permission' => 'supervisor.panel.view', 'active' => ['supervisor-dashboard.php']],
@@ -122,6 +137,7 @@ function admin_menu_registry(): array
             ['title' => 'تنظیمات داشبورد مدیرعامل', 'url' => '/admin/ceo-dashboard-settings.php', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-settings.php']],
             ['title' => 'تنظیمات داشبورد مدیران', 'url' => '/admin/manager-dashboard-settings.php', 'any' => ['manager_dashboard.settings', 'manager_dashboard.ai_settings'], 'active' => ['manager-dashboard-settings.php']],
             ['title' => 'تنظیمات پنل سرپرستان', 'url' => '/admin/supervisor-settings.php', 'permission' => 'admin.supervisor_settings.manage', 'active' => ['supervisor-settings.php']],
+            ['title' => 'تنظیمات فرمول بودجه آفر', 'url' => '/admin/sales-offer-formula-settings.php', 'roles' => ['admin', 'super_admin'], 'active' => ['sales-offer-formula-settings.php']],
         ]],
         'system' => ['title' => 'ابزارهای سیستم', 'items' => [
             ['title' => 'بکاپ فایل‌های سایت', 'url' => '/admin/uploaded-files-backup.php', 'permission' => 'file_backup.manage', 'active' => ['uploaded-files-backup.php']],
@@ -132,6 +148,7 @@ function admin_menu_registry(): array
             ['title' => 'نصب قوانین و صورتجلسات', 'url' => '/install/management_meetings_seed.php', 'permission' => 'system_maintenance', 'active' => ['management_meetings_seed.php']],
             ['title' => 'نصب حضور و کارکرد', 'url' => '/install/hr_attendance_seed.php', 'permission' => 'system_maintenance', 'active' => ['hr_attendance_seed.php']],
             ['title' => 'تعمیر پنل سرپرستان فروش', 'url' => '/install/sales_supervisor_panel_repair.php', 'permission' => 'system_maintenance', 'active' => ['sales_supervisor_panel_repair.php']],
+            ['title' => 'تعمیر استعلام بودجه آفر', 'url' => '/install/sales_offer_budget_repair.php', 'permission' => 'system_maintenance', 'active' => ['sales_offer_budget_repair.php']],
         ]],
     ];
 }
@@ -176,6 +193,12 @@ function admin_menu_allowed(array $item): bool
 function admin_menu_is_active(array $item, string $path): bool
 {
     $pathOnly = parse_url($path, PHP_URL_PATH) ?: $path;
+    if (isset($item['query_equals'])) {
+        if ($pathOnly !== (parse_url($item['url'], PHP_URL_PATH) ?: $item['url'])) return false;
+        parse_str((string)(parse_url($path, PHP_URL_QUERY) ?? ''), $query);
+        foreach ($item['query_equals'] as $key => $value) if (($query[$key] ?? null) !== $value) return false;
+        return true;
+    }
     if (isset($item['management_report_type'])) {
         parse_str((string)(parse_url($path, PHP_URL_QUERY) ?? ''), $query);
         return $pathOnly === '/admin/management-report-prepare.php' && ($query['type'] ?? '') === $item['management_report_type'];
