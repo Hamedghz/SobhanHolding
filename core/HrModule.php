@@ -14,6 +14,7 @@ class HrModule
         ] as $column => $definition) {
             if (!Database::columnExists('users', $column)) $pdo->exec("ALTER TABLE users ADD `{$column}` {$definition}");
         }
+        self::repairAssessmentSchema($pdo);
     }
 
     public static function schema(): array
@@ -28,14 +29,15 @@ class HrModule
             "CREATE TABLE IF NOT EXISTS hr_kpi_score_logs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,score_id INT UNSIGNED NULL,action VARCHAR(30) NOT NULL,old_value TEXT NULL,new_value TEXT NULL,performed_by INT UNSIGNED NULL,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,INDEX idx_hr_kpi_log_score(score_id),CONSTRAINT fk_hr_kpi_log_score FOREIGN KEY(score_id) REFERENCES hr_kpi_scores(id) ON DELETE SET NULL){$engine}",
             "CREATE TABLE IF NOT EXISTS hr_kpi_forms (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(190) NOT NULL,code VARCHAR(100) NOT NULL UNIQUE,source_file VARCHAR(190) NOT NULL,content_hash CHAR(64) NOT NULL UNIQUE,description TEXT NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP){$engine}",
             "CREATE TABLE IF NOT EXISTS hr_kpi_form_templates (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,form_id INT UNSIGNED NOT NULL,template_id INT UNSIGNED NOT NULL,sort_order INT NOT NULL DEFAULT 0,UNIQUE KEY uq_hr_form_template(form_id,template_id),CONSTRAINT fk_hr_form_template_form FOREIGN KEY(form_id) REFERENCES hr_kpi_forms(id) ON DELETE CASCADE,CONSTRAINT fk_hr_form_template_template FOREIGN KEY(template_id) REFERENCES hr_kpi_templates(id) ON DELETE CASCADE){$engine}",
-            "CREATE TABLE IF NOT EXISTS hr_assessment_tests (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(190) NOT NULL,code VARCHAR(100) NOT NULL UNIQUE,category VARCHAR(100) NULL,description TEXT NULL,age_range VARCHAR(80) NULL,scoring_type VARCHAR(50) NOT NULL DEFAULT 'dimensions',time_limit_minutes INT NOT NULL DEFAULT 20,active TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,seeded TINYINT(1) NOT NULL DEFAULT 0,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP){$engine}",
-            "CREATE TABLE IF NOT EXISTS hr_assessment_dimensions (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT UNSIGNED NOT NULL,dimension_key VARCHAR(100) NOT NULL,dimension_label VARCHAR(190) NOT NULL,description TEXT NULL,sort_order INT NOT NULL DEFAULT 0,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_hr_dimension(test_id,dimension_key),CONSTRAINT fk_hr_dimension_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE){$engine}",
-            "CREATE TABLE IF NOT EXISTS hr_assessment_questions (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT UNSIGNED NOT NULL,question_text TEXT NOT NULL,question_hash CHAR(64) NOT NULL,answer_type VARCHAR(30) NOT NULL,options_json TEXT NULL,dimension_key VARCHAR(100) NULL,secondary_dimension_key VARCHAR(100) NULL,weight DECIMAL(8,2) NOT NULL DEFAULT 1,reverse_score TINYINT(1) NOT NULL DEFAULT 0,correct_answer VARCHAR(190) NULL,required TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,active TINYINT(1) NOT NULL DEFAULT 1,seeded TINYINT(1) NOT NULL DEFAULT 0,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_hr_question(test_id,question_hash),INDEX idx_hr_question_test(test_id),CONSTRAINT fk_hr_question_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE){$engine}",
+            "CREATE TABLE IF NOT EXISTS hr_assessment_tests (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(190) NOT NULL,code VARCHAR(100) NOT NULL UNIQUE,category VARCHAR(100) NULL,description TEXT NULL,age_range VARCHAR(80) NULL,scoring_type VARCHAR(50) NOT NULL DEFAULT 'dimensions',time_limit_minutes INT NOT NULL DEFAULT 20,active TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,seeded TINYINT(1) NOT NULL DEFAULT 0,seed_key VARCHAR(100) NULL,seed_version VARCHAR(50) NULL,is_seeded TINYINT(1) NOT NULL DEFAULT 0,is_archived TINYINT(1) NOT NULL DEFAULT 0,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX idx_hr_assessment_seed(seed_key,seed_version),INDEX idx_hr_assessment_active(active,is_archived)){$engine}",
+            "CREATE TABLE IF NOT EXISTS hr_assessment_dimensions (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT UNSIGNED NOT NULL,dimension_key VARCHAR(100) NOT NULL,dimension_label VARCHAR(190) NOT NULL,description TEXT NULL,sort_order INT NOT NULL DEFAULT 0,seed_key VARCHAR(100) NULL,seed_version VARCHAR(50) NULL,is_seeded TINYINT(1) NOT NULL DEFAULT 0,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_hr_dimension(test_id,dimension_key),CONSTRAINT fk_hr_dimension_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE){$engine}",
+            "CREATE TABLE IF NOT EXISTS hr_assessment_questions (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT UNSIGNED NOT NULL,question_code VARCHAR(100) NULL,question_text TEXT NOT NULL,question_hash CHAR(64) NOT NULL,answer_type VARCHAR(30) NOT NULL,options_json TEXT NULL,correct_answer_json TEXT NULL,dimension_key VARCHAR(100) NULL,secondary_dimension_key VARCHAR(100) NULL,weight DECIMAL(8,2) NOT NULL DEFAULT 1,reverse_score TINYINT(1) NOT NULL DEFAULT 0,correct_answer VARCHAR(190) NULL,admin_note TEXT NULL,required TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,active TINYINT(1) NOT NULL DEFAULT 1,seeded TINYINT(1) NOT NULL DEFAULT 0,seed_key VARCHAR(100) NULL,seed_version VARCHAR(50) NULL,is_seeded TINYINT(1) NOT NULL DEFAULT 0,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_hr_question(test_id,question_hash),INDEX idx_hr_question_test(test_id),CONSTRAINT fk_hr_question_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE){$engine}",
             "CREATE TABLE IF NOT EXISTS hr_assessment_assignments (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,test_id INT UNSIGNED NOT NULL,employee_id INT UNSIGNED NOT NULL,department VARCHAR(150) NULL,role_key VARCHAR(100) NULL,sales_line VARCHAR(50) NULL,supervisor_id INT UNSIGNED NULL,manager_id INT UNSIGNED NULL,assigned_by INT UNSIGNED NULL,assignment_scope VARCHAR(40) NOT NULL DEFAULT 'employee',period_key VARCHAR(100) NULL,due_date DATE NULL,allow_retake TINYINT(1) NOT NULL DEFAULT 0,status VARCHAR(30) NOT NULL DEFAULT 'assigned',notes TEXT NULL,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX idx_hr_assignment_employee(employee_id,status),INDEX idx_hr_assignment_team(supervisor_id,manager_id),CONSTRAINT fk_hr_assignment_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE,CONSTRAINT fk_hr_assignment_employee FOREIGN KEY(employee_id) REFERENCES users(id) ON DELETE CASCADE){$engine}",
             "CREATE TABLE IF NOT EXISTS hr_assessment_responses (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,assignment_id INT UNSIGNED NOT NULL,employee_id INT UNSIGNED NOT NULL,test_id INT UNSIGNED NOT NULL,answers_json LONGTEXT NULL,progress_json TEXT NULL,status VARCHAR(30) NOT NULL DEFAULT 'in_progress',started_at DATETIME NULL,submitted_at DATETIME NULL,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_hr_response_assignment(assignment_id),CONSTRAINT fk_hr_response_assignment FOREIGN KEY(assignment_id) REFERENCES hr_assessment_assignments(id) ON DELETE CASCADE,CONSTRAINT fk_hr_response_employee FOREIGN KEY(employee_id) REFERENCES users(id) ON DELETE CASCADE,CONSTRAINT fk_hr_response_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE){$engine}",
             "CREATE TABLE IF NOT EXISTS hr_assessment_results (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,assignment_id INT UNSIGNED NOT NULL,employee_id INT UNSIGNED NOT NULL,test_id INT UNSIGNED NOT NULL,raw_answers_json LONGTEXT NULL,calculated_scores_json LONGTEXT NULL,normalized_scores_json LONGTEXT NULL,final_result TEXT NULL,risk_level VARCHAR(40) NULL,profile_summary TEXT NULL,recommendation_text TEXT NULL,calculated_at DATETIME NULL,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,INDEX idx_hr_result_employee(employee_id),INDEX idx_hr_result_test(test_id),CONSTRAINT fk_hr_result_assignment FOREIGN KEY(assignment_id) REFERENCES hr_assessment_assignments(id) ON DELETE CASCADE,CONSTRAINT fk_hr_result_employee FOREIGN KEY(employee_id) REFERENCES users(id) ON DELETE CASCADE,CONSTRAINT fk_hr_result_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE){$engine}",
             "CREATE TABLE IF NOT EXISTS hr_assessment_result_logs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,result_id INT UNSIGNED NULL,action VARCHAR(30) NOT NULL,performed_by INT UNSIGNED NULL,old_value_json LONGTEXT NULL,new_value_json LONGTEXT NULL,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT fk_hr_result_log FOREIGN KEY(result_id) REFERENCES hr_assessment_results(id) ON DELETE SET NULL){$engine}",
-            "CREATE TABLE IF NOT EXISTS hr_assessment_packages (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(190) NOT NULL,code VARCHAR(100) NOT NULL UNIQUE,role_key VARCHAR(100) NULL,description TEXT NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP){$engine}",
+            "CREATE TABLE IF NOT EXISTS hr_assessment_seed_versions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,seed_key VARCHAR(100) NOT NULL,version VARCHAR(50) NOT NULL,source_title VARCHAR(255) NULL,source_file VARCHAR(255) NULL,applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,applied_by BIGINT NULL,notes TEXT NULL,UNIQUE KEY uq_seed_version(seed_key,version)){$engine}",
+            "CREATE TABLE IF NOT EXISTS hr_assessment_packages (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(190) NOT NULL,code VARCHAR(100) NOT NULL UNIQUE,role_key VARCHAR(100) NULL,description TEXT NULL,active TINYINT(1) NOT NULL DEFAULT 1,seed_key VARCHAR(100) NULL,seed_version VARCHAR(50) NULL,is_seeded TINYINT(1) NOT NULL DEFAULT 0,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP){$engine}",
             "CREATE TABLE IF NOT EXISTS hr_assessment_package_tests (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,package_id INT UNSIGNED NOT NULL,test_id INT UNSIGNED NOT NULL,sort_order INT NOT NULL DEFAULT 0,UNIQUE KEY uq_hr_package_test(package_id,test_id),CONSTRAINT fk_hr_package_test_package FOREIGN KEY(package_id) REFERENCES hr_assessment_packages(id) ON DELETE CASCADE,CONSTRAINT fk_hr_package_test_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE){$engine}",
             "CREATE TABLE IF NOT EXISTS ai_reporting_sources (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,source_name VARCHAR(190) NOT NULL,source_type VARCHAR(50) NOT NULL DEFAULT 'view',connection_label VARCHAR(190) NULL,view_name VARCHAR(190) NOT NULL UNIQUE,description TEXT NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP){$engine}",
             "CREATE TABLE IF NOT EXISTS ai_insight_requests (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,requested_by INT UNSIGNED NULL,prompt TEXT NULL,source_context_json LONGTEXT NULL,result_json LONGTEXT NULL,status VARCHAR(30) NOT NULL DEFAULT 'pending',created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,INDEX idx_ai_insight_requested_by(requested_by),CONSTRAINT fk_ai_insight_user FOREIGN KEY(requested_by) REFERENCES users(id) ON DELETE SET NULL){$engine}",
@@ -54,11 +56,8 @@ class HrModule
         self::seedKpiForms($pdo,$counts);
         }
         if(in_array('assessment',$groups,true)){
-        $testStmt=$pdo->prepare('INSERT IGNORE INTO hr_assessment_tests(title,code,category,description,scoring_type,time_limit_minutes,active,sort_order,seeded,created_at,updated_at) VALUES (?,?,?,?,"dimensions",?,1,?,1,NOW(),NOW())');
-        $dimStmt=$pdo->prepare('INSERT IGNORE INTO hr_assessment_dimensions(test_id,dimension_key,dimension_label,sort_order,created_at,updated_at) VALUES (?,?,?,?,NOW(),NOW())');
-        $qStmt=$pdo->prepare('INSERT IGNORE INTO hr_assessment_questions(test_id,question_text,question_hash,answer_type,options_json,dimension_key,weight,reverse_score,correct_answer,required,sort_order,active,seeded,created_at,updated_at) VALUES (?,?,?,?,?,?,1,?,?,1,?,1,1,NOW(),NOW())');
-        $testSort=10;foreach(self::testDefinitions() as $code=>$test){$description=$test['description'].' '.self::DISCLAIMER;$testStmt->execute([$test['title'],$code,$test['category'],$description,$test['minutes'],$testSort]);$counts['tests']+=$testStmt->rowCount();$testId=(int)$pdo->query('SELECT id FROM hr_assessment_tests WHERE code='.$pdo->quote($code))->fetchColumn();$dSort=10;foreach($test['dimensions'] as $key=>$label){$dimStmt->execute([$testId,$key,$label,$dSort]);$dSort+=10;}$qSort=10;foreach(self::questionsFor($code,$test) as $q){$qStmt->execute([$testId,$q['text'],hash('sha256',self::normalize($q['text'])),$q['type'],$q['options']??null,$q['dimension'],$q['reverse']??0,$q['correct']??null,$qSort]);$counts['questions']+=$qStmt->rowCount();$qSort+=10;}$testSort+=10;}
-        self::seedPackages($pdo);
+        $assessmentCounts = self::seedSobhanAssessmentBattery($pdo);
+        foreach ($assessmentCounts as $key => $value) $counts[$key] = ($counts[$key] ?? 0) + (int)$value;
         }
         if(in_array('ai',$groups,true)){
         $sourceStmt=$pdo->prepare('INSERT IGNORE INTO ai_reporting_sources(source_name,source_type,connection_label,view_name,description,active,created_at,updated_at) VALUES (?,"view","SQL Server Reporting",?,?,1,NOW(),NOW())');foreach(self::reportingViews() as $view=>$description){$sourceStmt->execute([$view,$view,$description]);$counts['sources']+=$sourceStmt->rowCount();}
@@ -81,6 +80,191 @@ class HrModule
     }
 
     private static function normalize(string $text): string { return mb_strtolower(preg_replace('/\s+/u',' ',trim($text)),'UTF-8'); }
+
+    private static function repairAssessmentSchema(PDO $pdo): void
+    {
+        foreach ([
+            'hr_assessment_tests' => [
+                'seed_key' => 'VARCHAR(100) NULL',
+                'seed_version' => 'VARCHAR(50) NULL',
+                'is_seeded' => 'TINYINT(1) NOT NULL DEFAULT 0',
+                'is_archived' => 'TINYINT(1) NOT NULL DEFAULT 0',
+            ],
+            'hr_assessment_dimensions' => [
+                'seed_key' => 'VARCHAR(100) NULL',
+                'seed_version' => 'VARCHAR(50) NULL',
+                'is_seeded' => 'TINYINT(1) NOT NULL DEFAULT 0',
+            ],
+            'hr_assessment_questions' => [
+                'question_code' => 'VARCHAR(100) NULL',
+                'correct_answer_json' => 'TEXT NULL',
+                'admin_note' => 'TEXT NULL',
+                'seed_key' => 'VARCHAR(100) NULL',
+                'seed_version' => 'VARCHAR(50) NULL',
+                'is_seeded' => 'TINYINT(1) NOT NULL DEFAULT 0',
+            ],
+            'hr_assessment_packages' => [
+                'seed_key' => 'VARCHAR(100) NULL',
+                'seed_version' => 'VARCHAR(50) NULL',
+                'is_seeded' => 'TINYINT(1) NOT NULL DEFAULT 0',
+            ],
+        ] as $table => $columns) {
+            if (!Database::tableExists($table)) continue;
+            foreach ($columns as $column => $definition) {
+                if (!Database::columnExists($table, $column)) $pdo->exec("ALTER TABLE {$table} ADD `{$column}` {$definition}");
+            }
+        }
+        if (Database::tableExists('hr_assessment_questions') && !self::indexExists($pdo, 'hr_assessment_questions', 'uq_hr_question_code')) {
+            $pdo->exec('ALTER TABLE hr_assessment_questions ADD UNIQUE KEY uq_hr_question_code(test_id,question_code)');
+        }
+    }
+
+    private static function indexExists(PDO $pdo, string $table, string $indexName): bool
+    {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?');
+        $stmt->execute([$table, $indexName]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    public static function sobhanAssessmentData(): array
+    {
+        $path = __DIR__ . '/../install/data/sobhan_assessment_20_battery.json';
+        if (!is_file($path)) throw new RuntimeException('sobhan_assessment_seed_missing');
+        $decoded = json_decode((string)file_get_contents($path), true);
+        if (!is_array($decoded) || !isset($decoded['meta'], $decoded['tests'])) throw new RuntimeException('sobhan_assessment_seed_invalid');
+        return $decoded;
+    }
+
+    private static function seedSobhanAssessmentBattery(PDO $pdo, ?int $userId = null): array
+    {
+        $data = self::sobhanAssessmentData();
+        $meta = $data['meta'];
+        $seedKey = (string)$meta['seed_key'];
+        $seedVersion = (string)$meta['seed_version'];
+        $counts = ['tests' => 0, 'questions' => 0, 'updated' => 0, 'packages' => 0, 'package_links' => 0, 'archived' => 0, 'deleted' => 0];
+
+        [$responseCount, $resultCount, $submittedCount] = self::assessmentUsageCounts($pdo);
+        if ($responseCount === 0 && $resultCount === 0 && $submittedCount === 0) {
+            $counts['deleted'] = self::deletePreviousSeededAssessmentData($pdo, $seedKey);
+        } else {
+            $counts['archived'] = self::archivePreviousSeededAssessmentData($pdo, $seedKey, $seedVersion);
+        }
+
+        $testStmt = $pdo->prepare('INSERT INTO hr_assessment_tests(title,code,category,description,scoring_type,time_limit_minutes,active,sort_order,seeded,seed_key,seed_version,is_seeded,is_archived,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,1,?,?,1,0,NOW(),NOW()) ON DUPLICATE KEY UPDATE title=VALUES(title),category=VALUES(category),description=VALUES(description),scoring_type=VALUES(scoring_type),time_limit_minutes=VALUES(time_limit_minutes),active=VALUES(active),sort_order=VALUES(sort_order),seeded=1,seed_key=VALUES(seed_key),seed_version=VALUES(seed_version),is_seeded=1,is_archived=0,updated_at=NOW()');
+        $dimStmt = $pdo->prepare('INSERT INTO hr_assessment_dimensions(test_id,dimension_key,dimension_label,description,sort_order,seed_key,seed_version,is_seeded,created_at,updated_at) VALUES (?,?,?,?,?,?,?,1,NOW(),NOW()) ON DUPLICATE KEY UPDATE dimension_label=VALUES(dimension_label),description=VALUES(description),sort_order=VALUES(sort_order),seed_key=VALUES(seed_key),seed_version=VALUES(seed_version),is_seeded=1,updated_at=NOW()');
+        $questionStmt = $pdo->prepare('INSERT INTO hr_assessment_questions(test_id,question_code,question_text,question_hash,answer_type,options_json,correct_answer_json,dimension_key,secondary_dimension_key,weight,reverse_score,correct_answer,admin_note,required,sort_order,active,seeded,seed_key,seed_version,is_seeded,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,1,NOW(),NOW()) ON DUPLICATE KEY UPDATE question_text=VALUES(question_text),question_hash=VALUES(question_hash),answer_type=VALUES(answer_type),options_json=VALUES(options_json),correct_answer_json=VALUES(correct_answer_json),dimension_key=VALUES(dimension_key),secondary_dimension_key=VALUES(secondary_dimension_key),weight=VALUES(weight),reverse_score=VALUES(reverse_score),correct_answer=VALUES(correct_answer),admin_note=VALUES(admin_note),required=VALUES(required),sort_order=VALUES(sort_order),active=VALUES(active),seeded=1,seed_key=VALUES(seed_key),seed_version=VALUES(seed_version),is_seeded=1,updated_at=NOW()');
+        $packageStmt = $pdo->prepare('INSERT INTO hr_assessment_packages(title,code,role_key,description,active,seed_key,seed_version,is_seeded,created_at,updated_at) VALUES (?,?,?,?,1,?,?,1,NOW(),NOW()) ON DUPLICATE KEY UPDATE title=VALUES(title),role_key=VALUES(role_key),description=VALUES(description),active=1,seed_key=VALUES(seed_key),seed_version=VALUES(seed_version),is_seeded=1,updated_at=NOW()');
+        $packageTestStmt = $pdo->prepare('INSERT INTO hr_assessment_package_tests(package_id,test_id,sort_order) VALUES (?,?,?) ON DUPLICATE KEY UPDATE sort_order=VALUES(sort_order)');
+
+        $testSort = 10;
+        foreach ($data['tests'] as $test) {
+            $description = self::DISCLAIMER;
+            $testStmt->execute([
+                $test['test_title'],
+                $test['test_code'],
+                $test['category'] ?? null,
+                $description,
+                $test['scoring_type'] ?? 'dimensions',
+                (int)($test['time_limit_minutes'] ?? 20),
+                1,
+                $testSort,
+                $seedKey,
+                $seedVersion,
+            ]);
+            $testId = (int)$pdo->query('SELECT id FROM hr_assessment_tests WHERE code=' . $pdo->quote((string)$test['test_code']))->fetchColumn();
+            $counts['tests']++;
+            foreach ($test['dimensions'] as $dimension) {
+                $dimStmt->execute([
+                    $testId,
+                    $dimension['dimension_key'],
+                    $dimension['dimension_label'],
+                    null,
+                    (int)$dimension['sort_order'],
+                    $seedKey,
+                    $seedVersion,
+                ]);
+            }
+            foreach ($test['questions'] as $question) {
+                $questionStmt->execute([
+                    $testId,
+                    $question['question_code'],
+                    $question['question_text'],
+                    hash('sha256', self::normalize((string)$question['question_text'])),
+                    $question['answer_type'],
+                    $question['options_json'],
+                    $question['correct_answer_json'],
+                    $question['dimension_key'],
+                    $question['secondary_dimension_key'],
+                    (float)($question['weight'] ?? 1),
+                    (int)($question['reverse_score'] ?? 0),
+                    null,
+                    $question['admin_note'] ?? null,
+                    (int)($question['required'] ?? 1),
+                    (int)($question['sort_order'] ?? 0),
+                    (int)($question['active'] ?? 1),
+                    $seedKey,
+                    $seedVersion,
+                ]);
+                $counts['questions']++;
+            }
+            $testSort += 10;
+        }
+
+        foreach ($data['packages'] as $package) {
+            $packageStmt->execute([
+                $package['title'],
+                $package['code'],
+                $package['role_key'] ?? null,
+                'بسته پیشنهادی نقش‌محور بانک ۲۰ آزمون سازمانی سبحان',
+                $seedKey,
+                $seedVersion,
+            ]);
+            $packageId = (int)$pdo->query('SELECT id FROM hr_assessment_packages WHERE code=' . $pdo->quote((string)$package['code']))->fetchColumn();
+            $counts['packages']++;
+            $sort = 10;
+            foreach ($package['tests'] as $testCode) {
+                $testId = (int)$pdo->query('SELECT id FROM hr_assessment_tests WHERE code=' . $pdo->quote((string)$testCode))->fetchColumn();
+                if ($testId > 0) {
+                    $packageTestStmt->execute([$packageId, $testId, $sort]);
+                    $counts['package_links']++;
+                }
+                $sort += 10;
+            }
+        }
+
+        $seedVersionStmt = $pdo->prepare('INSERT INTO hr_assessment_seed_versions(seed_key,version,source_title,source_file,applied_by,notes) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE source_title=VALUES(source_title),source_file=VALUES(source_file),applied_by=VALUES(applied_by),notes=VALUES(notes)');
+        $seedVersionStmt->execute([$seedKey, $seedVersion, $meta['source_title'] ?? null, $meta['source_file'] ?? null, $userId, 'safe_hr_assessment_seed']);
+
+        return $counts;
+    }
+
+    private static function assessmentUsageCounts(PDO $pdo): array
+    {
+        return [
+            (int)$pdo->query('SELECT COUNT(*) FROM hr_assessment_responses')->fetchColumn(),
+            (int)$pdo->query('SELECT COUNT(*) FROM hr_assessment_results')->fetchColumn(),
+            (int)$pdo->query('SELECT COUNT(*) FROM hr_assessment_assignments WHERE status="submitted"')->fetchColumn(),
+        ];
+    }
+
+    private static function deletePreviousSeededAssessmentData(PDO $pdo, string $seedKey): int
+    {
+        $legacyCodes = array_merge(array_keys(self::testDefinitions()), array_map(static fn(array $item): string => (string)$item['test_code'], self::sobhanAssessmentData()['tests']));
+        $placeholders = implode(',', array_fill(0, count($legacyCodes), '?'));
+        $sql = 'DELETE FROM hr_assessment_tests WHERE ((COALESCE(is_seeded,0)=1 OR COALESCE(seeded,0)=1 OR seed_key IS NOT NULL) AND (seed_key <> ? OR seed_key IS NULL)) OR (code IN (' . $placeholders . ') AND (COALESCE(is_seeded,0)=1 OR COALESCE(seeded,0)=1))';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$seedKey], $legacyCodes));
+        return $stmt->rowCount();
+    }
+
+    private static function archivePreviousSeededAssessmentData(PDO $pdo, string $seedKey, string $seedVersion): int
+    {
+        $stmt = $pdo->prepare('UPDATE hr_assessment_tests SET active=0,is_archived=1,updated_at=NOW() WHERE (COALESCE(is_seeded,0)=1 OR COALESCE(seeded,0)=1 OR seed_key IS NOT NULL) AND (seed_key <> ? OR seed_version <> ? OR seed_key IS NULL)');
+        $stmt->execute([$seedKey, $seedVersion]);
+        $pdo->prepare('UPDATE hr_assessment_questions q JOIN hr_assessment_tests t ON t.id=q.test_id SET q.active=0,q.updated_at=NOW() WHERE t.is_archived=1')->execute();
+        $pdo->prepare('UPDATE hr_assessment_packages SET active=0,updated_at=NOW() WHERE (COALESCE(is_seeded,0)=1 OR seed_key IS NOT NULL) AND (seed_key <> ? OR seed_version <> ? OR seed_key IS NULL)')->execute([$seedKey, $seedVersion]);
+        return $stmt->rowCount();
+    }
 
     public static function kpiTemplates(): array
     {

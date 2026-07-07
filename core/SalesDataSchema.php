@@ -20,6 +20,7 @@ class SalesDataSchema
         }
 
         self::repairSalesAggregateColumns($pdo);
+        self::repairInventoryAggregateColumns($pdo);
 
         if (self::tableExists($pdo, 'modules')) {
             $stmt = $pdo->prepare(
@@ -101,6 +102,21 @@ class SalesDataSchema
             if ($duplicates === false) {
                 $pdo->exec('ALTER TABLE sales_aggregate_rows ADD UNIQUE KEY uq_sales_aggregate_source_key (source_unique_key)');
             }
+        }
+    }
+
+    private static function repairInventoryAggregateColumns(PDO $pdo): void
+    {
+        if (!self::tableExists($pdo, 'inventory_aggregate_rows')) return;
+        $text = ['source_type'=>'VARCHAR(30) NULL','index_code'=>'VARCHAR(100) NULL','index_name'=>'VARCHAR(255) NULL','expire_date_raw'=>'VARCHAR(100) NULL','manufacturer_code'=>'VARCHAR(100) NULL','manufacturer_name'=>'VARCHAR(255) NULL','product_tree_group_code'=>'VARCHAR(100) NULL','product_tree_group_name'=>'VARCHAR(255) NULL','barcode'=>'VARCHAR(191) NULL','control_code'=>'VARCHAR(191) NULL','group_code'=>'VARCHAR(100) NULL','group_name'=>'VARCHAR(255) NULL','brand_name'=>'VARCHAR(255) NULL','last_purchase_date_raw'=>'VARCHAR(100) NULL'];
+        $dates = ['expire_date'=>'DATE NULL','last_purchase_date'=>'DATE NULL'];
+        $numbers = ['consumer_price','sales_carton_qty','sales_part_qty','sales_total_qty','sales_total_amount','sales_discount_amount','sales_tax_amount','sales_duty_amount','sales_payable_amount','sales_return_carton_qty','sales_return_part_qty','sales_return_total_qty','purchase_carton_qty','purchase_part_qty','purchase_total_qty','opening_carton_qty','opening_part_qty','opening_total_qty','inbound_carton_qty','inbound_part_qty','inbound_total_qty','outbound_carton_qty','outbound_part_qty','outbound_total_qty','current_period_carton_qty','current_period_part_qty','current_period_total_qty','carton_size','last_cost_price','last_purchase_price','stock_value_by_last_cost','stock_value_by_sale_price_1','retail_price','wholesale_price','sale_price_3','sale_price_4','sale_price_5','sale_price_6','sale_price_7','sale_price_8','sale_price_9','sale_price_10','sale_price_11','sale_price_12','retail_commission','wholesale_commission','commission_3','commission_4','commission_5','commission_6','commission_7','commission_8','commission_9','commission_10','commission_11','commission_12','current_weight','current_volume','retail_collection_days','current_base_stock','current_part_stock','current_total_stock'];
+        foreach (array_merge($text,$dates,array_fill_keys($numbers,'DECIMAL(20,4) NULL')) as $column=>$definition) {
+            if (!self::columnExists($pdo,'inventory_aggregate_rows',$column)) $pdo->exec("ALTER TABLE inventory_aggregate_rows ADD `{$column}` {$definition}");
+        }
+        if (!self::indexExists($pdo,'inventory_aggregate_rows','uq_inventory_aggregate_source_key')) {
+            $duplicates=$pdo->query('SELECT source_unique_key FROM inventory_aggregate_rows WHERE source_unique_key IS NOT NULL AND source_unique_key<>"" GROUP BY source_unique_key HAVING COUNT(*)>1 LIMIT 1')->fetchColumn();
+            if ($duplicates===false) $pdo->exec('ALTER TABLE inventory_aggregate_rows ADD UNIQUE KEY uq_inventory_aggregate_source_key (source_unique_key)');
         }
     }
 
@@ -222,19 +238,28 @@ class SalesDataSchema
             "CREATE TABLE IF NOT EXISTS inventory_aggregate_rows (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 import_batch_id BIGINT UNSIGNED NULL,
+                source_type VARCHAR(30) NULL,
                 source_unique_key VARCHAR(191) NULL,
-                snapshot_date DATE NULL,
-                warehouse_code VARCHAR(100) NULL,
                 product_code VARCHAR(100) NULL,
                 product_name VARCHAR(255) NULL,
-                quantity DECIMAL(18,4) NULL,
-                inventory_value DECIMAL(20,2) NULL,
+                index_code VARCHAR(100) NULL,index_name VARCHAR(255) NULL,consumer_price DECIMAL(20,4) NULL,expire_date DATE NULL,expire_date_raw VARCHAR(100) NULL,
+                manufacturer_code VARCHAR(100) NULL,manufacturer_name VARCHAR(255) NULL,
+                sales_carton_qty DECIMAL(20,4) NULL,sales_part_qty DECIMAL(20,4) NULL,sales_total_qty DECIMAL(20,4) NULL,sales_total_amount DECIMAL(20,4) NULL,sales_discount_amount DECIMAL(20,4) NULL,sales_tax_amount DECIMAL(20,4) NULL,sales_duty_amount DECIMAL(20,4) NULL,sales_payable_amount DECIMAL(20,4) NULL,
+                sales_return_carton_qty DECIMAL(20,4) NULL,sales_return_part_qty DECIMAL(20,4) NULL,sales_return_total_qty DECIMAL(20,4) NULL,
+                purchase_carton_qty DECIMAL(20,4) NULL,purchase_part_qty DECIMAL(20,4) NULL,purchase_total_qty DECIMAL(20,4) NULL,
+                opening_carton_qty DECIMAL(20,4) NULL,opening_part_qty DECIMAL(20,4) NULL,opening_total_qty DECIMAL(20,4) NULL,
+                inbound_carton_qty DECIMAL(20,4) NULL,inbound_part_qty DECIMAL(20,4) NULL,inbound_total_qty DECIMAL(20,4) NULL,
+                outbound_carton_qty DECIMAL(20,4) NULL,outbound_part_qty DECIMAL(20,4) NULL,outbound_total_qty DECIMAL(20,4) NULL,
+                current_period_carton_qty DECIMAL(20,4) NULL,current_period_part_qty DECIMAL(20,4) NULL,current_period_total_qty DECIMAL(20,4) NULL,carton_size DECIMAL(20,4) NULL,
+                last_cost_price DECIMAL(20,4) NULL,last_purchase_price DECIMAL(20,4) NULL,stock_value_by_last_cost DECIMAL(20,4) NULL,stock_value_by_sale_price_1 DECIMAL(20,4) NULL,
+                retail_price DECIMAL(20,4) NULL,wholesale_price DECIMAL(20,4) NULL,sale_price_3 DECIMAL(20,4) NULL,sale_price_4 DECIMAL(20,4) NULL,sale_price_5 DECIMAL(20,4) NULL,sale_price_6 DECIMAL(20,4) NULL,sale_price_7 DECIMAL(20,4) NULL,sale_price_8 DECIMAL(20,4) NULL,sale_price_9 DECIMAL(20,4) NULL,sale_price_10 DECIMAL(20,4) NULL,sale_price_11 DECIMAL(20,4) NULL,sale_price_12 DECIMAL(20,4) NULL,
+                retail_commission DECIMAL(20,4) NULL,wholesale_commission DECIMAL(20,4) NULL,commission_3 DECIMAL(20,4) NULL,commission_4 DECIMAL(20,4) NULL,commission_5 DECIMAL(20,4) NULL,commission_6 DECIMAL(20,4) NULL,commission_7 DECIMAL(20,4) NULL,commission_8 DECIMAL(20,4) NULL,commission_9 DECIMAL(20,4) NULL,commission_10 DECIMAL(20,4) NULL,commission_11 DECIMAL(20,4) NULL,commission_12 DECIMAL(20,4) NULL,
+                current_weight DECIMAL(20,4) NULL,current_volume DECIMAL(20,4) NULL,product_tree_group_code VARCHAR(100) NULL,product_tree_group_name VARCHAR(255) NULL,barcode VARCHAR(191) NULL,control_code VARCHAR(191) NULL,group_code VARCHAR(100) NULL,group_name VARCHAR(255) NULL,retail_collection_days DECIMAL(20,4) NULL,current_base_stock DECIMAL(20,4) NULL,current_part_stock DECIMAL(20,4) NULL,current_total_stock DECIMAL(20,4) NULL,brand_name VARCHAR(255) NULL,last_purchase_date DATE NULL,last_purchase_date_raw VARCHAR(100) NULL,
                 raw_json LONGTEXT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NULL,
                 INDEX idx_inventory_aggregate_batch (import_batch_id),
-                INDEX idx_inventory_aggregate_unique_key (source_unique_key),
-                INDEX idx_inventory_aggregate_snapshot (snapshot_date),
+                UNIQUE KEY uq_inventory_aggregate_source_key (source_unique_key),
                 INDEX idx_inventory_aggregate_product (product_code)
             ){$engine}",
             "CREATE TABLE IF NOT EXISTS sales_team_members (

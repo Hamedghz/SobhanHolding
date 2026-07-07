@@ -31,6 +31,8 @@
 
 `install/sales_aggregate_mapping_seed.php` سرستون‌های شناخته‌شده tbltajmi را با unique key `(source_module, source_header)` ثبت می‌کند و اجرای مجدد duplicate نمی‌سازد.
 
+در workbook واقعی بررسی‌شده، منبع فاقد Table Object بود و شیت با عنوان ` گزارش تجمیعی فروش` از مسیر header scan شناسایی شد. aliasهای `Mobile` و `موبایل` هر دو به کلید canonical `mobile` نگاشت می‌شوند.
+
 - ارقام فارسی/عربی به انگلیسی تبدیل می‌شوند.
 - جداکننده هزارگان حذف می‌شود؛ مقدار عددی خالی `NULL` است.
 - تاریخ جلالی، میلادی و serial معتبر Excel به `invoice_date` میلادی تبدیل و مقدار اصلی در `invoice_date_raw` حفظ می‌شود.

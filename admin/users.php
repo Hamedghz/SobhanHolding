@@ -196,9 +196,7 @@ $salesLines = array_column(Database::fetchAll('SELECT DISTINCT sales_line FROM u
 $employees = Database::fetchAll('SELECT u.id,u.name,u.email FROM users u WHERE u.role = "employee" AND u.status = "active"'.$selectableSql.' ORDER BY u.name',$selectableParams);
 $modules = Database::fetchAll('SELECT * FROM modules WHERE status = "active" ORDER BY sort_order ASC, id ASC');
 $moduleMeta = [
-    'messenger.view' => ['group' => 'پیام‌رسان', 'route' => '/messenger/', 'description' => 'مشاهده پیام‌ها و Snapshotهای ارسال‌شده برای کاربر'],
     'notification_hub.devices' => ['group' => 'اعلان‌ها', 'route' => '/admin/notification-devices.php', 'description' => 'مدیریت اتصال برنامه اعلان ویندوز'],
-    'manager_dashboard.forward' => ['group' => 'فروش و گزارش‌ها', 'route' => '/admin/manager-dashboard.php', 'description' => 'ارسال خروجی‌های مجاز پنل مدیران فروش به پیام‌رسان'],
     'dashboard' => ['group' => 'داشبوردها', 'route' => '/admin/index.php', 'description' => 'داشبورد عمومی پنل مدیریت'],
     'ceo_dashboard' => ['group' => 'داشبوردها', 'route' => '/admin/ceo-dashboard.php', 'description' => 'نسخه قدیمی دسترسی داشبورد مدیرعامل'],
     'view_ceo_dashboard' => ['group' => 'داشبوردها', 'route' => '/admin/ceo-dashboard.php', 'description' => 'مشاهده داشبورد مدیرعامل و گزارش‌های API سبحان'],

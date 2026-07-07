@@ -28,7 +28,7 @@ function admin_menu_registry(): array
         ]],
         'sales_data' => ['title' => 'مدیریت داده فروش', 'items' => [
             ['title' => 'ورود اطلاعات فروش تجمیعی', 'url' => '/admin/sales-aggregate-import.php', 'permission' => 'sales_data_import', 'active' => ['sales-aggregate-import.php']],
-            ['title' => 'آپدیت موجودی انبار', 'url' => '/admin/sales-data-index.php?source=inventory', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'inventory']],
+            ['title' => 'آپدیت موجودی انبار', 'url' => '/admin/inventory-aggregate-import.php', 'permission' => 'sales_data_import', 'active' => ['inventory-aggregate-import.php']],
             ['title' => 'ورود اطلاعات ویزیتورها', 'url' => '/admin/sales-data-index.php?source=sales_team', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'sales_team']],
             ['title' => 'ورود ضرایب صنف', 'url' => '/admin/sales-data-index.php?source=customer_coefficients', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'customer_coefficients']],
             ['title' => 'ورود اولویت کالا', 'url' => '/admin/sales-data-index.php?source=product_priorities', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'product_priorities']],
@@ -98,16 +98,8 @@ function admin_menu_registry(): array
             ['title' => 'اسلایدر و بنرها', 'url' => '/admin/carousel.php', 'permission' => 'carousel', 'active' => ['carousel.php']],
         ]],
         'correspondence' => ['title' => 'مکاتبات اداری', 'items' => [
-            ['title' => 'پیام‌رسان سازمانی', 'url' => '/employee/messenger.php', 'permission' => 'messenger.view', 'active_paths' => ['/employee/messenger.php','/employee/message-inbox.php','/messenger/','/messenger/report-view.php']],
             ['title' => 'تیکت‌های من', 'url' => '/employee/tickets.php', 'permission' => 'dashboard', 'active_paths' => ['/employee/tickets.php','/employee/ticket-create.php','/employee/ticket-view.php']],
             ['title' => 'مدیریت تیکت‌ها', 'url' => '/admin/tickets.php', 'permission' => 'ticketing.manage', 'active_paths' => ['/admin/tickets.php','/admin/ticket-categories.php','/admin/ticket-settings.php']],
-            ['title' => 'داشبورد پیام‌رسان', 'url' => '/admin/messenger-dashboard.php', 'permission' => 'messenger.admin.dashboard', 'active' => ['messenger-dashboard.php']],
-            ['title' => 'مدیریت گروه‌ها', 'url' => '/admin/messenger-groups.php', 'permission' => 'messenger.group.manage', 'active' => ['messenger-groups.php']],
-            ['title' => 'مدیریت کانال‌ها', 'url' => '/admin/messenger-channels.php', 'permission' => 'messenger.channel.manage', 'active' => ['messenger-channels.php']],
-            ['title' => 'ارسال سراسری', 'url' => '/admin/messenger-broadcast.php', 'permission' => 'messenger.broadcast.send', 'active' => ['messenger-broadcast.php']],
-            ['title' => 'گزارش تخلف پیام‌ها', 'url' => '/admin/messenger-reports.php', 'permission' => 'messenger.admin.reports', 'active' => ['messenger-reports.php']],
-            ['title' => 'ممیزی پیام‌رسان', 'url' => '/admin/messenger-audit.php', 'permission' => 'messenger.admin.audit', 'active' => ['messenger-audit.php']],
-            ['title' => 'تنظیمات پیام‌رسان', 'url' => '/admin/messenger-settings.php', 'permission' => 'messenger.admin.settings', 'active' => ['messenger-settings.php']],
             ['title' => 'نامه‌های سازمانی', 'url' => '/admin/letters.php', 'letter_capability' => 'view', 'active' => ['letters.php', 'letter-create.php', 'letter-view.php', 'letter-print.php', 'letter-pdf.php']],
             ['title' => 'قالب‌های نامه', 'url' => '/admin/letter-templates.php', 'permission' => 'letters.settings', 'action' => 'edit', 'active' => ['letter-templates.php']],
             ['title' => 'سربرگ‌ها', 'url' => '/admin/letter-letterheads.php', 'permission' => 'letters.settings', 'action' => 'edit', 'active' => ['letter-letterheads.php']],
@@ -130,6 +122,7 @@ function admin_menu_registry(): array
             ['title' => 'پایگاه دانش و ایندکس', 'url' => '/admin/knowledge.php', 'permission' => 'manage_knowledge', 'active' => ['knowledge.php']],
         ]],
         'settings' => ['title' => 'تنظیمات', 'items' => [
+            ['title' => 'سامانه پیامکی', 'url' => '/admin/sms-settings.php', 'permission' => 'sms.manage', 'active' => ['sms-settings.php','sms-send.php']],
             ['title' => 'اعلان ویندوز و دستگاه‌ها', 'url' => '/admin/notification-devices.php', 'permission' => 'dashboard', 'active' => ['notification-devices.php']],
             ['title' => 'ظاهر پنل من', 'url' => '/admin/theme-settings.php', 'permission' => 'dashboard', 'active' => ['theme-settings.php']],
             ['title' => 'تنظیمات اعلان‌ها', 'url' => '/admin/notification-settings.php', 'permission' => 'dashboard', 'active' => ['notification-settings.php']],

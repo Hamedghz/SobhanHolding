@@ -18,10 +18,7 @@ class NotificationService
         'sla_breach' => 'عبور از SLA',
         'ticket_reopened' => 'بازگشایی تیکت',
         'internal_message' => 'پیام داخلی',
-        'messenger_message' => 'پیام جدید پیام‌رسان',
-        'messenger_official_notice' => 'اطلاعیه رسمی پیام‌رسان',
         'personal_planner_reminder' => 'یادآوری برنامه کاری من',
-        'forwarded_report' => 'گزارش فورواردشده',
         'due_date_reminder' => 'یادآوری مهلت انجام',
         'test' => 'اعلان آزمایشی',
     ];
@@ -272,7 +269,7 @@ class NotificationService
         if (!$recipient) return null;
 
         $actor = $options['actor_user'] ?? Auth::user();
-        $systemAuthorized = !empty($options['system_authorized']) && ($eventType === 'forwarded_report' || str_starts_with($eventType, 'ticket_'));
+        $systemAuthorized = !empty($options['system_authorized']) && str_starts_with($eventType, 'ticket_');
         if (!$systemAuthorized && !self::canCreateForUser($userId, is_array($actor) ? $actor : null)) return null;
 
         $settings = self::settings($userId);
@@ -453,14 +450,6 @@ class NotificationService
         return self::create($userId, 'internal_message', 'پیام داخلی جدید', 'یک پیام داخلی جدید برای شما ثبت شد.', $actionUrl, ['related_type' => 'internal_message', 'related_id' => $messageId]);
     }
 
-    public static function notifyForwardedReport(int $userId, int $messageId, int $shareId, string $senderName): ?int
-    {
-        $senderName = self::limit(strip_tags($senderName), 150);
-        return self::create($userId, 'forwarded_report', 'گزارش فروش جدید', 'یک گزارش فروش جدید از طرف '.$senderName.' برای شما ارسال شد.', '/messenger/report-view.php?id='.$shareId, [
-            'related_type'=>'forwarded_report', 'related_id'=>$messageId, 'safe_push_body'=>'یک گزارش فروش جدید برای شما ارسال شد.', 'system_authorized'=>true,
-        ]);
-    }
-
     private static function ensureDefaultSettings(int $userId): void
     {
         Database::execute(
@@ -483,18 +472,16 @@ class NotificationService
         $event = strtolower($event);
         return match (true) {
             str_contains($event,'ticket'),str_contains($event,'sla')=>'ticketing',str_contains($event,'cartable')=>'cartable',
-            str_contains($event,'approval')=>'approval',str_contains($event,'group_message')=>'messenger_group',str_contains($event,'channel')=>'messenger_channel',
-            str_contains($event,'message'),str_contains($event,'messenger'),str_contains($event,'forwarded_report')=>'messenger',
-            str_contains($event,'hr'),str_contains($event,'assessment'),str_contains($event,'payroll')=>'hr',str_contains($event,'sale')=>'sales',
+            str_contains($event,'approval')=>'approval',
+            str_contains($event,'forwarded_report'),str_contains($event,'sale'),str_contains($event,'manager_dashboard')=>'sales',
+            str_contains($event,'hr'),str_contains($event,'assessment'),str_contains($event,'payroll')=>'hr',
             str_contains($event,'management'),str_contains($event,'meeting'),str_contains($event,'resolution'),str_contains($event,'finance')=>'management',default=>'system',
         };
     }
 
     private static function hubActions(string $module, string $event): array
     {
-        $actions=[['id'=>'open','label'=>'باز کردن'],['id'=>'mark_read','label'=>'خوانده شد']];
-        if($module==='messenger'&&str_contains($event,'message'))$actions[]=['id'=>'reply','label'=>'پاسخ سریع'];
-        return $actions;
+        return [['id'=>'open','label'=>'باز کردن'],['id'=>'mark_read','label'=>'خوانده شد']];
     }
 
     private static function safeActionUrl(?string $url): ?string

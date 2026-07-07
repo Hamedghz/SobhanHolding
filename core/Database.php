@@ -293,6 +293,8 @@ class Database
         LetterModule::repair($pdo);
         require_once __DIR__ . '/EmailHubModule.php';
         EmailHubModule::repair($pdo);
+        require_once __DIR__ . '/SmsModule.php';
+        SmsModule::repair($pdo);
         require_once __DIR__ . '/WorkforceModule.php';
         WorkforceModule::repair($pdo);
         require_once __DIR__ . '/ManagementReportsModule.php';
@@ -303,8 +305,6 @@ class Database
         HrAttendanceModule::repair($pdo);
         require_once __DIR__ . '/FileBackupModule.php';
         FileBackupModule::repair($pdo);
-        require_once __DIR__ . '/MessengerModule.php';
-        MessengerModule::repair($pdo);
         require_once __DIR__ . '/../lib/NotificationService.php';
         NotificationService::repair($pdo);
         require_once __DIR__ . '/WindowsNotificationHubModule.php';

@@ -92,6 +92,11 @@ class WorkPlannerService
         $task=Database::fetch('SELECT * FROM work_planner_tasks WHERE id=?',[$taskId]);if(!$task)return;$type=(string)($task['recurrence_type']??'none');if($type==='none')return;$interval=max(1,(int)($task['recurrence_interval']??1));$modifier=match($type){'daily'=>"+{$interval} day",'weekly'=>"+{$interval} week",'monthly'=>"+{$interval} month",default=>null};if(!$modifier)return;$base=$task['due_date']?:date('Y-m-d');$due=(new DateTimeImmutable($base))->modify($modifier)->format('Y-m-d');if(Database::fetch('SELECT id FROM work_planner_tasks WHERE parent_task_id=? AND due_date=? LIMIT 1',[$taskId,$due]))return;Database::execute('INSERT INTO work_planner_tasks(user_id,employee_id,assigned_by,title,description,task_type,priority,status,start_date,due_date,progress_percent,parent_task_id,is_locked,is_personal,is_visible_on_dashboard,recurrence_type,recurrence_interval,created_at,updated_at) VALUES(?,?,?, ?,?,"custom",?,"todo",CURDATE(),?,0,?,0,1,1,?,?,NOW(),NOW())',[(int)$task['user_id'],(int)$task['user_id'],$userId,$task['title'],$task['description'],$task['priority'],$due,$taskId,$type,$interval]);self::logTaskAction((int)Database::lastInsertId(),$userId,'recurrence_created',['source_task_id'=>$taskId],['due_date'=>$due]);
     }
 
+    public static function markTaskUrgent(int $taskId,int $userId): bool
+    {
+        if(!self::canUserAccessTask($userId,$taskId))return false;$task=Database::fetch('SELECT priority,status FROM work_planner_tasks WHERE id=?',[$taskId]);if(!$task||in_array($task['status'],['done','cancelled'],true))return false;Database::execute('UPDATE work_planner_tasks SET priority="urgent",updated_at=NOW() WHERE id=?',[$taskId]);self::logTaskAction($taskId,$userId,'updated',['priority'=>$task['priority']],['priority'=>'urgent'],'تغییر اولویت به فوری');return true;
+    }
+
     private static function nextOccurrenceDate(DateTimeImmutable $date,string $type,int $interval,int $monthDay): DateTimeImmutable
     {
         if($type==='daily')return $date->modify("+{$interval} day");if($type==='weekly')return $date->modify("+{$interval} week");

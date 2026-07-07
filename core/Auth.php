@@ -122,10 +122,6 @@ class Auth
             'use_ai_assistant' => ['ai_assistant'],
             'manager_dashboard.ai' => ['manager_dashboard.ai_run'],
             'manager_dashboard.ai_run' => ['manager_dashboard.ai'],
-            'messenger.live_location.send' => ['messenger.location.live'],
-            'messenger.location.live' => ['messenger.live_location.send'],
-            'messenger.message.moderate' => ['messenger.moderate'],
-            'messenger.moderate' => ['messenger.message.moderate'],
         ];
 
         $column = match ($action) {

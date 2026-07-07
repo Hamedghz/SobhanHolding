@@ -1,1 +1,0 @@
-<?php require __DIR__.'/bootstrap.php';messenger_run(function($u){$in=messenger_input();MessengerService::react((int)($in['message_id']??0),(string)($in['reaction']??''),(int)$u['id'],!empty($in['remove']));return ['updated'=>true];},true);

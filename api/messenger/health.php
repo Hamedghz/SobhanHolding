@@ -1,1 +1,0 @@
-<?php require __DIR__.'/bootstrap.php';messenger_run(fn($u)=>['messenger_enabled'=>MessengerService::setting('messenger.enabled','1')==='1','realtime_enabled'=>MessengerService::setting('messenger.realtime_url')!=='','web_push_ready'=>class_exists('PushNotificationService'),'windows_agent_ready'=>class_exists('NotificationHubService')||is_dir(__DIR__.'/../notify')]);

@@ -46,10 +46,9 @@ APIها:
 
 ## Hookهای اختیاری
 
-برای اتصال quick reply و approval به ماژول مقصد می‌توان این handlerها را تعریف کرد:
+برای اتصال approval به ماژول مقصد می‌توان این handler را تعریف کرد:
 
 ```php
-sobhan_messenger_quick_reply(array $notification, string $text, int $userId): void
 sobhan_notification_direct_action(array $notification, string $action, int $userId): void
 ```
 

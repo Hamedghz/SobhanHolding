@@ -1,1 +1,0 @@
-<?php require __DIR__.'/bootstrap.php';$method=$_SERVER['REQUEST_METHOD']??'GET';messenger_run(function($u)use($method){$in=messenger_input();if($method==='GET')return MessengerService::conversations((int)$u['id'],(string)($_GET['q']??''),(int)($_GET['limit']??100));return MessengerService::createConversation($in,$u);},$method!=='GET');

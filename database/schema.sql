@@ -29,6 +29,33 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY uq_users_employee_no(employee_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS sms_settings (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, provider_name VARCHAR(100) NOT NULL DEFAULT 'bazyabpayam',
+  wsdl_url VARCHAR(255) NOT NULL, url_api_base VARCHAR(255) NULL, username VARCHAR(100) NOT NULL,
+  password_encrypted LONGTEXT NOT NULL, default_sender VARCHAR(50) NOT NULL, is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_sms_settings_active(is_active), CONSTRAINT fk_sms_settings_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sms_messages (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, provider_name VARCHAR(100) NOT NULL, sender VARCHAR(50) NOT NULL,
+  message_body TEXT NOT NULL, recipients_count INT UNSIGNED NOT NULL DEFAULT 0, bulk_code VARCHAR(100) NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'queued', source_module VARCHAR(100) NULL, source_id BIGINT UNSIGNED NULL,
+  created_by INT UNSIGNED NULL, sent_at DATETIME NULL, last_checked_at DATETIME NULL, error_code VARCHAR(50) NULL,
+  error_message TEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_sms_messages_status(status), INDEX idx_sms_messages_bulk(bulk_code), INDEX idx_sms_messages_source(source_module,source_id),
+  CONSTRAINT fk_sms_messages_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sms_message_recipients (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, message_id BIGINT UNSIGNED NOT NULL, mobile VARCHAR(20) NOT NULL,
+  normalized_mobile VARCHAR(20) NOT NULL, delivery_status VARCHAR(50) NULL, provider_message_id VARCHAR(100) NULL,
+  checked_at DATETIME NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_sms_recipient_message(message_id), INDEX idx_sms_recipient_mobile(normalized_mobile),
+  CONSTRAINT fk_sms_recipient_message FOREIGN KEY(message_id) REFERENCES sms_messages(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS user_theme_preferences (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,
@@ -87,6 +114,193 @@ CREATE TABLE IF NOT EXISTS hr_kpi_template_roles (
   UNIQUE KEY uq_hr_kpi_template_role(template_id, role_id),
   INDEX idx_hr_kpi_template_roles_role(role_id),
   INDEX idx_hr_kpi_template_roles_active(active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_tests (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(190) NOT NULL,
+  code VARCHAR(100) NOT NULL UNIQUE,
+  category VARCHAR(100) NULL,
+  description TEXT NULL,
+  age_range VARCHAR(80) NULL,
+  scoring_type VARCHAR(50) NOT NULL DEFAULT 'dimensions',
+  time_limit_minutes INT NOT NULL DEFAULT 20,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  seeded TINYINT(1) NOT NULL DEFAULT 0,
+  seed_key VARCHAR(100) NULL,
+  seed_version VARCHAR(50) NULL,
+  is_seeded TINYINT(1) NOT NULL DEFAULT 0,
+  is_archived TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_hr_assessment_seed(seed_key, seed_version),
+  INDEX idx_hr_assessment_active(active, is_archived)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_dimensions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  test_id INT UNSIGNED NOT NULL,
+  dimension_key VARCHAR(100) NOT NULL,
+  dimension_label VARCHAR(190) NOT NULL,
+  description TEXT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  seed_key VARCHAR(100) NULL,
+  seed_version VARCHAR(50) NULL,
+  is_seeded TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_hr_dimension(test_id, dimension_key),
+  CONSTRAINT fk_hr_dimension_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_questions (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  test_id INT UNSIGNED NOT NULL,
+  question_code VARCHAR(100) NULL,
+  question_text TEXT NOT NULL,
+  question_hash CHAR(64) NOT NULL,
+  answer_type VARCHAR(30) NOT NULL,
+  options_json TEXT NULL,
+  correct_answer_json TEXT NULL,
+  dimension_key VARCHAR(100) NULL,
+  secondary_dimension_key VARCHAR(100) NULL,
+  weight DECIMAL(8,2) NOT NULL DEFAULT 1,
+  reverse_score TINYINT(1) NOT NULL DEFAULT 0,
+  correct_answer VARCHAR(190) NULL,
+  admin_note TEXT NULL,
+  required TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  seeded TINYINT(1) NOT NULL DEFAULT 0,
+  seed_key VARCHAR(100) NULL,
+  seed_version VARCHAR(50) NULL,
+  is_seeded TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_hr_question(test_id, question_hash),
+  UNIQUE KEY uq_hr_question_code(test_id, question_code),
+  INDEX idx_hr_question_test(test_id),
+  CONSTRAINT fk_hr_question_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_assignments (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  test_id INT UNSIGNED NOT NULL,
+  employee_id INT UNSIGNED NOT NULL,
+  department VARCHAR(150) NULL,
+  role_key VARCHAR(100) NULL,
+  sales_line VARCHAR(50) NULL,
+  supervisor_id INT UNSIGNED NULL,
+  manager_id INT UNSIGNED NULL,
+  assigned_by INT UNSIGNED NULL,
+  assignment_scope VARCHAR(40) NOT NULL DEFAULT 'employee',
+  batch_key VARCHAR(80) NULL,
+  scope_type VARCHAR(40) NULL,
+  scope_value VARCHAR(190) NULL,
+  period_key VARCHAR(100) NULL,
+  due_date DATE NULL,
+  allow_retake TINYINT(1) NOT NULL DEFAULT 0,
+  show_result_to_employee TINYINT(1) NOT NULL DEFAULT 0,
+  initial_status VARCHAR(30) NOT NULL DEFAULT 'assigned',
+  status VARCHAR(30) NOT NULL DEFAULT 'assigned',
+  notes TEXT NULL,
+  cancel_reason TEXT NULL,
+  cancelled_by INT UNSIGNED NULL,
+  cancelled_at DATETIME NULL,
+  archived_at DATETIME NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_hr_assignment_employee(employee_id, status),
+  INDEX idx_hr_assignment_team(supervisor_id, manager_id),
+  CONSTRAINT fk_hr_assignment_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE,
+  CONSTRAINT fk_hr_assignment_employee FOREIGN KEY(employee_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_responses (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  assignment_id INT UNSIGNED NOT NULL,
+  employee_id INT UNSIGNED NOT NULL,
+  test_id INT UNSIGNED NOT NULL,
+  answers_json LONGTEXT NULL,
+  progress_json TEXT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'in_progress',
+  started_at DATETIME NULL,
+  submitted_at DATETIME NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_hr_response_assignment(assignment_id),
+  CONSTRAINT fk_hr_response_assignment FOREIGN KEY(assignment_id) REFERENCES hr_assessment_assignments(id) ON DELETE CASCADE,
+  CONSTRAINT fk_hr_response_employee FOREIGN KEY(employee_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_hr_response_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_results (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  assignment_id INT UNSIGNED NOT NULL,
+  employee_id INT UNSIGNED NOT NULL,
+  test_id INT UNSIGNED NOT NULL,
+  raw_answers_json LONGTEXT NULL,
+  calculated_scores_json LONGTEXT NULL,
+  normalized_scores_json LONGTEXT NULL,
+  final_result TEXT NULL,
+  risk_level VARCHAR(40) NULL,
+  profile_summary TEXT NULL,
+  recommendation_text TEXT NULL,
+  calculated_at DATETIME NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_hr_result_employee(employee_id),
+  INDEX idx_hr_result_test(test_id),
+  CONSTRAINT fk_hr_result_assignment FOREIGN KEY(assignment_id) REFERENCES hr_assessment_assignments(id) ON DELETE CASCADE,
+  CONSTRAINT fk_hr_result_employee FOREIGN KEY(employee_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_hr_result_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_result_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  result_id INT UNSIGNED NULL,
+  action VARCHAR(30) NOT NULL,
+  performed_by INT UNSIGNED NULL,
+  old_value_json LONGTEXT NULL,
+  new_value_json LONGTEXT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_hr_result_log FOREIGN KEY(result_id) REFERENCES hr_assessment_results(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_seed_versions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  seed_key VARCHAR(100) NOT NULL,
+  version VARCHAR(50) NOT NULL,
+  source_title VARCHAR(255) NULL,
+  source_file VARCHAR(255) NULL,
+  applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  applied_by BIGINT NULL,
+  notes TEXT NULL,
+  UNIQUE KEY uq_seed_version(seed_key, version)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_packages (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(190) NOT NULL,
+  code VARCHAR(100) NOT NULL UNIQUE,
+  role_key VARCHAR(100) NULL,
+  description TEXT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  seed_key VARCHAR(100) NULL,
+  seed_version VARCHAR(50) NULL,
+  is_seeded TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_assessment_package_tests (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  package_id INT UNSIGNED NOT NULL,
+  test_id INT UNSIGNED NOT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uq_hr_package_test(package_id, test_id),
+  CONSTRAINT fk_hr_package_test_package FOREIGN KEY(package_id) REFERENCES hr_assessment_packages(id) ON DELETE CASCADE,
+  CONSTRAINT fk_hr_package_test_test FOREIGN KEY(test_id) REFERENCES hr_assessment_tests(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS hr_assessment_assignment_logs (
@@ -1002,12 +1216,15 @@ CREATE TABLE IF NOT EXISTS sales_aggregate_rows (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS inventory_aggregate_rows (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
-  snapshot_date DATE NULL, warehouse_code VARCHAR(100) NULL, product_code VARCHAR(100) NULL, product_name VARCHAR(255) NULL,
-  quantity DECIMAL(18,4) NULL, inventory_value DECIMAL(20,2) NULL, raw_json LONGTEXT NULL,
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_type VARCHAR(30) NULL, source_unique_key VARCHAR(191) NULL,
+  product_code VARCHAR(100) NULL,product_name VARCHAR(255) NULL,index_code VARCHAR(100) NULL,index_name VARCHAR(255) NULL,consumer_price DECIMAL(20,4) NULL,expire_date DATE NULL,expire_date_raw VARCHAR(100) NULL,manufacturer_code VARCHAR(100) NULL,manufacturer_name VARCHAR(255) NULL,
+  sales_carton_qty DECIMAL(20,4) NULL,sales_part_qty DECIMAL(20,4) NULL,sales_total_qty DECIMAL(20,4) NULL,sales_total_amount DECIMAL(20,4) NULL,sales_discount_amount DECIMAL(20,4) NULL,sales_tax_amount DECIMAL(20,4) NULL,sales_duty_amount DECIMAL(20,4) NULL,sales_payable_amount DECIMAL(20,4) NULL,sales_return_carton_qty DECIMAL(20,4) NULL,sales_return_part_qty DECIMAL(20,4) NULL,sales_return_total_qty DECIMAL(20,4) NULL,
+  purchase_carton_qty DECIMAL(20,4) NULL,purchase_part_qty DECIMAL(20,4) NULL,purchase_total_qty DECIMAL(20,4) NULL,opening_carton_qty DECIMAL(20,4) NULL,opening_part_qty DECIMAL(20,4) NULL,opening_total_qty DECIMAL(20,4) NULL,inbound_carton_qty DECIMAL(20,4) NULL,inbound_part_qty DECIMAL(20,4) NULL,inbound_total_qty DECIMAL(20,4) NULL,outbound_carton_qty DECIMAL(20,4) NULL,outbound_part_qty DECIMAL(20,4) NULL,outbound_total_qty DECIMAL(20,4) NULL,current_period_carton_qty DECIMAL(20,4) NULL,current_period_part_qty DECIMAL(20,4) NULL,current_period_total_qty DECIMAL(20,4) NULL,carton_size DECIMAL(20,4) NULL,
+  last_cost_price DECIMAL(20,4) NULL,last_purchase_price DECIMAL(20,4) NULL,stock_value_by_last_cost DECIMAL(20,4) NULL,stock_value_by_sale_price_1 DECIMAL(20,4) NULL,retail_price DECIMAL(20,4) NULL,wholesale_price DECIMAL(20,4) NULL,sale_price_3 DECIMAL(20,4) NULL,sale_price_4 DECIMAL(20,4) NULL,sale_price_5 DECIMAL(20,4) NULL,sale_price_6 DECIMAL(20,4) NULL,sale_price_7 DECIMAL(20,4) NULL,sale_price_8 DECIMAL(20,4) NULL,sale_price_9 DECIMAL(20,4) NULL,sale_price_10 DECIMAL(20,4) NULL,sale_price_11 DECIMAL(20,4) NULL,sale_price_12 DECIMAL(20,4) NULL,
+  retail_commission DECIMAL(20,4) NULL,wholesale_commission DECIMAL(20,4) NULL,commission_3 DECIMAL(20,4) NULL,commission_4 DECIMAL(20,4) NULL,commission_5 DECIMAL(20,4) NULL,commission_6 DECIMAL(20,4) NULL,commission_7 DECIMAL(20,4) NULL,commission_8 DECIMAL(20,4) NULL,commission_9 DECIMAL(20,4) NULL,commission_10 DECIMAL(20,4) NULL,commission_11 DECIMAL(20,4) NULL,commission_12 DECIMAL(20,4) NULL,
+  current_weight DECIMAL(20,4) NULL,current_volume DECIMAL(20,4) NULL,product_tree_group_code VARCHAR(100) NULL,product_tree_group_name VARCHAR(255) NULL,barcode VARCHAR(191) NULL,control_code VARCHAR(191) NULL,group_code VARCHAR(100) NULL,group_name VARCHAR(255) NULL,retail_collection_days DECIMAL(20,4) NULL,current_base_stock DECIMAL(20,4) NULL,current_part_stock DECIMAL(20,4) NULL,current_total_stock DECIMAL(20,4) NULL,brand_name VARCHAR(255) NULL,last_purchase_date DATE NULL,last_purchase_date_raw VARCHAR(100) NULL,raw_json LONGTEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
-  INDEX idx_inventory_aggregate_batch(import_batch_id), INDEX idx_inventory_aggregate_unique_key(source_unique_key),
-  INDEX idx_inventory_aggregate_snapshot(snapshot_date), INDEX idx_inventory_aggregate_product(product_code)
+  INDEX idx_inventory_aggregate_batch(import_batch_id), UNIQUE KEY uq_inventory_aggregate_source_key(source_unique_key), INDEX idx_inventory_aggregate_product(product_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sales_team_members (
@@ -1136,61 +1353,6 @@ CREATE TABLE IF NOT EXISTS uploaded_files_backup_logs (
   INDEX idx_uploaded_files_backup_logs_file(file_id,created_at), INDEX idx_uploaded_files_backup_logs_action(action,created_at),
   CONSTRAINT fk_uploaded_files_backup_logs_file FOREIGN KEY(file_id) REFERENCES uploaded_files_backup(id) ON DELETE SET NULL,
   CONSTRAINT fk_uploaded_files_backup_logs_user FOREIGN KEY(actor_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS messenger_groups (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, created_by INT UNSIGNED NULL,
-  active TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_messenger_groups_active(active),
-  CONSTRAINT fk_messenger_groups_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS messenger_group_members (
-  group_id INT UNSIGNED NOT NULL, user_id INT UNSIGNED NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY(group_id,user_id), INDEX idx_messenger_group_members_user(user_id),
-  CONSTRAINT fk_messenger_group_members_group FOREIGN KEY(group_id) REFERENCES messenger_groups(id) ON DELETE CASCADE,
-  CONSTRAINT fk_messenger_group_members_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS sales_report_shares (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, sender_user_id INT UNSIGNED NOT NULL, source_module VARCHAR(80) NOT NULL DEFAULT 'manager_dashboard',
-  source_page VARCHAR(190) NOT NULL, source_report_type VARCHAR(100) NOT NULL, source_record_id BIGINT UNSIGNED NULL,
-  report_title VARCHAR(190) NOT NULL, report_period VARCHAR(100) NULL, filters_json LONGTEXT NULL, snapshot_json LONGTEXT NOT NULL,
-  attachment_path VARCHAR(500) NULL, attachment_name VARCHAR(255) NULL, attachment_mime VARCHAR(120) NULL, snapshot_hash CHAR(64) NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_sales_report_shares_sender(sender_user_id,created_at),
-  INDEX idx_sales_report_shares_source(source_module,source_record_id), INDEX idx_sales_report_shares_hash(snapshot_hash),
-  CONSTRAINT fk_sales_report_shares_sender FOREIGN KEY(sender_user_id) REFERENCES users(id) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS messenger_messages (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, sender_user_id INT UNSIGNED NOT NULL, message_type VARCHAR(50) NOT NULL DEFAULT 'text',
-  title VARCHAR(190) NOT NULL, body TEXT NULL, payload_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_messenger_messages_sender(sender_user_id,created_at),
-  INDEX idx_messenger_messages_type(message_type,created_at), CONSTRAINT fk_messenger_messages_sender FOREIGN KEY(sender_user_id) REFERENCES users(id) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS messenger_message_recipients (
-  message_id BIGINT UNSIGNED NOT NULL, user_id INT UNSIGNED NOT NULL, status ENUM('unread','read','archived') NOT NULL DEFAULT 'unread',
-  read_at DATETIME NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(message_id,user_id),
-  INDEX idx_messenger_recipient_inbox(user_id,status,created_at),
-  CONSTRAINT fk_messenger_recipients_message FOREIGN KEY(message_id) REFERENCES messenger_messages(id) ON DELETE CASCADE,
-  CONSTRAINT fk_messenger_recipients_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS messenger_forwarded_reports (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, message_id BIGINT UNSIGNED NOT NULL, share_id BIGINT UNSIGNED NOT NULL,
-  sender_user_id INT UNSIGNED NOT NULL, recipient_type VARCHAR(40) NOT NULL, recipient_id VARCHAR(190) NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_messenger_forwarded_message(message_id), INDEX idx_messenger_forwarded_share(share_id),
-  CONSTRAINT fk_messenger_forwarded_message FOREIGN KEY(message_id) REFERENCES messenger_messages(id) ON DELETE CASCADE,
-  CONSTRAINT fk_messenger_forwarded_share FOREIGN KEY(share_id) REFERENCES sales_report_shares(id) ON DELETE RESTRICT,
-  CONSTRAINT fk_messenger_forwarded_sender FOREIGN KEY(sender_user_id) REFERENCES users(id) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS messenger_forward_logs (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, share_id BIGINT UNSIGNED NULL, message_id BIGINT UNSIGNED NULL,
-  actor_user_id INT UNSIGNED NULL, action VARCHAR(60) NOT NULL, status VARCHAR(30) NOT NULL DEFAULT 'success', details_json LONGTEXT NULL,
-  ip_address VARCHAR(45) NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_messenger_forward_logs_share(share_id,created_at), INDEX idx_messenger_forward_logs_actor(actor_user_id,created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sobhan_notification_devices (
@@ -1393,7 +1555,7 @@ SELECT employee_id,YEAR(attendance_date) AS `year`,MONTH(attendance_date) AS `mo
 FROM hr_attendance_entries
 GROUP BY employee_id,YEAR(attendance_date),MONTH(attendance_date);
 
--- Independent ticketing module. Additive only, existing messenger tables are intentionally unrelated.
+-- Independent ticketing module.
 CREATE TABLE IF NOT EXISTS ticket_categories (id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(190) NOT NULL,description TEXT NULL,assigned_unit_id INT UNSIGNED NULL,default_assignee_user_id INT UNSIGNED NULL,active TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX idx_ticket_category_active(active,sort_order)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS tickets (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,ticket_no VARCHAR(40) NULL,subject VARCHAR(255) NOT NULL,category_id INT UNSIGNED NOT NULL,priority ENUM('low','normal','high','urgent') NOT NULL DEFAULT 'normal',requester_user_id INT UNSIGNED NOT NULL,assigned_user_id INT UNSIGNED NULL,assigned_unit_id INT UNSIGNED NULL,due_at DATETIME NULL,status ENUM('open','assigned','in_progress','waiting_user','waiting_admin','resolved','closed','cancelled') NOT NULL DEFAULT 'open',last_message_at DATETIME NULL,resolved_at DATETIME NULL,closed_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_ticket_no(ticket_no),INDEX idx_ticket_requester(requester_user_id,status),INDEX idx_ticket_assignee(assigned_user_id,status),INDEX idx_ticket_unit(assigned_unit_id,status),INDEX idx_ticket_due(status,due_at),CONSTRAINT fk_ticket_category FOREIGN KEY(category_id) REFERENCES ticket_categories(id) ON DELETE RESTRICT,CONSTRAINT fk_ticket_requester FOREIGN KEY(requester_user_id) REFERENCES users(id) ON DELETE RESTRICT,CONSTRAINT fk_ticket_assignee FOREIGN KEY(assigned_user_id) REFERENCES users(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS ticket_messages (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,ticket_id BIGINT UNSIGNED NOT NULL,user_id INT UNSIGNED NOT NULL,message TEXT NOT NULL,is_internal TINYINT(1) NOT NULL DEFAULT 0,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,INDEX idx_ticket_message(ticket_id,created_at),CONSTRAINT fk_ticket_message_ticket FOREIGN KEY(ticket_id) REFERENCES tickets(id) ON DELETE RESTRICT,CONSTRAINT fk_ticket_message_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE RESTRICT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

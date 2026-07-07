@@ -71,7 +71,7 @@ class SalesDataNormalizer
             'مبلغ تخفیف 2'=>'discount_amount_2','%تخفیف3'=>'discount_percent_3','مبلغ تخفیف 3'=>'discount_amount_3',
             'مجموع مبلغ تخفیف سطری'=>'discount_amount','ناخالص - تخفیف'=>'gross_after_discount','مبلغ مالیات'=>'tax_amount','مبلغ عوارض'=>'duty_amount',
             'جمع مالیات عوارض'=>'tax_duty_amount','مبلغ خالص'=>'net_amount','وزن'=>'weight','حجم'=>'volume','کد انبار'=>'warehouse_code','نام انبار'=>'warehouse_name',
-            'آدرس مشتری'=>'customer_address','کد شعبه'=>'branch_code','نام شعبه'=>'branch_name','Mobile'=>'mobile','تلفن'=>'phone','کد شهر'=>'city_code','نام شهر'=>'city_name',
+            'آدرس مشتری'=>'customer_address','کد شعبه'=>'branch_code','نام شعبه'=>'branch_name','Mobile'=>'mobile','موبایل'=>'mobile','تلفن'=>'phone','کد شهر'=>'city_code','نام شهر'=>'city_name',
             'درجه مشتری'=>'customer_grade','کد ملی'=>'national_code','کد صنف'=>'customer_class_code','نام صنف'=>'customer_class_name','مسیر'=>'route_code','نام مسیر'=>'route_name',
             'کد مامور پخش'=>'distributor_code','نام مامور پخش'=>'distributor_name','کد راننده'=>'driver_code','نام راننده'=>'driver_name','کد سرپرست'=>'supervisor_code',
             'نام سرپرست'=>'supervisor_name','کد مدیر فروش'=>'sales_manager_code','نام مدیر فروش'=>'sales_manager_name','شماره خروجی'=>'dispatch_number',
