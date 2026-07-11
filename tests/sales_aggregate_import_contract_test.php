@@ -10,8 +10,8 @@ require_once $root.'/core/SalesAggregateImportService.php';
 if(SalesAggregateImportService::normalizePersianArabicDigits('۱۲٣')!=='123')throw new RuntimeException('Digit normalization failed.');
 if(SalesAggregateImportService::normalizeDecimal('۱٬۲۳۴.۵۰')!=='1234.5')throw new RuntimeException('Decimal normalization failed.');
 if(SalesAggregateImportService::normalizeDate('1403/03/01')!=='2024-05-21')throw new RuntimeException('Jalali normalization failed.');
-$key=SalesAggregateImportService::buildSourceUniqueKey(['unique_code'=>'ABC-1']);if($key!=='unique:ABC-1')throw new RuntimeException('Unique-code key failed.');
-$fallback=SalesAggregateImportService::buildSourceUniqueKey(['invoice_number'=>'1','invoice_type'=>'sale','sub_invoice_number'=>'2','product_code'=>'P','customer_code'=>'C','visitor_code'=>'V','invoice_date'=>'2024-05-21']);if(strlen($fallback)!==40)throw new RuntimeException('SHA1 fallback failed.');
+$key=SalesAggregateImportService::buildSourceUniqueKey(['unique_code'=>'ABC-1']);if($key!==sha1('sales_aggregate|ABC-1'))throw new RuntimeException('Unique-code key failed.');
+$fallback=SalesAggregateImportService::buildSourceUniqueKey(['invoice_number'=>'1','invoice_type'=>'sale','sub_invoice_number'=>'2','product_code'=>'P','customer_code'=>'C','visitor_code'=>'V','invoice_date_raw'=>'1403/03/01']);if($fallback!==sha1('sales_aggregate|1|sale|2|P|C|V|1403/03/01'))throw new RuntimeException('SHA1 fallback failed.');
 $headers=array_keys(SalesDataNormalizer::REQUIRED);$rows=[$headers,array_fill(0,count($headers),'x')];
 $workbook=['sheets'=>[
  ['name'=>'تجمیعی','visible'=>true,'rows'=>$rows,'tables'=>[]],

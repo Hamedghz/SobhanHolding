@@ -58,3 +58,7 @@ uploads/management-followups/*
 !uploads/management-meetings/index.html
 !uploads/management-followups/.htaccess
 !uploads/management-followups/index.html
+
+# Codex local runtime
+.codex-runtime/
+*.pre-sobhan-codex.bak

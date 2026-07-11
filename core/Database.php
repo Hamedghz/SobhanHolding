@@ -313,6 +313,8 @@ class Database
         SalesOfferBudgetModule::repair($pdo);
         require_once __DIR__ . '/SalesDataSchema.php';
         SalesDataSchema::repair($pdo);
+        require_once __DIR__ . '/SalesReferenceSchema.php';
+        SalesReferenceSchema::repair($pdo);
 
         if (self::tableExists('users')) {
             if (!self::columnExists('users', 'description')) {

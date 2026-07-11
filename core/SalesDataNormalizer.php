@@ -54,7 +54,10 @@ class SalesDataNormalizer
         $value = self::normalizePersianArabicDigits($value);
         if ($value === '') return null;
         $value = strtr($value, ['٬'=>'', '،'=>'', ','=>'', ' '=>'', "\xC2\xA0"=>'', '−'=>'-', '%'=>'']);
-        if (!preg_match('/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/', $value)) return null;
+        if (!preg_match('/^[+-]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$/', $value)) return null;
+        if (stripos($value, 'e') !== false) {
+            $value = sprintf('%.10F', (float)$value);
+        }
         $number = str_contains($value, '.') ? rtrim(rtrim($value, '0'), '.') : $value;
         if ($number === '' || $number === '-' || $number === '+') return '0';
         return $number;

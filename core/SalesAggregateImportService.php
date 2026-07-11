@@ -2,18 +2,19 @@
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/SalesAggregateRepository.php';
 require_once __DIR__ . '/SalesDataNormalizer.php';
+require_once __DIR__ . '/SalesReferenceRepository.php';
 
 class SalesAggregateImportService
 {
     public const SOURCE_MODULE = 'sales_aggregate';
-    public const MODES = ['skip_duplicates','update_existing','fail_on_duplicate'];
+    public const MODES = ['replace_reference','append','update_existing','skip_duplicates','fail_on_duplicate'];
     private const MAX_FILE_SIZE = 26214400;
     private const MAX_UNCOMPRESSED_SIZE = 104857600;
     private const MAX_ROWS = 100000;
 
-    public static function readUploadedFile(array $file, string $importMode, int $actorId): array
+    public static function readUploadedFile(array $file, string $importMode, int $actorId, ?string $periodKey = null): array
     {
-        if (!in_array($importMode, self::MODES, true)) $importMode = 'skip_duplicates';
+        if (!in_array($importMode, self::MODES, true)) $importMode = 'replace_reference';
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) throw new InvalidArgumentException('فایل بارگذاری‌شده معتبر نیست.');
         $tmp = (string)($file['tmp_name'] ?? '');
         $isUploaded = is_uploaded_file($tmp) || (PHP_SAPI === 'cli' && is_file($tmp));
@@ -51,8 +52,10 @@ class SalesAggregateImportService
                 'file_name' => $originalName, 'file_hash' => hash_file('sha256', $path),
                 'detected_sheet' => $selected['sheet_name'] ?? null, 'detected_table' => $selected['table_name'] ?? null,
                 'import_mode' => $importMode, 'status' => $selected ? 'uploaded' : 'awaiting_source_selection',
-                'started_by' => $actorId, 'metadata_json' => json_encode($metadata, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+                'started_by' => $actorId, 'period_key' => self::cleanPeriodKey($periodKey),
+                'metadata_json' => json_encode($metadata, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
             ]);
+            SalesReferenceRepository::setPeriodKey($batchId, self::cleanPeriodKey($periodKey));
             if ($selected) {
                 $summary = self::storeToStaging($batchId, $selected);
                 return ['batch_id'=>$batchId,'needs_selection'=>false,'summary'=>$summary];
@@ -131,11 +134,13 @@ class SalesAggregateImportService
     {
         $errors = [];
         foreach (SalesDataNormalizer::REQUIRED as $label => $key) {
-            $value = $key === 'invoice_date_raw' ? ($normalized['invoice_date'] ?? null) : ($normalized[$key] ?? null);
+            if (in_array($key, ['visitor_code', 'visitor_name'], true)) continue;
+            $value = $normalized[$key] ?? null;
             if ($value === null || trim((string)$value) === '') $errors[] = ['code'=>'required_field','message'=>"فیلد «{$label}» الزامی است."];
         }
-        $dateRaw = trim((string)($normalized['invoice_date_raw'] ?? ''));
-        if ($dateRaw !== '' && empty($normalized['invoice_date'])) $errors[] = ['code'=>'invalid_date','message'=>'تاریخ فاکتور قابل تشخیص نیست.'];
+        if (trim((string)($normalized['visitor_code'] ?? '')) === '' && trim((string)($normalized['visitor_name'] ?? '')) === '') {
+            $errors[] = ['code'=>'required_field','message'=>'یکی از فیلدهای «کد فروشنده» یا «نام فروشنده» الزامی است.'];
+        }
         foreach (['quantity'=>'تعداد کل','gross_amount'=>'مبلغ ناخالص','discount_amount'=>'مجموع مبلغ تخفیف سطری','net_amount'=>'مبلغ خالص'] as $key=>$label) {
             $rawValue = self::rawValueForKey($raw, $key);
             if (trim((string)$rawValue) !== '' && ($normalized[$key] ?? null) === null) $errors[] = ['code'=>'invalid_number','message'=>"مقدار «{$label}» عدد معتبر نیست."];
@@ -153,9 +158,9 @@ class SalesAggregateImportService
     public static function buildSourceUniqueKey(array $normalized): string
     {
         $uniqueCode = trim((string)($normalized['unique_code'] ?? ''));
-        if ($uniqueCode !== '') return 'unique:' . mb_substr($uniqueCode, 0, 180);
-        $parts = ['invoice_number','invoice_type','sub_invoice_number','product_code','customer_code','visitor_code','invoice_date'];
-        return sha1(implode('|', array_map(static fn($key) => trim((string)($normalized[$key] ?? '')), $parts)));
+        if ($uniqueCode !== '') return sha1('sales_aggregate|' . $uniqueCode);
+        $parts = ['invoice_number','invoice_type','sub_invoice_number','product_code','customer_code','visitor_code','invoice_date_raw'];
+        return sha1('sales_aggregate|' . implode('|', array_map(static fn($key) => trim((string)($normalized[$key] ?? '')), $parts)));
     }
 
     public static function detectDuplicate(string $sourceKey, array $seen = []): bool
@@ -172,7 +177,7 @@ class SalesAggregateImportService
         if ($mapping['missing_required']) throw new InvalidArgumentException('سرستون‌های الزامی یافت نشد: ' . implode('، ', $mapping['missing_required']));
         $batch = Database::fetch('SELECT import_mode,metadata_json FROM sales_import_batches WHERE id=? AND source_module="sales_aggregate"', [$batchId]);
         if (!$batch) throw new InvalidArgumentException('Batch پیدا نشد.');
-        $mode = in_array($batch['import_mode'], self::MODES, true) ? $batch['import_mode'] : 'skip_duplicates';
+        $mode = in_array($batch['import_mode'], self::MODES, true) ? $batch['import_mode'] : 'replace_reference';
         $seen = [];
         $counts = ['total_rows'=>0,'valid_rows'=>0,'invalid_rows'=>0,'duplicate_rows'=>0,'ready_rows'=>0];
         foreach ($rows as $offset => $values) {
@@ -188,7 +193,7 @@ class SalesAggregateImportService
             $normalized['_duplicate'] = $duplicate;
             $errors = self::validateRow($normalized, $raw);
             if ($duplicate && $mode === 'fail_on_duplicate') $errors[] = ['code'=>'duplicate','message'=>'این ردیف با داده موجود یا ردیف دیگری در فایل تکراری است.'];
-            $status = $errors ? 'invalid' : (($duplicate && $mode === 'skip_duplicates') ? 'duplicate' : 'valid');
+            $status = $errors ? 'invalid' : (($duplicate && in_array($mode, ['skip_duplicates','append'], true)) ? 'duplicate' : 'valid');
             SalesAggregateRepository::addStagingRow($batchId,$rowNumber,$raw,$normalized,$status,$errors,$sourceKey);
             $counts['total_rows']++;
             if ($duplicate) $counts['duplicate_rows']++;
@@ -208,7 +213,7 @@ class SalesAggregateImportService
         if (!$batch) throw new InvalidArgumentException('Batch پیدا نشد.');
         return [
             'total_rows'=>(int)$batch['total_rows'],'valid_rows'=>(int)$batch['valid_rows'],'invalid_rows'=>(int)$batch['invalid_rows'],
-            'duplicate_rows'=>(int)$batch['duplicate_rows'],'ready_rows'=>max(0,(int)$batch['valid_rows']-($batch['import_mode']==='skip_duplicates'?(int)$batch['duplicate_rows']:0)),
+            'duplicate_rows'=>(int)$batch['duplicate_rows'],'ready_rows'=>max(0,(int)$batch['valid_rows']-(in_array($batch['import_mode'], ['skip_duplicates','append'], true)?(int)$batch['duplicate_rows']:0)),
         ];
     }
 
@@ -237,9 +242,11 @@ class SalesAggregateImportService
                 throw new DomainException('داده تکراری یافت شد؛ ورود نهایی لغو شد.');
             }
             $rows = SalesAggregateRepository::stagingRows($batchId,'valid');
-            if (!$rows && (int)$batch['total_rows'] > 0) throw new DomainException('هیچ ردیف معتبری برای ورود نهایی وجود ندارد.');
+            if (!$rows && (int)$batch['total_rows'] > 0 && !in_array($batch['import_mode'], ['skip_duplicates','append'], true)) {
+                throw new DomainException('هیچ ردیف معتبری برای ورود نهایی وجود ندارد.');
+            }
             $imported = $updated = $skipped = 0;
-            if ($batch['import_mode'] === 'skip_duplicates') {
+            if (in_array($batch['import_mode'], ['skip_duplicates','append'], true)) {
                 $duplicates = SalesAggregateRepository::stagingRows($batchId,'duplicate');
                 foreach ($duplicates as $duplicate) {
                     SalesAggregateRepository::markStaging((int)$duplicate['id'],'skipped');
@@ -248,10 +255,11 @@ class SalesAggregateImportService
             }
             foreach ($rows as $row) {
                 $data = json_decode((string)$row['normalized_json'], true) ?: [];
+                $data['period_key'] = $batch['period_key'] ?? null;
                 $raw = json_decode((string)$row['raw_json'], true) ?: [];
                 $existing = SalesAggregateRepository::finalRowBySourceKey((string)$row['source_unique_key'],true);
                 if ($existing && $batch['import_mode'] === 'fail_on_duplicate') throw new DomainException('داده تکراری یافت شد؛ ورود نهایی لغو شد.');
-                if ($existing && $batch['import_mode'] === 'skip_duplicates') {
+                if ($existing && in_array($batch['import_mode'], ['skip_duplicates','append'], true)) {
                     SalesAggregateRepository::markStaging((int)$row['id'],'skipped'); $skipped++; continue;
                 }
                 if ($existing) {
@@ -262,7 +270,8 @@ class SalesAggregateImportService
                     SalesAggregateRepository::markStaging((int)$row['id'],'committed'); $imported++;
                 }
             }
-            SalesAggregateRepository::finishBatch($batchId,'completed',$imported,$updated,$skipped);
+            SalesAggregateRepository::finishBatch($batchId,'committed',$imported,$updated,$skipped);
+            SalesReferenceRepository::setActiveReferenceBatch($batchId, $actorId);
             $pdo->commit();
             return compact('imported','updated','skipped');
         } catch (Throwable $e) {
@@ -279,7 +288,7 @@ class SalesAggregateImportService
         $pdo->beginTransaction();
         try {
             $batch = SalesAggregateRepository::batchForActor($batchId,$actorId,$isAdmin,true);
-            if (!$batch || in_array($batch['status'],['completed','cancelled'],true)) throw new InvalidArgumentException('Batch قابل لغو نیست.');
+            if (!$batch || in_array($batch['status'],['completed','committed','cancelled'],true)) throw new InvalidArgumentException('Batch قابل لغو نیست.');
             Database::execute('UPDATE staging_sales_data SET validation_status="cancelled" WHERE import_batch_id=? AND source_module="sales_aggregate"',[$batchId]);
             SalesAggregateRepository::finishBatch($batchId,'cancelled',0,0,0);
             $pdo->commit();
@@ -300,6 +309,13 @@ class SalesAggregateImportService
         $normalized['invoice_date_raw'] = SalesDataNormalizer::normalizePersianArabicDigits($normalized['invoice_date_raw'] ?? '');
         $normalized['invoice_date'] = SalesDataNormalizer::normalizeDate($normalized['invoice_date_raw']);
         return $normalized;
+    }
+
+    private static function cleanPeriodKey(?string $periodKey): ?string
+    {
+        $periodKey = SalesDataNormalizer::normalizePersianArabicDigits((string)$periodKey);
+        $periodKey = trim($periodKey);
+        return $periodKey === '' ? null : mb_substr($periodKey, 0, 50);
     }
 
     private static function rawValueForKey(array $raw, string $key): mixed

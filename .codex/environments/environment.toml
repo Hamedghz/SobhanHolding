@@ -1,0 +1,5 @@
+version = 1
+name = "SobhanWebsite"
+
+[setup]
+script = "powershell -NoProfile -ExecutionPolicy Bypass -File .codex/scripts/setup.ps1"
