@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/Database.php';
+require_once __DIR__ . '/../services/FormulaRuntime.php';
 
 class ManagerDashboardCalculator
 {
@@ -50,6 +51,11 @@ class ManagerDashboardCalculator
         $achievement = (float)($data['achievement_percent'] ?? 0);
         $threshold = (float)$rules['line_underperformance_threshold_percent'];
         $penaltyPercent = $achievement < $threshold ? max(0, $threshold - $achievement) : 0;
+        $runtime = FormulaRuntime::evaluateByKey('manager_penalty', $data + [
+            'achievement_percent' => $achievement,
+            'penalty_percent' => $penaltyPercent,
+        ]);
+        if ($runtime !== null) $penaltyPercent = max(0, (float)$runtime['final_result']);
         return ['penalty_percent' => round($penaltyPercent, 2), 'is_underperforming' => $achievement < $threshold];
     }
 
@@ -71,12 +77,22 @@ class ManagerDashboardCalculator
             + (float)($data['total_achievement_bonus'] ?? 0) + (float)($data['coverage_bonus'] ?? 0);
         if ($achievement >= 100) $bonuses += (float)$rules['over_100_bonus_amount'];
         if ($achievement >= 110) $bonuses += (float)$rules['over_110_total_bonus_amount'];
+        $finalCommission = round(max(0, $afterPenalty - $returnLoss + $bonuses), 2);
+        $runtime = FormulaRuntime::evaluateByKey('manager_commission', $data + [
+            'achievement_percent' => $achievement,
+            'sales_amount' => $sales,
+            'commission_after_penalty' => $afterPenalty,
+            'return_loss' => $returnLoss,
+            'bonus_total' => $bonuses,
+            'final_commission' => $finalCommission,
+        ]);
+        if ($runtime !== null) $finalCommission = max(0, (float)$runtime['final_result']);
         return [
             'eligible' => $eligible,
             'achievement_factor_percent' => $achievement,
             'commission_after_penalty' => round($afterPenalty, 2),
             'return_loss' => round($returnLoss, 2),
-            'final_commission' => round(max(0, $afterPenalty - $returnLoss + $bonuses), 2),
+            'final_commission' => round($finalCommission, 2),
         ];
     }
 
@@ -85,10 +101,18 @@ class ManagerDashboardCalculator
         $floor = max(0, (float)($data['customer_floor'] ?? 0), (float)$rules['customer_coverage_floor'], (float)$rules['customer_target_floor']);
         $coverage = max(0, (float)($data['coverage_count'] ?? 0));
         $remaining = self::calculateRemainingToTarget($floor, $coverage);
+        $rewardOrPenalty = $remaining > 0 ? -(float)$rules['customer_coverage_penalty_amount'] : (float)$rules['brand_customer_bonus_amount'];
+        $runtime = FormulaRuntime::evaluateByKey('manager_customer_coverage', $data + [
+            'coverage_count' => $coverage,
+            'target_qty' => $floor,
+            'remaining_to_target' => $remaining,
+            'reward_or_penalty' => $rewardOrPenalty,
+        ]);
+        if ($runtime !== null) $rewardOrPenalty = (float)$runtime['final_result'];
         return [
             'coverage_percent' => self::calculateAchievement($floor, $coverage),
             'remaining_to_target' => $remaining,
-            'reward_or_penalty' => $remaining > 0 ? -(float)$rules['customer_coverage_penalty_amount'] : (float)$rules['brand_customer_bonus_amount'],
+            'reward_or_penalty' => $rewardOrPenalty,
         ];
     }
 
@@ -96,7 +120,14 @@ class ManagerDashboardCalculator
     {
         $percent = self::calculateAchievement((float)($data['target_brand_count'] ?? 0), (float)($data['achieved_brand_count'] ?? 0));
         $eligible = $percent >= (float)$rules['brand_target_min_percent'];
-        return ['achievement_percent' => $percent, 'eligible' => $eligible, 'bonus_amount' => $eligible ? (float)$rules['brand_target_bonus_amount'] : 0];
+        $bonus = $eligible ? (float)$rules['brand_target_bonus_amount'] : 0;
+        $runtime = FormulaRuntime::evaluateByKey('manager_brand_bonus', $data + [
+            'brand_achievement_percent' => $percent,
+            'achievement_percent' => $percent,
+            'bonus_total' => $bonus,
+        ]);
+        if ($runtime !== null) $bonus = max(0, (float)$runtime['final_result']);
+        return ['achievement_percent' => $percent, 'eligible' => $eligible, 'bonus_amount' => $bonus];
     }
 
     public static function validateDashboardRows(array $rows): array

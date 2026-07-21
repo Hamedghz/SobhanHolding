@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/SalesOperationsModule.php';
+require_once __DIR__ . '/../lib/AppDate.php';
 
 class SalesOperationsService
 {
@@ -80,30 +81,72 @@ class SalesOperationsService
 
     public static function supervisorManagerId(int $supervisorId): ?int
     {
-        $row = Database::fetch('SELECT sales_manager_id FROM sales_team_assignments WHERE supervisor_id=? AND active=1 AND sales_manager_id IS NOT NULL ORDER BY id DESC LIMIT 1', [$supervisorId]);
-        if ($row) return (int)$row['sales_manager_id'];
-        $user = Database::fetch('SELECT organization_manager_id,parent_user_id,supervisor_id FROM users WHERE id=?', [$supervisorId]);
-        foreach (['organization_manager_id','parent_user_id','supervisor_id'] as $field) {
+        $user = Database::fetch('SELECT organization_manager_id,parent_user_id,sales_line_id FROM users WHERE id=?', [$supervisorId]);
+        foreach (['organization_manager_id','parent_user_id'] as $field) {
             if (!empty($user[$field])) return (int)$user[$field];
         }
+        if (!empty($user['sales_line_id'])) {
+            $line = Database::fetch('SELECT manager_user_id FROM sales_lines WHERE id=? AND active=1', [(int)$user['sales_line_id']]);
+            if (!empty($line['manager_user_id'])) return (int)$line['manager_user_id'];
+        }
+        $row = Database::fetch('SELECT sales_manager_id FROM sales_team_assignments WHERE supervisor_id=? AND active=1 AND sales_manager_id IS NOT NULL ORDER BY id DESC LIMIT 1', [$supervisorId]);
+        if ($row) return (int)$row['sales_manager_id'];
         return null;
     }
 
     public static function getSupervisorVisitors(int $supervisorId): array
     {
-        $rows = Database::fetchAll('SELECT u.id,u.name,u.sales_line,u.role_key FROM users u WHERE u.status="active" AND (u.supervisor_id=? OR u.parent_user_id=? OR u.id IN (SELECT visitor_id FROM sales_team_assignments WHERE supervisor_id=? AND active=1)) ORDER BY u.display_order,u.name', [$supervisorId,$supervisorId,$supervisorId]);
-        return $rows;
+        $rows = Database::fetchAll(
+            'SELECT u.id,u.name,u.username,u.employee_no,u.kara_system_code,u.sales_line,u.sales_line_id,u.role_key
+             FROM users u
+             LEFT JOIN org_roles r ON r.id=u.org_role_id
+             WHERE u.status="active" AND (r.code="VISITOR" OR u.role_key IN ("VISITOR","visitor","ویزیتور"))
+               AND (u.supervisor_id=? OR u.parent_user_id=?)
+             ORDER BY u.display_order,u.name',
+            [$supervisorId,$supervisorId]
+        );
+        if ($rows) return $rows;
+        return Database::fetchAll(
+            'SELECT u.id,u.name,u.username,u.employee_no,u.kara_system_code,u.sales_line,u.sales_line_id,u.role_key
+             FROM users u
+             WHERE u.status="active"
+               AND u.supervisor_id IS NULL AND u.parent_user_id IS NULL AND u.sales_line_id IS NULL
+               AND u.id IN (SELECT visitor_id FROM sales_team_assignments WHERE supervisor_id=? AND active=1)
+             ORDER BY u.display_order,u.name',
+            [$supervisorId]
+        );
     }
 
     public static function assertVisitorBelongsToSupervisor(int $visitorId, int $supervisorId): bool
     {
         if ($visitorId <= 0) return true;
-        return (bool)Database::fetch('SELECT id FROM users WHERE id=? AND status="active" AND (supervisor_id=? OR parent_user_id=? OR id IN (SELECT visitor_id FROM sales_team_assignments WHERE supervisor_id=? AND active=1)) LIMIT 1', [$visitorId,$supervisorId,$supervisorId,$supervisorId]);
+        $visitor = Database::fetch('SELECT id,supervisor_id,parent_user_id,sales_line_id FROM users WHERE id=? AND status="active"', [$visitorId]);
+        if (!$visitor) return false;
+        if (!empty($visitor['supervisor_id']) || !empty($visitor['parent_user_id']) || !empty($visitor['sales_line_id'])) {
+            return (int)($visitor['supervisor_id'] ?: $visitor['parent_user_id']) === $supervisorId;
+        }
+        return (bool)Database::fetch('SELECT id FROM sales_team_assignments WHERE visitor_id=? AND supervisor_id=? AND active=1 LIMIT 1', [$visitorId,$supervisorId]);
     }
 
     public static function getSalesManagerSupervisorIds(int $managerId): array
     {
-        $rows = Database::fetchAll('SELECT DISTINCT u.id FROM users u WHERE u.status="active" AND (u.organization_manager_id=? OR u.parent_user_id=? OR u.id IN (SELECT supervisor_id FROM sales_team_assignments WHERE sales_manager_id=? AND active=1)) ORDER BY u.id', [$managerId,$managerId,$managerId]);
+        $rows = Database::fetchAll(
+            'SELECT DISTINCT u.id FROM users u
+             LEFT JOIN org_roles r ON r.id=u.org_role_id
+             WHERE u.status="active" AND (r.code="SALES_SUPERVISOR" OR u.role_key IN ("SALES_SUPERVISOR","supervisor","سرپرست فروش"))
+               AND (u.organization_manager_id=? OR u.parent_user_id=?)
+             ORDER BY u.id',
+            [$managerId,$managerId]
+        );
+        if (!$rows) {
+            $rows = Database::fetchAll(
+                'SELECT DISTINCT u.id FROM users u
+                 WHERE u.status="active" AND u.organization_manager_id IS NULL AND u.parent_user_id IS NULL
+                   AND u.id IN (SELECT supervisor_id FROM sales_team_assignments WHERE sales_manager_id=? AND active=1)
+                 ORDER BY u.id',
+                [$managerId]
+            );
+        }
         return array_map('intval', array_column($rows, 'id'));
     }
 
@@ -118,29 +161,117 @@ class SalesOperationsService
 
     public static function dateFilters(array $input): array
     {
-        $from = trim((string)($input['from'] ?? '')) ?: date('Y-m-01');
-        $to = trim((string)($input['to'] ?? '')) ?: date('Y-m-d');
-        if (!self::validDate($from)) $from = date('Y-m-01');
-        if (!self::validDate($to)) $to = date('Y-m-d');
+        $periodKey = trim((string)($input['period_key'] ?? ''));
+        if ($periodKey !== '') {
+            try {
+                $period = AppDate::resolvePeriod(
+                    $periodKey,
+                    (string)($input['from'] ?? $input['date_from'] ?? ''),
+                    (string)($input['to'] ?? $input['date_to'] ?? '')
+                );
+                return [$period['start_date'], $period['end_date']];
+            } catch (InvalidArgumentException) {
+                // Keep compatibility with the existing explicit date filters below.
+            }
+        }
+        $from = AppDate::toGregorian((string)($input['from'] ?? $input['date_from'] ?? '')) ?: date('Y-m-01');
+        $to = AppDate::toGregorian((string)($input['to'] ?? $input['date_to'] ?? '')) ?: date('Y-m-d');
         if ($from > $to) [$from,$to] = [$to,$from];
         return [$from, $to];
     }
 
     public static function validDate(string $date): bool
     {
-        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
-        return $parsed !== false && $parsed->format('Y-m-d') === $date;
+        return AppDate::isValidDate($date);
     }
 
     public static function getSupervisorSalesSummary(int $supervisorId, array $filters = []): array
     {
         [$from,$to] = self::dateFilters($filters);
-        $visitorIds = array_map('intval', array_column(self::getSupervisorVisitors($supervisorId), 'id'));
-        if (!$visitorIds || !Database::tableExists('ceo_dashboard_visitors')) return ['net_sales'=>0,'invoice_count'=>0,'customer_count'=>0,'visitors'=>0,'rows'=>[]];
+        $visitors = self::getSupervisorVisitors($supervisorId);
+        $visitorIds = array_map('intval', array_column($visitors, 'id'));
+        if (!$visitorIds) return ['net_sales'=>0,'invoice_count'=>0,'customer_count'=>0,'visitors'=>0,'rows'=>[],'data_source'=>'none'];
+
+        if (Database::tableExists('vw_active_sales_aggregate_rows')) {
+            $codes = array_values(array_unique(array_filter(array_map(
+                static fn(array $visitor): string => trim((string)($visitor['employee_no'] ?? '')),
+                $visitors
+            ))));
+            $names = array_values(array_unique(array_filter(array_map(
+                static fn(array $visitor): string => trim((string)($visitor['employee_no'] ?? '')) === ''
+                    ? trim((string)($visitor['name'] ?? ''))
+                    : '',
+                $visitors
+            ))));
+            $identityParts = [];
+            $params = [$from, $to];
+            if ($codes) {
+                $identityParts[] = 'visitor_code IN (' . implode(',', array_fill(0, count($codes), '?')) . ')';
+                array_push($params, ...$codes);
+            }
+            if ($names) {
+                $identityParts[] = '((visitor_code IS NULL OR visitor_code="") AND visitor_name IN (' . implode(',', array_fill(0, count($names), '?')) . '))';
+                array_push($params, ...$names);
+            }
+            if ($identityParts) {
+                try {
+                    $rows = Database::fetchAll(
+                        'SELECT visitor_code,visitor_name,line_code,
+                                COUNT(DISTINCT invoice_number) invoice_count,
+                                COUNT(DISTINCT customer_code) customer_count,
+                                COALESCE(SUM(net_amount),0) net_sales,
+                                COALESCE(SUM(total_qty),0) qty
+                         FROM vw_active_sales_aggregate_rows
+                         WHERE invoice_date BETWEEN ? AND ?
+                           AND (' . implode(' OR ', $identityParts) . ')
+                         GROUP BY visitor_code,visitor_name,line_code
+                         ORDER BY net_sales DESC',
+                        $params
+                    );
+                    $totals = Database::fetch(
+                        'SELECT COUNT(DISTINCT invoice_number) invoice_count,
+                                COUNT(DISTINCT customer_code) customer_count,
+                                COALESCE(SUM(net_amount),0) net_sales
+                         FROM vw_active_sales_aggregate_rows
+                         WHERE invoice_date BETWEEN ? AND ?
+                           AND (' . implode(' OR ', $identityParts) . ')',
+                        $params
+                    ) ?: [];
+                    $byCode = [];
+                    $byName = [];
+                    foreach ($visitors as $visitor) {
+                        if (trim((string)($visitor['employee_no'] ?? '')) !== '') {
+                            $byCode[(string)$visitor['employee_no']] = (int)$visitor['id'];
+                        } elseif (trim((string)($visitor['name'] ?? '')) !== '') {
+                            $byName[(string)$visitor['name']] = (int)$visitor['id'];
+                        }
+                    }
+                    foreach ($rows as &$row) {
+                        $row['user_id'] = $byCode[(string)($row['visitor_code'] ?? '')] ?? $byName[(string)($row['visitor_name'] ?? '')] ?? null;
+                        $row['achievement_percent'] = null;
+                    }
+                    unset($row);
+                    return [
+                        'net_sales' => (float)($totals['net_sales'] ?? 0),
+                        'invoice_count' => (int)($totals['invoice_count'] ?? 0),
+                        'customer_count' => (int)($totals['customer_count'] ?? 0),
+                        'visitors' => count($visitorIds),
+                        'rows' => $rows,
+                        'data_source' => 'active_sales_reference_view',
+                    ];
+                } catch (Throwable $e) {
+                    error_log('Supervisor active sales view: ' . $e->getMessage());
+                }
+            }
+        }
+
+        if (!Database::tableExists('ceo_dashboard_visitors')) {
+            return ['net_sales'=>0,'invoice_count'=>0,'customer_count'=>0,'visitors'=>count($visitorIds),'rows'=>[],'data_source'=>'none'];
+        }
         $placeholders = implode(',', array_fill(0, count($visitorIds), '?'));
         $params = array_merge([$from,$to], $visitorIds);
         $rows = Database::fetchAll("SELECT user_id,visitor_name,line_code,SUM(sales_amount) net_sales,SUM(qty) qty,AVG(CASE WHEN target_amount>0 THEN sales_amount/target_amount*100 ELSE 0 END) achievement_percent FROM ceo_dashboard_visitors WHERE report_date BETWEEN ? AND ? AND user_id IN ({$placeholders}) GROUP BY user_id,visitor_name,line_code ORDER BY net_sales DESC", $params);
-        return ['net_sales'=>array_sum(array_map(fn($r)=>(float)($r['net_sales'] ?? 0), $rows)), 'invoice_count'=>0, 'customer_count'=>0, 'visitors'=>count($visitorIds), 'rows'=>$rows];
+        return ['net_sales'=>array_sum(array_map(fn($r)=>(float)($r['net_sales'] ?? 0), $rows)), 'invoice_count'=>0, 'customer_count'=>0, 'visitors'=>count($visitorIds), 'rows'=>$rows, 'data_source'=>'legacy_ceo_dashboard_visitors'];
     }
 
     public static function getSalesManagerSupervisorSummary(int $managerId, array $filters = []): array
@@ -182,10 +313,17 @@ class SalesOperationsService
         $visitorId = (int)($data['visitor_id'] ?? 0);
         if ($visitorId && !self::assertVisitorBelongsToSupervisor($visitorId, $supervisorId)) throw new InvalidArgumentException('ویزیتور انتخاب‌شده در زیرمجموعه این سرپرست نیست.');
         $managerId = self::supervisorManagerId($supervisorId);
-        Database::execute('INSERT INTO supervisor_actions(supervisor_id,sales_manager_id,sales_line,section_id,visitor_id,customer_id,title,description,action_type,priority,status,due_date,dynamic_values_json,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())', [$supervisorId,$managerId,$data['sales_line'] ?? null,(int)($data['section_id'] ?? 0) ?: null,$visitorId ?: null,(int)($data['customer_id'] ?? 0) ?: null,trim((string)$data['title']),trim((string)($data['description'] ?? '')),trim((string)($data['action_type'] ?? '')),self::validPriority($data['priority'] ?? 'normal'),self::validSupervisorStatus($data['status'] ?? 'open'),trim((string)($data['due_date'] ?? '')) ?: null,json_encode($data['dynamic_values'] ?? [], JSON_UNESCAPED_UNICODE),(int)$user['id'],(int)$user['id']]);
+        $dueDate = self::nullableDate($data['due_date'] ?? null);
+        Database::execute('INSERT INTO supervisor_actions(supervisor_id,sales_manager_id,sales_line,section_id,visitor_id,customer_id,title,description,action_type,priority,status,due_date,dynamic_values_json,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())', [$supervisorId,$managerId,$data['sales_line'] ?? null,(int)($data['section_id'] ?? 0) ?: null,$visitorId ?: null,(int)($data['customer_id'] ?? 0) ?: null,trim((string)$data['title']),trim((string)($data['description'] ?? '')),trim((string)($data['action_type'] ?? '')),self::validPriority($data['priority'] ?? 'normal'),self::validSupervisorStatus($data['status'] ?? 'open'),$dueDate,json_encode($data['dynamic_values'] ?? [], JSON_UNESCAPED_UNICODE),(int)$user['id'],(int)$user['id']]);
         $id = (int)Database::connection()->lastInsertId();
         self::logSupervisorAction($id, 'create', null, $data);
         if (!empty($data['add_to_planner'])) self::syncSupervisorActionToPlanner($id);
+        try {
+            require_once __DIR__ . '/ActionHubService.php';
+            ActionHubService::mirrorLegacyAction('supervisor_actions', $id);
+        } catch (Throwable $e) {
+            error_log('Action hub supervisor mirror: ' . $e->getMessage());
+        }
         return $id;
     }
 
@@ -202,9 +340,16 @@ class SalesOperationsService
             if (!$supervisorId && !self::canAccessSalesUser($visitorId, $managerId, $user)) throw new InvalidArgumentException('ویزیتور انتخاب‌شده خارج از تیم شماست.');
         }
         if (!self::canAccessSalesUser($assignedTo, $managerId, $user)) throw new InvalidArgumentException('مسئول انتخاب‌شده خارج از دامنه تیم فروش است.');
-        Database::execute('INSERT INTO sales_actions(source_type,source_id,sales_manager_id,supervisor_id,visitor_id,customer_id,brand_id,product_id,sales_line,assigned_to,title,description,priority,status,due_date,dynamic_values_json,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())', [$data['source_type'] ?? null,(int)($data['source_id'] ?? 0) ?: null,$managerId,(int)($data['supervisor_id'] ?? 0) ?: null,(int)($data['visitor_id'] ?? 0) ?: null,(int)($data['customer_id'] ?? 0) ?: null,(int)($data['brand_id'] ?? 0) ?: null,(int)($data['product_id'] ?? 0) ?: null,$data['sales_line'] ?? null,(int)($data['assigned_to'] ?? 0) ?: $managerId,trim((string)$data['title']),trim((string)($data['description'] ?? '')),self::validPriority($data['priority'] ?? 'normal'),self::validActionStatus($data['status'] ?? 'open'),trim((string)($data['due_date'] ?? '')) ?: null,json_encode($data['dynamic_values'] ?? [], JSON_UNESCAPED_UNICODE),(int)$user['id'],(int)$user['id']]);
+        $dueDate = self::nullableDate($data['due_date'] ?? null);
+        Database::execute('INSERT INTO sales_actions(source_type,source_id,sales_manager_id,supervisor_id,visitor_id,customer_id,brand_id,product_id,sales_line,assigned_to,title,description,priority,status,due_date,dynamic_values_json,created_by,updated_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())', [$data['source_type'] ?? null,(int)($data['source_id'] ?? 0) ?: null,$managerId,(int)($data['supervisor_id'] ?? 0) ?: null,(int)($data['visitor_id'] ?? 0) ?: null,(int)($data['customer_id'] ?? 0) ?: null,(int)($data['brand_id'] ?? 0) ?: null,(int)($data['product_id'] ?? 0) ?: null,$data['sales_line'] ?? null,(int)($data['assigned_to'] ?? 0) ?: $managerId,trim((string)$data['title']),trim((string)($data['description'] ?? '')),self::validPriority($data['priority'] ?? 'normal'),self::validActionStatus($data['status'] ?? 'open'),$dueDate,json_encode($data['dynamic_values'] ?? [], JSON_UNESCAPED_UNICODE),(int)$user['id'],(int)$user['id']]);
         $id = (int)Database::connection()->lastInsertId();
         if (!empty($data['add_to_planner'])) self::syncSalesActionToPlanner($id);
+        try {
+            require_once __DIR__ . '/ActionHubService.php';
+            ActionHubService::mirrorLegacyAction('sales_actions', $id);
+        } catch (Throwable $e) {
+            error_log('Action hub sales mirror: ' . $e->getMessage());
+        }
         return $id;
     }
 
@@ -282,6 +427,15 @@ class SalesOperationsService
     public static function validSupervisorStatus(string $status): string
     {
         return in_array($status, ['draft','open','in_progress','done','cancelled','needs_manager_review'], true) ? $status : 'open';
+    }
+
+    private static function nullableDate(mixed $value): ?string
+    {
+        $value = trim((string)$value);
+        if ($value === '') return null;
+        $date = AppDate::toGregorian($value);
+        if ($date === null) throw new InvalidArgumentException('تاریخ مهلت معتبر نیست.');
+        return $date;
     }
 
     public static function statusLabel(string $status): string

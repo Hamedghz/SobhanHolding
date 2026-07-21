@@ -4,24 +4,54 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/ManagerDashboard.php';
 require_once __DIR__ . '/../lib/OrgAccess.php';
+require_once __DIR__ . '/../lib/DashboardPreferences.php';
+require_once __DIR__ . '/../services/CanonicalSalesDashboardService.php';
 
 Auth::requirePermission('manager_dashboard.view');
 $pageTitle = ManagerDashboard::setting('dashboard_title');
-$aiDashboardEnabled=setting('sobhan_api_enabled','0')==='1'&&setting('sobhan_ai_autofill_enabled','0')==='1';$dashboardCache=Database::fetch('SELECT source,updated_at FROM dashboard_data_cache WHERE dashboard_key="manager_dashboard" AND scope_key="all" LIMIT 1');$dashboardSource=$aiDashboardEnabled?($dashboardCache['source']??'Windows Server API - در انتظار بروزرسانی'):'دستی / دیتابیس';
+$aiDashboardEnabled=setting('sobhan_api_enabled','0')==='1'&&setting('sobhan_ai_autofill_enabled','0')==='1';$dashboardCache=Database::fetch('SELECT source,updated_at FROM dashboard_data_cache WHERE dashboard_key="manager_dashboard" AND scope_key="all" LIMIT 1');$dashboardSource=$aiDashboardEnabled?($dashboardCache['source']??'Windows Server API - در انتظار بروزرسانی'):'گزارش ایمپورت‌شده / دیتابیس';
 $definitions = ManagerDashboard::definitions();
 $requestedReportId = (int)($_GET['report_id'] ?? 0);
-if ($requestedReportId) $report = ManagerDashboard::latestReport($requestedReportId);
+$canonicalSnapshot = $requestedReportId > 0
+    ? ['has_data' => false]
+    : CanonicalSalesDashboardService::managerSnapshot(Auth::user() ?: []);
+$canonicalMode = (bool)($canonicalSnapshot['has_data'] ?? false);
+if ($canonicalMode) {
+    $report = [
+        'id' => 0,
+        'report_title' => 'داده فعال فروش و تارگت — ' . ($canonicalSnapshot['period_title'] ?: $canonicalSnapshot['period_key']),
+        'report_date' => $canonicalSnapshot['report_date'] ?: date('Y-m-d'),
+        'import_status' => 'success',
+    ];
+    $dashboardSource = 'Batch فعال → Viewهای گزارش → فرمول‌های منتشرشده';
+} elseif ($requestedReportId) $report = ManagerDashboard::latestReport($requestedReportId);
 elseif (ManagerDashboard::setting('show_latest_report_by_default') === '1' || ManagerDashboard::setting('default_report_mode') === 'latest_report') $report = Database::fetch("SELECT * FROM manager_dashboard_reports WHERE import_status='success' ORDER BY report_date DESC,id DESC LIMIT 1");
 else $report = ManagerDashboard::latestReport((int)ManagerDashboard::setting('default_report_id') ?: null);
 $reportId = (int)($report['id'] ?? 0);
 $errors = [];
+$legacyManualMode = isset($_GET['legacy']) && Auth::isSuperAdmin();
+$useCanonicalImport = $canonicalMode || (!$report && $requestedReportId === 0);
+$canCanonicalImport = Auth::isAdmin()
+    || Auth::can('import_center.upload')
+    || Auth::can('sales_reference_upload')
+    || Auth::can('sales_data_import');
+$canDashboardImport = $useCanonicalImport ? $canCanonicalImport : Auth::can('manager_dashboard.import');
+$dashboardImportUrl = $useCanonicalImport
+    ? '/admin/import-center.php?source=sales_aggregate'
+    : '/admin/manager-dashboard-import.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Auth::verifyCsrf($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('درخواست نامعتبر است.'); }
     $action = $_POST['action'] ?? '';
     $widget = $_POST['widget'] ?? '';
     $def = $definitions[$widget] ?? null;
-    if (in_array($action, ['save','delete'], true)) Auth::requirePermission('manager_dashboard.edit');
+    if (in_array($action, ['save','delete'], true)) {
+        Auth::requirePermission('manager_dashboard.edit');
+        if (!$legacyManualMode) {
+            http_response_code(403);
+            exit('ورود دستی قدیمی غیرفعال است؛ از مسیر ورود اطلاعات استفاده کنید.');
+        }
+    }
     if ($action === 'delete' && $def) {
         Database::execute("DELETE FROM `{$def['table']}` WHERE id=? AND report_id=?", [(int)$_POST['id'],$reportId]);
         flash('success','ردیف حذف شد.'); redirect('/admin/manager-dashboard.php?report_id='.$reportId.'#widget-'.$widget);
@@ -68,12 +98,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $reports = Database::fetchAll("SELECT * FROM manager_dashboard_reports WHERE import_status='success' ORDER BY report_date DESC,id DESC");
 $widgets = Database::fetchAll('SELECT * FROM manager_dashboard_widget_settings WHERE is_enabled=1 AND show_in_dashboard=1 ORDER BY sort_order,id');
+$dashboardPreferences = DashboardPreferences::forScope('sales_manager', 0, (int)(Auth::user()['id'] ?? 0));
+$widgets = DashboardPreferences::sortRows($widgets, $dashboardPreferences);
 $aiSettings = ManagerDashboard::aiSettings();
-$commission = $reportId ? Database::fetchAll('SELECT * FROM manager_commission_summary WHERE report_id=?',[$reportId]) : [];
-$lines = $reportId ? Database::fetchAll('SELECT * FROM manager_line_performance WHERE report_id=?',[$reportId]) : [];
-$coverage = $reportId ? Database::fetchAll('SELECT * FROM manager_customer_coverage WHERE report_id=?',[$reportId]) : [];
-$brands = $reportId ? Database::fetchAll('SELECT * FROM manager_brand_target_achievement WHERE report_id=?',[$reportId]) : [];
-if (!Auth::isAdmin()) {
+$commission = $canonicalMode ? ($canonicalSnapshot['commission'] ?? []) : ($reportId ? Database::fetchAll('SELECT * FROM manager_commission_summary WHERE report_id=?',[$reportId]) : []);
+$lines = $canonicalMode ? ($canonicalSnapshot['lines'] ?? []) : ($reportId ? Database::fetchAll('SELECT * FROM manager_line_performance WHERE report_id=?',[$reportId]) : []);
+$coverage = $canonicalMode ? ($canonicalSnapshot['coverage'] ?? []) : ($reportId ? Database::fetchAll('SELECT * FROM manager_customer_coverage WHERE report_id=?',[$reportId]) : []);
+$brands = $canonicalMode ? ($canonicalSnapshot['brands'] ?? []) : ($reportId ? Database::fetchAll('SELECT * FROM manager_brand_target_achievement WHERE report_id=?',[$reportId]) : []);
+if (!$canonicalMode && !Auth::isAdmin()) {
     $orgIds = OrgAccess::accessibleUserIds(Auth::user());
     $orgNames = $orgIds ? array_column(Database::fetchAll('SELECT name FROM users WHERE id IN ('.implode(',',array_fill(0,count($orgIds),'?')).')', $orgIds), 'name') : [];
     $nameAllowed = static fn(array $row): bool => in_array(trim((string)($row['visitor_name'] ?? $row['person_name'] ?? '')), $orgNames, true);
@@ -125,40 +157,68 @@ function md_input(array $field,$value=''): string {
 }
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
-<div class="dashboard-source-bar"><span>منبع بروزرسانی: <strong><?=e($dashboardSource)?></strong></span><span>آخرین بروزرسانی: <?=e($dashboardCache['updated_at']??'ثبت نشده')?></span><?php if(Auth::isAdmin()||Auth::can('ai_updates')):?><form data-dashboard-refresh><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="dashboard_key" value="manager_dashboard"><button class="btn btn-small">بروزرسانی داشبورد</button></form><?php endif?></div>
+<div class="dashboard-source-bar"><span>منبع بروزرسانی: <strong><?=e($dashboardSource)?></strong></span><span>آخرین بروزرسانی: <?=e($dashboardCache['updated_at']??'ثبت نشده')?></span><?php if(DashboardPreferences::canManage('sales_manager',Auth::user())):?><a class="btn btn-small" href="/admin/dashboard-settings.php?scope=sales_manager">تنظیم نمایش</a><?php endif?><?php if(Auth::isAdmin()||Auth::can('ai_updates')):?><form data-dashboard-refresh><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="dashboard_key" value="manager_dashboard"><button class="btn btn-small">بروزرسانی داشبورد</button></form><?php endif?></div>
 <div class="manager-hero">
  <div><span>پنل مستقل مدیران فروش</span><h1><?= e($pageTitle) ?></h1><p><?= $report ? e($report['report_title']).' · '.e(md_date_label($report['report_date'])) : 'برای شروع یک فایل گزارش وارد کنید.' ?></p></div>
- <form method="get"><label>دوره گزارش<select name="report_id" onchange="this.form.submit()"><option value="">آخرین گزارش</option><?php foreach($reports as $r):?><option value="<?=$r['id']?>" <?=$reportId===$r['id']?'selected':''?>><?=e($r['report_title'].' - '.md_date_label($r['report_date']))?></option><?php endforeach?></select></label></form>
+ <form method="get"><label>دوره گزارش<select name="report_id" onchange="this.form.submit()"><option value="" <?=$canonicalMode?'selected':''?>>داده فعال Import / View</option><?php foreach($reports as $r):?><option value="<?=$r['id']?>" <?=!$canonicalMode&&$reportId===$r['id']?'selected':''?>><?=e($r['report_title'].' - '.md_date_label($r['report_date']))?></option><?php endforeach?></select></label></form>
 </div>
 <?php foreach($errors as $error):?><div class="alert alert-error"><?=e(is_array($error)?implode(' ',$error):$error)?></div><?php endforeach?>
-<?php if(!$report):?><div class="card manager-empty"><h2>هنوز گزارشی وجود ندارد</h2><p>قالب اکسل را دریافت کنید، اعداد را وارد کنید و فایل را بارگذاری کنید.</p><?php if(Auth::can('manager_dashboard.import')):?><a class="btn" href="/admin/manager-dashboard-import.php">ورودی اکسل</a><?php endif?></div><?php else:?>
-<div class="manager-kpis"><?php foreach($kpis as $label=>$value):?><article><span><?=e($label)?></span><strong><?=e((string)$value)?></strong></article><?php endforeach?></div>
-<div class="manager-chart-grid">
- <?php foreach([['تحقق ویزیتورها','visitorAchievementChart'],['پورسانت نهایی ویزیتورها','visitorCommissionChart'],['تحقق لاین‌ها','lineAchievementChart'],['پوشش مشتری','coverageChart'],['تحقق برندها','brandChart'],['ضرایب کاهنده','penaltyChart']] as [$title,$id]):?><article class="card"><h2><?=e($title)?></h2><canvas id="<?=$id?>"></canvas></article><?php endforeach?>
-</div>
+<?php if($canonicalMode):?><div class="alert alert-success">این نما مستقیماً از Batch فعال، Viewهای دارای دامنه دسترسی و فرمول‌های منتشرشده محاسبه شده است. گزارش‌های اکسل قدیمی از فهرست دوره‌ها همچنان قابل مشاهده‌اند.</div><?php endif?>
+<?php if(!$report):?><div class="card manager-empty"><h2>هنوز گزارشی وجود ندارد</h2><p>ابتدا داده معتبر را از مسیر ورود اطلاعات فعال کنید؛ تنظیمات داشبورد جای ورود عدد کسب‌وکار نیست.</p><?php if($canDashboardImport):?><a class="btn" href="<?=e($dashboardImportUrl)?>"><?= $useCanonicalImport ? 'ورود اطلاعات فروش' : 'ورودی اکسل قدیمی' ?></a><?php endif?></div><?php else:?>
+<?php
+$managerWidgetContent = [];
+if (DashboardPreferences::isVisible($dashboardPreferences, 'summary_kpis')) {
+    ob_start();
+    ?><div class="manager-kpis"><?php foreach($kpis as $label=>$value):?><article><span><?=e($label)?></span><strong><?=e((string)$value)?></strong></article><?php endforeach?></div><?php
+    $managerWidgetContent['summary_kpis'] = (string)ob_get_clean();
+}
+$chartWidgets=[['visitor_achievement_chart','تحقق ویزیتورها','visitorAchievementChart'],['visitor_commission_chart','پورسانت نهایی ویزیتورها','visitorCommissionChart'],['line_achievement_chart','تحقق لاین‌ها','lineAchievementChart'],['customer_coverage','پوشش مشتری','coverageChart'],['brand_target','تحقق برندها','brandChart'],['visitor_penalty','ضرایب کاهنده','penaltyChart']];
+foreach ($chartWidgets as [$preferenceKey,$title,$id]) {
+    if (!DashboardPreferences::isVisible($dashboardPreferences, $preferenceKey)) continue;
+    ob_start();
+    ?><article class="card"><h2><?=e(DashboardPreferences::title($dashboardPreferences,$preferenceKey,$title))?></h2><canvas id="<?=e($id)?>"></canvas></article><?php
+    $managerWidgetContent[$preferenceKey] = (string)ob_get_clean();
+}
+echo DashboardPreferences::render($dashboardPreferences, $managerWidgetContent);
+?>
 <nav class="manager-tabs"><?php foreach($widgets as $w):?><a href="#widget-<?=e($w['widget_key'])?>"><?=e($w['widget_title_fa'])?></a><?php endforeach?></nav>
 <?php foreach($widgets as $setting): $key=$setting['widget_key']; if($key==='ai_insights'||!isset($definitions[$key]))continue;$def=$definitions[$key];
  $search=trim($_GET['search']??'');$line=trim($_GET['line_code']??'');$visitor=trim($_GET['visitor']??'');$supervisor=trim($_GET['supervisor']??'');
- $where=['report_id=?'];$params=[$reportId];
- $cols=array_column($def['fields'],0);if($search){$like=[];foreach($cols as $c)$like[]="CAST(`$c` AS CHAR) LIKE ?"; $where[]='('.implode(' OR ',$like).')';$params=array_merge($params,array_fill(0,count($cols),'%'.$search.'%'));}
- foreach(['line_code'=>$line,'line_group'=>$line,'visitor_name'=>$visitor,'supervisor_name'=>$supervisor] as $c=>$v)if($v&&in_array($c,$cols,true)){$where[]="`$c`=?";$params[]=$v;}
- $page=max(1,(int)(($_GET['widget']??'')===$key?($_GET['page']??1):1));$per=25;$total=(int)(Database::fetch("SELECT COUNT(*) c FROM `{$def['table']}` WHERE ".implode(' AND ',$where),$params)['c']??0);$offset=($page-1)*$per;
- $order=in_array($key,['team_target_achievement','over_achievement_bonus'],true)?"FIELD(entity_type,'visitor','supervisor','manager'),id DESC":'id DESC';
- $rows=Database::fetchAll("SELECT * FROM `{$def['table']}` WHERE ".implode(' AND ',$where)." ORDER BY {$order} LIMIT {$per} OFFSET {$offset}",$params);
+ $cols=array_column($def['fields'],0);
+ $page=max(1,(int)(($_GET['widget']??'')===$key?($_GET['page']??1):1));$per=25;$offset=($page-1)*$per;
+ if($canonicalMode){
+  $rows=array_values($canonicalSnapshot['widgets'][$key]??[]);
+  $rows=array_values(array_filter($rows,static function(array $row)use($search,$line,$visitor,$supervisor,$cols):bool{
+   if($line&&in_array('line_code',$cols,true)&&(string)($row['line_code']??'')!==$line)return false;
+   if($line&&in_array('line_group',$cols,true)&&(string)($row['line_group']??'')!==$line)return false;
+   if($visitor&&in_array('visitor_name',$cols,true)&&(string)($row['visitor_name']??'')!==$visitor)return false;
+   if($supervisor&&in_array('supervisor_name',$cols,true)&&(string)($row['supervisor_name']??'')!==$supervisor)return false;
+   if($search!==''){foreach($cols as $column)if(str_contains((string)($row[$column]??''),$search))return true;return false;}
+   return true;
+  }));
+  $total=count($rows);$rows=array_slice($rows,$offset,$per);
+ }else{
+  $where=['report_id=?'];$params=[$reportId];
+  if($search){$like=[];foreach($cols as $c)$like[]="CAST(`$c` AS CHAR) LIKE ?"; $where[]='('.implode(' OR ',$like).')';$params=array_merge($params,array_fill(0,count($cols),'%'.$search.'%'));}
+  foreach(['line_code'=>$line,'line_group'=>$line,'visitor_name'=>$visitor,'supervisor_name'=>$supervisor] as $c=>$v)if($v&&in_array($c,$cols,true)){$where[]="`$c`=?";$params[]=$v;}
+  $total=(int)(Database::fetch("SELECT COUNT(*) c FROM `{$def['table']}` WHERE ".implode(' AND ',$where),$params)['c']??0);
+  $order=in_array($key,['team_target_achievement','over_achievement_bonus'],true)?"FIELD(entity_type,'visitor','supervisor','manager'),id DESC":'id DESC';
+  $rows=Database::fetchAll("SELECT * FROM `{$def['table']}` WHERE ".implode(' AND ',$where)." ORDER BY {$order} LIMIT {$per} OFFSET {$offset}",$params);
+ }
  $imageUrl='/admin/manager-dashboard-image-export.php?'.http_build_query(['widget_key'=>$key,'report_id'=>$reportId,'format'=>ManagerDashboard::setting('image_export_format'),'search'=>$search,'line_code'=>$line,'visitor'=>$visitor,'supervisor'=>$supervisor,'page'=>$page]);?>
 <section class="card manager-widget" id="widget-<?=e($key)?>">
- <header><div><h2><?=e($setting['widget_title_fa'])?></h2><?php if($setting['widget_description_fa']):?><p><?=e($setting['widget_description_fa'])?></p><?php endif?></div><div class="actions"><?php if(Auth::can('manager_dashboard.export')&&(int)$setting['allow_export']):?><a class="btn btn-light" href="/admin/manager-dashboard-export.php?report_id=<?=$reportId?>&widget=<?=e($key)?>">خروجی اکسل</a><?php endif?><?php if(Auth::can('manager_dashboard.image_export')&&ManagerDashboard::setting('image_export_enabled')==='1'&&(int)($setting['allow_image_export']??0)):?><a class="btn btn-light" target="_blank" href="<?=e($imageUrl)?>">خروجی تصویری</a><a class="btn btn-light" target="_blank" href="<?=e($imageUrl.'&print=1')?>">چاپ</a><?php endif?><a class="btn btn-light" href="<?=e($_SERVER['REQUEST_URI'])?>#widget-<?=e($key)?>">بروزرسانی</a><?php if(Auth::can('manager_dashboard.import')&&(int)$setting['allow_import']):?><a class="btn btn-light" href="/admin/manager-dashboard-import.php?widget=<?=e($key)?>">ورودی جدول</a><?php endif?><?php if(Auth::can('manager_dashboard.edit')&&(int)$setting['allow_manual_edit']):?><button class="btn" type="button" onclick="document.getElementById('add-<?=e($key)?>').showModal()">افزودن ردیف</button><?php endif?></div></header>
+ <header><div><h2><?=e(DashboardPreferences::title($dashboardPreferences,$key,$setting['widget_title_fa']))?></h2><?php if($setting['widget_description_fa']):?><p><?=e($setting['widget_description_fa'])?></p><?php endif?></div><div class="actions"><?php if(!$canonicalMode&&Auth::can('manager_dashboard.export')&&(int)$setting['allow_export']):?><a class="btn btn-light" href="/admin/manager-dashboard-export.php?report_id=<?=$reportId?>&widget=<?=e($key)?>">خروجی اکسل</a><?php endif?><?php if(!$canonicalMode&&Auth::can('manager_dashboard.image_export')&&ManagerDashboard::setting('image_export_enabled')==='1'&&(int)($setting['allow_image_export']??0)):?><a class="btn btn-light" target="_blank" href="<?=e($imageUrl)?>">خروجی تصویری</a><a class="btn btn-light" target="_blank" href="<?=e($imageUrl.'&print=1')?>">چاپ</a><?php endif?><a class="btn btn-light" href="<?=e($_SERVER['REQUEST_URI'])?>#widget-<?=e($key)?>">بروزرسانی</a><?php if($canDashboardImport&&(int)$setting['allow_import']):?><a class="btn btn-light" href="<?=e($dashboardImportUrl)?>"><?= $useCanonicalImport ? 'ورود اطلاعات' : 'ورودی جدول قدیمی' ?></a><?php endif?><?php if($legacyManualMode&&Auth::can('manager_dashboard.edit')&&(int)($setting['allow_manual_edit']??0)):?><button class="btn" type="button" onclick="document.getElementById('add-<?=e($key)?>').showModal()">افزودن ردیف قدیمی</button><?php endif?></div></header>
  <form class="manager-filter" method="get"><input type="hidden" name="report_id" value="<?=$reportId?>"><input type="hidden" name="widget" value="<?=e($key)?>"><input name="search" placeholder="جستجو..." value="<?=e($search)?>"><select name="line_code"><option value="">همه لاین‌ها</option><?php foreach(['A','B','C','D','A-B','C-D'] as $v):?><option <?=$line===$v?'selected':''?>><?=$v?></option><?php endforeach?></select><input name="visitor" placeholder="ویزیتور" value="<?=e($visitor)?>"><input name="supervisor" placeholder="سرپرست" value="<?=e($supervisor)?>"><button class="btn btn-light">اعمال فیلتر</button></form>
- <div class="table-wrap"><table><thead><tr><?php foreach($def['fields'] as $f):?><th><?=e($f[1])?></th><?php endforeach?><th>عملیات</th></tr></thead><tbody><?php foreach($rows as $row):?><tr><?php foreach($def['fields'] as [$field,,$type]): $class=$type==='percent'?' achievement-'.((float)$row[$field]>=100?'good':((float)$row[$field]>=75?'warn':'bad')):'';?><td><span class="<?=$class?>"><?=e(md_value($row[$field],$type))?></span></td><?php endforeach?><td class="row-actions"><?php if(Auth::can('manager_dashboard.edit')&&(int)$setting['allow_manual_edit']):?><button class="link-btn" type="button" onclick="document.getElementById('edit-<?=$key?>-<?=$row['id']?>').showModal()">ویرایش</button><form method="post" onsubmit="return confirm('ردیف حذف شود؟')"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="widget" value="<?=e($key)?>"><input type="hidden" name="id" value="<?=$row['id']?>"><button class="link-btn danger">حذف</button></form><?php endif?></td></tr>
- <dialog class="manager-dialog" id="edit-<?=$key?>-<?=$row['id']?>"><form method="post"><header><h3>ویرایش ردیف</h3><button type="button" onclick="this.closest('dialog').close()">×</button></header><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="save"><input type="hidden" name="widget" value="<?=e($key)?>"><input type="hidden" name="id" value="<?=$row['id']?>"><div class="manager-form-grid"><?php foreach($def['fields'] as $f):?><label><span><?=e($f[1])?></span><?=md_input($f,$row[$f[0]])?></label><?php endforeach?></div><footer><button class="btn">ذخیره</button><button class="btn btn-light" type="button" onclick="this.closest('dialog').close()">انصراف</button></footer></form></dialog>
- <?php endforeach?><?php if(!$rows):?><tr><td colspan="<?=count($def['fields'])+1?>">داده‌ای برای این گزارش ثبت نشده است.</td></tr><?php endif?></tbody></table></div>
+ <div class="table-wrap"><table><thead><tr><?php foreach($def['fields'] as $f):?><th><?=e($f[1])?></th><?php endforeach?><?php if($legacyManualMode):?><th>عملیات قدیمی</th><?php endif?></tr></thead><tbody><?php foreach($rows as $row):?><tr><?php foreach($def['fields'] as [$field,,$type]): $class=$type==='percent'?' achievement-'.((float)$row[$field]>=100?'good':((float)$row[$field]>=75?'warn':'bad')):'';?><td><span class="<?=$class?>"><?=e(md_value($row[$field],$type))?></span></td><?php endforeach?><?php if($legacyManualMode):?><td class="row-actions"><?php if(Auth::can('manager_dashboard.edit')&&(int)$setting['allow_manual_edit']):?><button class="link-btn" type="button" onclick="document.getElementById('edit-<?=$key?>-<?=$row['id']?>').showModal()">ویرایش</button><form method="post" onsubmit="return confirm('ردیف حذف شود؟')"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="widget" value="<?=e($key)?>"><input type="hidden" name="id" value="<?=$row['id']?>"><button class="link-btn danger">حذف</button></form><?php endif?></td><?php endif?></tr>
+ <?php if($legacyManualMode):?><dialog class="manager-dialog" id="edit-<?=$key?>-<?=$row['id']?>"><form method="post"><header><h3>ویرایش ردیف</h3><button type="button" onclick="this.closest('dialog').close()">×</button></header><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="save"><input type="hidden" name="widget" value="<?=e($key)?>"><input type="hidden" name="id" value="<?=$row['id']?>"><div class="manager-form-grid"><?php foreach($def['fields'] as $f):?><label><span><?=e($f[1])?></span><?=md_input($f,$row[$f[0]]??'')?></label><?php endforeach?></div><footer><button class="btn">ذخیره</button><button class="btn btn-light" type="button" onclick="this.closest('dialog').close()">انصراف</button></footer></form></dialog><?php endif?>
+ <?php endforeach?><?php if(!$rows):?><tr><td colspan="<?=count($def['fields'])+($legacyManualMode?1:0)?>">داده‌ای برای این گزارش ثبت نشده است.</td></tr><?php endif?></tbody></table></div>
  <?php if($total>$per):?><div class="pagination"><?php for($p=1;$p<=ceil($total/$per);$p++):?><a class="<?=$p===$page?'active':''?>" href="?report_id=<?=$reportId?>&widget=<?=$key?>&page=<?=$p?>#widget-<?=$key?>"><?=$p?></a><?php endfor?></div><?php endif?>
 </section>
-<dialog class="manager-dialog" id="add-<?=e($key)?>"><form method="post"><header><h3>افزودن ردیف به <?=e($setting['widget_title_fa'])?></h3><button type="button" onclick="this.closest('dialog').close()">×</button></header><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="save"><input type="hidden" name="widget" value="<?=e($key)?>"><div class="manager-form-grid"><?php foreach($def['fields'] as $f):?><label><span><?=e($f[1])?></span><?=md_input($f,$f[0]==='report_date'?format_jalali_date($report['report_date']):'')?></label><?php endforeach?></div><footer><button class="btn">ذخیره</button><button class="btn btn-light" type="button" onclick="this.closest('dialog').close()">انصراف</button></footer></form></dialog>
+<?php if($legacyManualMode):?><dialog class="manager-dialog" id="add-<?=e($key)?>"><form method="post"><header><h3>افزودن ردیف قدیمی به <?=e($setting['widget_title_fa'])?></h3><button type="button" onclick="this.closest('dialog').close()">×</button></header><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="save"><input type="hidden" name="widget" value="<?=e($key)?>"><div class="manager-form-grid"><?php foreach($def['fields'] as $f):?><label><span><?=e($f[1])?></span><?=md_input($f,$f[0]==='report_date'?format_jalali_date($report['report_date']):'')?></label><?php endforeach?></div><footer><button class="btn">ذخیره</button><button class="btn btn-light" type="button" onclick="this.closest('dialog').close()">انصراف</button></footer></form></dialog><?php endif?>
 <?php endforeach?>
 <?php if((int)($aiSettings['ai_enabled']??0)&&Auth::can('manager_dashboard.ai_run')):$buttonLabels=['calculate_achievement'=>'محاسبه و کنترل تحقق','calculate_commission'=>'بررسی پورسانت‌ها','calculate_penalty'=>'بررسی ضرایب کاهنده','calculate_customer_coverage'=>'تحلیل پوشش مشتری','calculate_brand_target'=>'تحلیل تحقق برند','detect_anomalies'=>'شناسایی مغایرت‌ها','generate_management_recommendations'=>'پیشنهاد اقدام مدیریتی'];?><section class="card manager-ai" id="widget-ai_insights"><h2>بینش هوشمند فروش</h2><p>تحلیل فقط خواندنی است و هیچ داده‌ای را تغییر نمی‌دهد.</p><?php if((int)($aiSettings['ai_show_buttons']??1)):?><form method="post"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="ai"><div class="actions"><button class="btn btn-light" name="skill_key" value="basic_summary">تحلیل کلی گزارش</button><?php if((int)($aiSettings['ai_skills_enabled']??0)): foreach(ManagerDashboard::enabledSkills() as $skill):?><button class="btn btn-light" name="skill_key" value="<?=e($skill['skill_key'])?>"><?=e($buttonLabels[$skill['skill_key']]??$skill['skill_title_fa'])?></button><?php endforeach; endif?></div></form><?php endif?><?php if(!empty($aiAnswer)):?><div class="ai-answer"><?=md_render_ai_answer($aiAnswer)?><?=render_ai_knowledge_sources($aiKnowledgeSources??[])?></div><?php endif?></section><?php endif?>
 <script src="/assets/js/chart.umd.min.js"></script><script>
-const chart=(id,labels,data,color)=>new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{data,backgroundColor:color,borderRadius:7}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+const chart=(id,labels,data,color)=>{const canvas=document.getElementById(id);if(!canvas)return null;return new Chart(canvas,{type:'bar',data:{labels,datasets:[{data,backgroundColor:color,borderRadius:7}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});};
 const visitors=<?=json_encode(array_column($commission,'visitor_name'),JSON_UNESCAPED_UNICODE)?>;
 chart('visitorAchievementChart',visitors,<?=json_encode(array_map('floatval',array_column($commission,'achievement_percent')))?>,'#22c55e');chart('visitorCommissionChart',visitors,<?=json_encode(array_map('floatval',array_column($commission,'final_commission')))?>,'#3b82f6');
 chart('lineAchievementChart',<?=json_encode(array_column($lines,'line_code'),JSON_UNESCAPED_UNICODE)?>,<?=json_encode(array_map('floatval',array_column($lines,'achievement_percent')))?>,'#14b8a6');chart('coverageChart',<?=json_encode(array_column($coverage,'visitor_name'),JSON_UNESCAPED_UNICODE)?>,<?=json_encode(array_map('floatval',array_column($coverage,'coverage_count')))?>,'#6366f1');chart('brandChart',<?=json_encode(array_column($brands,'visitor_name'),JSON_UNESCAPED_UNICODE)?>,<?=json_encode(array_map('floatval',array_column($brands,'achievement_percent')))?>,'#f59e0b');chart('penaltyChart',visitors,<?=json_encode(array_map('floatval',array_column($commission,'penalty_percent')))?>,'#ef4444');

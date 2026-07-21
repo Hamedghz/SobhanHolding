@@ -71,6 +71,8 @@ The page also calls `SalesStructureModule::repair()` defensively, so missing tab
 
 The module does not replace existing user/org fields. It complements the existing fields already used by `users.php` and `hr-settings.php`:
 
+- `users.kara_system_code`
+- `users.sales_line_id`
 - `users.sales_line`
 - `users.supervisor_id`
 - `users.organization_manager_id`
@@ -79,8 +81,9 @@ The module does not replace existing user/org fields. It complements the existin
 
 When a line or territory is saved, these compatibility fields are updated safely so existing manager/supervisor/visitor reports can continue to work.
 
-- Saving a line syncs the supervisor's `sales_line`, manager parent fields, and the manager-to-supervisor `manager_employees` link.
-- Saving visitor territories syncs `sales_line`, `supervisor_id`, `parent_user_id`, `organization_manager_id`, and the supervisor-to-visitor link.
+- Saving a line syncs the supervisor's `sales_line_id`, compatibility `sales_line`, manager parent fields, and the manager-to-supervisor `manager_employees` link.
+- Saving visitor territories syncs `sales_line_id`, compatibility `sales_line`, `supervisor_id`, `parent_user_id`, `organization_manager_id`, and the supervisor-to-visitor link.
+- The normal visitor import/mapping workflow is retired; visitor identity and hierarchy are managed through the central user and sales-structure pages.
 
 ## Testing checklist
 

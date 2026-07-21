@@ -4,6 +4,7 @@ require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/Upload.php';
 require_once __DIR__ . '/../core/Pwa.php';
+require_once __DIR__ . '/../lib/ImportSettings.php';
 
 Auth::requirePermission('settings', 'view');
 $pageTitle = 'تنظیمات سایت';
@@ -16,6 +17,10 @@ $siteKeys = [
     'footer_text' => ['label' => 'متن فوتر', 'type' => 'text', 'default' => '© شرکت پخش سبحان'],
     'primary_color' => ['label' => 'رنگ اصلی', 'type' => 'color', 'default' => '#2563eb'],
     'logo_path' => ['label' => 'مسیر لوگو', 'type' => 'image', 'default' => ''],
+    'max_excel_upload_mb' => ['label' => 'حداکثر حجم ورود Excel (MB)', 'type' => 'number', 'default' => '50'],
+    'max_letter_attachment_mb' => ['label' => 'حداکثر حجم پیوست مکاتبات (MB)', 'type' => 'number', 'default' => '50'],
+    'max_letterhead_upload_mb' => ['label' => 'حداکثر حجم فایل سربرگ مکاتبات (MB)', 'type' => 'number', 'default' => '50'],
+    'allowed_import_extensions' => ['label' => 'پسوندهای مجاز ورود اطلاعات', 'type' => 'text', 'default' => 'xlsx,csv'],
 ];
 $pwaFields = Pwa::fields();
 
@@ -89,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 require __DIR__ . '/../views/partials/admin-header.php';
+$importServerLimits = ImportSettings::serverLimits();
 ?>
 <form class="card admin-form" method="post" enctype="multipart/form-data">
     <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
@@ -100,7 +106,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
                 <?php if ($meta['type'] === 'textarea'): ?>
                     <textarea name="<?= e($key) ?>"><?= e(setting($key, $meta['default'])) ?></textarea>
                 <?php else: ?>
-                    <input <?= $meta['type'] === 'color' ? 'type="color"' : '' ?> name="<?= e($key) ?>" value="<?= e(setting($key, $meta['default'])) ?>">
+                    <input type="<?= $meta['type'] === 'color' ? 'color' : ($meta['type'] === 'number' ? 'number' : 'text') ?>" name="<?= e($key) ?>" value="<?= e(setting($key, $meta['default'])) ?>">
                 <?php endif; ?>
             </label>
         <?php endforeach; ?>
@@ -110,6 +116,13 @@ require __DIR__ . '/../views/partials/admin-header.php';
             <small><?= e(setting('logo_path')) ?></small>
         </label>
     </div>
+    <section class="settings-section" id="import-settings">
+        <h2>وضعیت سرور برای ورود اطلاعات</h2>
+        <?php if (ImportSettings::applicationExceedsServer()): ?><div class="alert alert-warning">سقف برنامه از محدودیت مؤثر PHP بیشتر است؛ فایل‌های بزرگ پیش از رسیدن به برنامه توسط سرور رد می‌شوند.</div><?php endif; ?>
+        <div class="grid grid-2">
+            <?php foreach ($importServerLimits as $key=>$value): ?><div class="card"><small><?=e($key)?></small><strong style="display:block;margin-top:4px"><?=e($value)?></strong></div><?php endforeach; ?>
+        </div>
+    </section>
     <section class="settings-section" id="pwa-settings">
         <h2>تنظیمات PWA</h2>
         <div class="grid grid-2">

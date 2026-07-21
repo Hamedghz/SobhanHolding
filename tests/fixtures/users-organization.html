@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <link rel="stylesheet" href="/assets/css/app-compact-ui.css">
+  <link rel="stylesheet" href="/assets/css/users-organization.css">
+  <title>کاربران و ساختار فروش</title>
+</head>
+<body class="admin-body app-compact-ui">
+<main class="admin-main" style="max-width:1440px;margin:auto;padding:18px">
+  <section class="admin-content">
+    <section class="user-org-hero" data-user-org-reveal>
+      <div><span class="user-org-kicker">منبع واحد ساختار نیروی فروش</span><h1>مدیریت کاربران و ساختار سازمانی</h1><p>ویزیتور رکورد جداگانه ندارد؛ نقش، لاین، مدیر، سرپرست و منطقه او مستقیماً از کاربر مرکزی و ساختار فروش خوانده می‌شود.</p></div>
+      <div class="user-org-flow"><span>۱. واحد و نقش</span><i></i><span>۲. لاین مرکزی</span><i></i><span>۳. مدیر و سرپرست</span><i></i><span>۴. منطقه</span></div>
+    </section>
+    <form class="card admin-form user-organization-form" data-user-org-reveal>
+      <div class="grid grid-3">
+        <label class="form-field"><span>نام</span><input value="علی رضایی"></label>
+        <label class="form-field"><span>شماره پرسنلی</span><input value="10001"></label>
+        <label class="form-field"><span>کد سیستم کارا</span><input value="KARA-10001" dir="ltr"><small>کد خارجی یکتا برای اتصال رکوردهای سیستم کارا</small></label>
+        <label class="form-field"><span>واحد سازمانی</span><select><option>فروش</option></select></label>
+        <label class="form-field"><span>نقش سازمانی</span><select><option>ویزیتور</option></select></label>
+        <label class="form-field sales-org-field"><span>لاین فروش مرکزی</span><select><option>لاین A (A)</option></select><small>مدیر لاین: مدیر فروش شرق · سرپرست لاین: سرپرست لاین A</small></label>
+        <label class="form-field sales-org-field"><span>سرپرست فروش</span><select><option>سرپرست لاین A</option></select></label>
+        <label class="form-field sales-org-field"><span>مدیر فروش</span><select><option>مدیر فروش شرق</option></select></label>
+        <label class="form-field sales-org-field"><span>شهر / منطقه اصلی فروش</span><select><option>زاهدان / زاهدان منطقه ۱ - ZAHEDAN_R1</option></select></label>
+      </div>
+      <div class="form-actions"><button class="btn btn-primary">ذخیره کاربر</button><button class="btn">ساختار فروش</button></div>
+    </form>
+    <section class="card" data-user-org-reveal>
+      <h2>کاربران فروش</h2>
+      <div class="table-wrap"><table><thead><tr><th>نام / شناسه‌ها</th><th>نقش</th><th>مدیر مستقیم</th><th>لاین / منطقه</th><th>وضعیت</th></tr></thead><tbody><tr><td>علی رضایی<small>10001 · کارا: KARA-10001</small></td><td>ویزیتور</td><td>سرپرست لاین A</td><td>لاین A<small>زاهدان / منطقه ۱</small></td><td>فعال</td></tr></tbody></table></div>
+    </section>
+  </section>
+</main>
+<script src="/assets/vendor/motion/motion-12.42.2.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>document.querySelectorAll('[data-user-org-reveal]').forEach((element,index)=>{
+  window.Motion?.animate(element,{opacity:[0,1],transform:['translateY(10px)','translateY(0)']},{duration:.28,delay:index*.04,ease:'easeOut'});
+}));
+</script>
+</body>
+</html>

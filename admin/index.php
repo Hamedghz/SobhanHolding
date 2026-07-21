@@ -10,11 +10,11 @@ Auth::requirePermission('dashboard','view');
 $dashboardUser=Auth::user();$dashboardUserId=(int)$dashboardUser['id'];
 if($_SERVER['REQUEST_METHOD']==='POST'&&str_starts_with((string)($_POST['action']??''),'planner_')){try{if(!Auth::verifyCsrf($_POST['csrf_token']??''))throw new InvalidArgumentException('اعتبار فرم منقضی شده است.');$action=(string)$_POST['action'];if($action==='planner_quick_add'){$today=date('Y-m-d');$input=$_POST;$input['due_date']=$today;WorkPlannerService::createPersonalTask($dashboardUserId,$input,$today);flash('وظیفه امروز افزوده شد.');}elseif($action==='planner_tomorrow'){if(!WorkPlannerService::moveToTomorrow((int)($_POST['task_id']??0),$dashboardUserId))throw new InvalidArgumentException('انتقال این وظیفه ممکن نیست.');flash('وظیفه به فردا منتقل شد.');}elseif($action==='planner_urgent'){if(!WorkPlannerService::markTaskUrgent((int)($_POST['task_id']??0),$dashboardUserId))throw new InvalidArgumentException('تغییر اولویت این وظیفه ممکن نیست.');flash('وظیفه فوری شد.');}}catch(InvalidArgumentException $e){flash($e->getMessage(),'danger');}catch(Throwable $e){error_log('Dashboard planner action: '.$e->getMessage());flash('عملیات وظیفه انجام نشد.','danger');}redirect('/admin/index.php');}
 $pageTitle='داشبورد';
-$icons=['dashboards'=>'▦','performance'=>'↗','hr'=>'◎','finance'=>'﷼','ai'=>'AI','content'=>'□','system'=>'⚙'];
+$icons=['dashboards'=>'▦','okr'=>'◎','performance'=>'↗','hr'=>'◎','finance'=>'﷼','ai'=>'AI','content'=>'□','system'=>'⚙'];
 $groups=[];foreach(admin_menu_registry() as $key=>$group){$items=array_values(array_filter($group['items'],'admin_menu_allowed'));if($items)$groups[$key]=['title'=>$group['title'],'items'=>$items];}
 $cache=Database::fetchAll('SELECT dashboard_key,source,updated_at FROM dashboard_data_cache ORDER BY updated_at DESC');$cacheByKey=array_column($cache,null,'dashboard_key');
 $profile=OrgAccess::userContext($dashboardUserId);
-$adminExtraStylesheets=['/assets/css/personal-planner.css'];
+$adminExtraStylesheets=['/assets/css/personal-planner.css'];$adminExtraScripts=['/assets/js/dashboard-planner.js'];
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
 <?php require __DIR__ . '/../views/partials/work-planner-widget.php';?>

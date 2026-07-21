@@ -3,6 +3,7 @@ require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/SalesStructureModule.php';
+require_once __DIR__ . '/../lib/UserOrganizationService.php';
 
 Auth::requirePermission('sales_structure', 'view');
 $pageTitle = 'ساختار فروش، لاین و مناطق';
@@ -53,6 +54,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($supervisorId && !Database::fetch("SELECT u.id FROM users u LEFT JOIN org_roles r ON r.id=u.org_role_id WHERE u.id=? AND u.status='active' AND (r.code='SALES_SUPERVISOR' OR u.role_key='SALES_SUPERVISOR')", [$supervisorId])) {
                 throw new InvalidArgumentException('سرپرست فروش انتخاب‌شده معتبر نیست.');
+            }
+            if ($supervisorId && !$managerId) {
+                throw new InvalidArgumentException('برای لاینی که سرپرست دارد، انتخاب مدیر فروش الزامی است.');
+            }
+            if ($supervisorId && $managerId) {
+                $supervisorContext = Database::fetch('SELECT parent_user_id,organization_manager_id FROM users WHERE id=?', [$supervisorId]);
+                $currentManagerId = (int)($supervisorContext['organization_manager_id'] ?? 0)
+                    ?: ((int)($supervisorContext['parent_user_id'] ?? 0) ?: null);
+                if ($currentManagerId && $currentManagerId !== $managerId) {
+                    throw new InvalidArgumentException('سرپرست انتخاب‌شده زیرمجموعه مدیر فروش دیگری است.');
+                }
             }
             if ($supervisorId && $active) {
                 if (!SalesStructureModule::validateSupervisorLineUniqueness($supervisorId, $id)) throw new InvalidArgumentException('این سرپرست قبلاً مسئول یک لاین فعال دیگر است.');
@@ -119,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $geoIds = array_values(array_unique(array_map('intval', $_POST['geography_ids'] ?? [])));
             $geoIds = array_values(array_filter($geoIds, static fn($id) => $id > 0));
 
-            $visitor = Database::fetch("SELECT u.id,u.name FROM users u LEFT JOIN org_roles r ON r.id=u.org_role_id WHERE u.id=? AND u.status='active' AND (r.code='VISITOR' OR u.role_key='VISITOR')", [$visitorId]);
+            $visitor = Database::fetch("SELECT u.id,u.name,u.org_unit_id,u.org_role_id FROM users u LEFT JOIN org_roles r ON r.id=u.org_role_id WHERE u.id=? AND u.status='active' AND (r.code='VISITOR' OR u.role_key='VISITOR')", [$visitorId]);
             $line = Database::fetch('SELECT id,code,manager_user_id,supervisor_user_id FROM sales_lines WHERE id=? AND active=1', [$lineId]);
             if (!$visitor) throw new InvalidArgumentException('ویزیتور انتخاب‌شده معتبر نیست.');
             if (!$line) throw new InvalidArgumentException('لاین انتخاب‌شده معتبر نیست.');
@@ -130,6 +142,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$geoIds) throw new InvalidArgumentException('حداقل یک شهر یا منطقه فعال باید انتخاب شود.');
             if ($primaryGeoId && !in_array($primaryGeoId, $geoIds, true)) $primaryGeoId = $geoIds[0];
             if (!$primaryGeoId) $primaryGeoId = $geoIds[0];
+
+            UserOrganizationService::validateAssignment([
+                'org_unit_id' => $visitor['org_unit_id'],
+                'org_role_id' => $visitor['org_role_id'],
+                'sales_line_id' => $lineId,
+                'supervisor_id' => $line['supervisor_user_id'],
+                'organization_manager_id' => $line['manager_user_id'],
+                'primary_geography_id' => $primaryGeoId,
+            ], $visitorId, true);
 
             Database::execute('UPDATE sales_visitor_territories SET active=0,is_primary=0,updated_at=NOW() WHERE visitor_user_id=? AND line_id=?', [$visitorId,$lineId]);
             foreach ($geoIds as $geoId) {

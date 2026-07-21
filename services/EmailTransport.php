@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/EmailOAuthService.php';
 
 require_once __DIR__ . '/../core/EmailHubModule.php';
 
@@ -38,6 +39,7 @@ class EmailSmtpClient extends EmailSocket
     private function command(string $command,array $codes): string{$this->write($command."\r\n");return $this->response($codes);}
     public function connect(): void
     {
+        if (($this->account['auth_type'] ?? '') === 'oauth2') $this->account = EmailOAuthService::ensureAccessToken($this->account);
         $this->open((string)$this->account['smtp_host'],(int)$this->account['smtp_port'],(string)$this->account['smtp_encryption']);
         $this->response([220]);$host=preg_replace('/[^a-z0-9.-]/i','',gethostname()?:'localhost')?:'localhost';$this->command('EHLO '.$host,[250]);
         if($this->account['smtp_encryption']==='tls'){$this->command('STARTTLS',[220]);if(!stream_socket_enable_crypto($this->stream,true,STREAM_CRYPTO_METHOD_TLS_CLIENT))throw new EmailProtocolException('smtp_tls_failed');$this->command('EHLO '.$host,[250]);}
@@ -73,6 +75,7 @@ class EmailImapClient extends EmailSocket
     private static function quoted(string $value): string{if(preg_match('/[\x00-\x1F\x7F]/',$value))throw new EmailProtocolException('imap_credential_contains_control_character');return '"'.str_replace(['\\','"'],['\\\\','\\"'],$value).'"';}
     public function connect(): void
     {
+        if (($this->account['auth_type'] ?? '') === 'oauth2') $this->account = EmailOAuthService::ensureAccessToken($this->account);
         $this->open((string)$this->account['imap_host'],(int)$this->account['imap_port'],(string)$this->account['imap_encryption']);$greeting=$this->line();if(!str_contains($greeting,'OK'))throw new EmailProtocolException('imap_greeting_failed:'.trim($greeting));
         if($this->account['imap_encryption']==='tls'){$this->command('STARTTLS');if(!stream_socket_enable_crypto($this->stream,true,STREAM_CRYPTO_METHOD_TLS_CLIENT))throw new EmailProtocolException('imap_tls_failed');}
         $credentials=EmailHubModule::credentials($this->account);if(($this->account['auth_type']??'')==='oauth2'){$payload=base64_encode('user='.$this->account['username']."\x01auth=Bearer ".($credentials['access_token']??'')."\x01\x01");$this->command('AUTHENTICATE XOAUTH2 '.$payload);}else{$this->command('LOGIN '.self::quoted((string)$this->account['username']).' '.self::quoted((string)($credentials['password']??'')));}

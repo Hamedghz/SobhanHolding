@@ -1,10 +1,14 @@
-﻿<?php
+<?php
 
 return [
     'seed_key' => 'hr_assessment',
 
     'run' => static function (PDO $pdo, array $options): array {
-        $expected = 10 + 233;
+        $data = HrModule::sobhanAssessmentData();
+        $expected = count($data['tests'])
+            + array_sum(array_map(static fn(array $test): int => count($test['questions'] ?? []), $data['tests']))
+            + count($data['packages'] ?? [])
+            + array_sum(array_map(static fn(array $package): int => count($package['tests'] ?? []), $data['packages'] ?? []));
         $mode = $options['mode'] ?? 'safe';
 
         if ($mode === 'dry_run') {

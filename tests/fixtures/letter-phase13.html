@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>مکاتبات سازمانی — فاز ۱۳</title>
+  <link rel="stylesheet" href="../../assets/vendor/quill/quill.snow.css">
+  <link rel="stylesheet" href="../../assets/css/letters.css">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f3f7f8;color:#17313e;font-family:Tahoma,Arial,sans-serif}.fixture-shell{max-width:1180px;margin:auto;padding:24px}.card{padding:18px;background:#fff;border:1px solid #dce7ea;border-radius:15px}.btn{display:inline-flex;padding:9px 14px;border:1px solid #cbdadd;border-radius:9px;background:#fff;color:#17313e;text-decoration:none}.btn-primary{background:#147d7c;color:#fff;border-color:#147d7c}.grid{display:grid;gap:12px}.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}.form-field{display:grid;gap:6px}.form-field span{font-size:12px;font-weight:700;color:#526a75}.form-field input,.form-field select{width:100%;padding:10px;border:1px solid #cbdadd;border-radius:9px}.grid-span-2{grid-column:span 2}.letter-sticky-actions{position:static;margin-top:16px;border:0;border-radius:12px}.fixture-preview{margin-top:18px;overflow:auto;padding:18px;border-radius:15px;background:#dfe8ea}.fixture-preview .official-letter{width:min(100%,210mm);min-height:460px}
+    @media(max-width:700px){.fixture-shell{padding:12px}.grid-3{grid-template-columns:1fr}.grid-span-2{grid-column:auto}.fixture-preview{padding:8px}.fixture-preview .official-letter{zoom:.48}}
+  </style>
+</head>
+<body>
+<main class="fixture-shell">
+  <div class="letters-page-head"><div><h1>ایجاد نامه سازمانی</h1><p>متن رسمی، سربرگ و خروجی چاپ در یک جریان کم‌کلیک.</p></div><a class="btn" href="#">نامه‌ها</a></div>
+  <nav class="letter-tabs"><a class="is-active" href="#">نامه جدید</a><a href="#">قالب‌ها</a><a href="#">سربرگ‌ها</a><a href="#">تنظیمات</a></nav>
+  <form data-letter-form>
+    <textarea data-editor-input hidden><p>با سلام،</p><p>این نامه برای بررسی و تأیید فرایند جدید ارسال می‌شود.</p></textarea>
+    <textarea data-editor-delta hidden></textarea>
+    <section class="card letter-form-section"><header><div><span class="letter-step">۱</span><h2>اطلاعات نامه</h2></div></header><div class="grid grid-3"><label class="form-field"><span>تاریخ نامه</span><input value="۱۴۰۵/۰۴/۲۵"></label><label class="form-field grid-span-2"><span>موضوع</span><input value="درخواست بررسی فرایند مکاتبات"></label><label class="form-field"><span>گیرنده</span><input value="مدیریت محترم"></label><label class="form-field"><span>سربرگ</span><select><option>سربرگ رسمی — پیش‌فرض</option></select></label><label class="form-field"><span>کاغذ</span><select><option>A4 عمودی</option></select></label></div></section>
+    <section class="card letter-form-section"><header><div><span class="letter-step">۲</span><h2>متن نامه</h2></div><button class="btn" type="button" data-preview-toggle>پیش‌نمایش</button></header>
+      <div class="letter-editor" data-rich-editor>
+        <div class="editor-toolbar" data-quill-toolbar><select class="ql-font"></select><select class="ql-size"></select><button class="ql-bold" type="button"></button><button class="ql-italic" type="button"></button><button class="ql-underline" type="button"></button><select class="ql-color"></select><select class="ql-background"></select><button class="ql-direction" value="rtl" type="button"></button><select class="ql-align"></select><button class="ql-list" value="ordered" type="button"></button><button class="ql-list" value="bullet" type="button"></button><button class="ql-indent" value="-1" type="button"></button><button class="ql-indent" value="+1" type="button"></button><button class="ql-link" type="button"></button><button class="ql-clean" type="button"></button><button class="ql-undo" type="button"></button><button class="ql-redo" type="button"></button></div>
+        <div class="editor-surface" dir="rtl" data-editor-surface><p>با سلام،</p><p>این نامه برای بررسی و تأیید فرایند جدید ارسال می‌شود.</p><ol><li>بررسی متن نامه</li><li>تأیید سربرگ و حاشیه چاپ</li></ol></div>
+      </div>
+      <div class="letter-variable-hint"><strong>متغیرهای هوشمند:</strong><button type="button" data-insert-variable="{recipient_name}">{recipient_name}</button><button type="button" data-insert-variable="{letter_date}">{letter_date}</button></div>
+    </section>
+    <div class="letter-sticky-actions"><button class="btn">ذخیره پیش‌نویس</button><button class="btn btn-primary">ذخیره و ارسال برای امضا</button></div>
+  </form>
+  <section class="fixture-preview"><article class="official-letter paper-a4 orientation-portrait" style="--letter-header-offset:3mm;--letter-footer-offset:2mm"><header class="letter-document-header"><div class="letter-brand"><div><strong>شرکت پخش سبحان</strong><small>مکاتبات رسمی سازمانی</small></div></div><dl class="letter-meta"><div><dt>شماره:</dt><dd>SH-00001</dd></div><div><dt>تاریخ:</dt><dd>۱۴۰۵/۰۴/۲۵</dd></div></dl></header><section class="letter-address"><p>موضوع: <strong>درخواست بررسی فرایند مکاتبات</strong></p><p>مدیریت محترم</p><p>با سلام و احترام،</p></section><section class="letter-body-content"><p>این پیش‌نمایش برای کنترل RTL، خوانایی، حاشیه و سازگاری چاپ است.</p></section><footer class="letter-document-footer">شرکت پخش سبحان</footer></article></section>
+</main>
+<dialog class="letter-preview-dialog" data-preview-dialog><header><strong>پیش‌نمایش متن</strong><button type="button" data-preview-close>×</button></header><div data-preview-content class="letter-body-content"></div></dialog>
+<script src="../../assets/vendor/quill/quill.js"></script>
+<script src="../../assets/js/letters.js"></script>
+</body>
+</html>

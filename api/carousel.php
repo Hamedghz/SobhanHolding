@@ -1,7 +1,8 @@
 <?php
 require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../core/Response.php';
+require_once __DIR__ . '/../core/CarouselModule.php';
 header('Content-Type: application/json; charset=utf-8');
 try {
-    echo json_encode(['ok'=>true,'items'=>Database::fetchAll('SELECT title,description,image_path,button_text,button_link FROM carousel_items WHERE status="active" ORDER BY sort_order ASC,id DESC')], JSON_UNESCAPED_UNICODE);
-} catch (Throwable $e) { http_response_code(500); echo json_encode(['ok'=>false,'error'=>'خطا در دریافت اطلاعات'], JSON_UNESCAPED_UNICODE); }
+    echo json_encode(['success'=>true,'message'=>'اسلایدها دریافت شدند.','data'=>['items'=>CarouselModule::publicItems()],'meta'=>[],'error'=>null], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+} catch (Throwable $e) { error_log('Carousel API ['.get_class($e).']');http_response_code(500);echo json_encode(['success'=>false,'message'=>'دریافت اسلایدها امکان‌پذیر نبود.','data'=>null,'meta'=>[],'error'=>['code'=>'CAROUSEL_LOAD_FAILED']],JSON_UNESCAPED_UNICODE); }

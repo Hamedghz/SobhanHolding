@@ -1,0 +1,208 @@
+- generic [ref=f1e2]:
+  - complementary [ref=f1e3]:
+    - link "شرکت پخش سبحان پنل مدیریت" [ref=f1e4] [cursor=pointer]:
+      - /url: /admin/
+      - generic [ref=f1e5]: شرکت پخش سبحان
+      - generic [ref=f1e6]: پنل مدیریت
+    - navigation "منوی مدیریت" [ref=f1e7]:
+      - group [ref=f1e8]:
+        - generic "داشبوردها" [ref=f1e9] [cursor=pointer]
+        - generic [ref=f1e10]:
+          - link "داشبورد اصلی" [ref=f1e11] [cursor=pointer]:
+            - /url: /admin/index.php
+          - link "پنل مدیرعامل" [ref=f1e13] [cursor=pointer]:
+            - /url: /admin/ceo-dashboard.php
+          - link "پنل مدیران فروش" [ref=f1e15] [cursor=pointer]:
+            - /url: /admin/manager-dashboard.php
+          - link "پنل سرپرست فروش" [ref=f1e17] [cursor=pointer]:
+            - /url: /admin/supervisor-dashboard.php
+          - link "پنل کارمند" [ref=f1e19] [cursor=pointer]:
+            - /url: /admin/employee-dashboard.php
+      - group [ref=f1e21]:
+        - generic "OKR و اهداف سازمانی" [ref=f1e22] [cursor=pointer]
+      - group [ref=f1e23]:
+        - generic "برنامه کاری من" [ref=f1e24] [cursor=pointer]
+      - group [ref=f1e25]:
+        - generic "گزارش کار روزانه" [ref=f1e26] [cursor=pointer]
+      - group [ref=f1e27]:
+        - generic "مرکز اقدامات" [ref=f1e28] [cursor=pointer]
+        - generic [ref=f1e29]:
+          - link "همه اقدامات" [ref=f1e30] [cursor=pointer]:
+            - /url: /admin/action-hub.php
+          - link "قالب‌های اقدام" [ref=f1e32] [cursor=pointer]:
+            - /url: /admin/action-templates.php
+          - link "انواع اقدام" [ref=f1e34] [cursor=pointer]:
+            - /url: /admin/action-types.php
+      - group [ref=f1e36]:
+        - generic "فروش و تحلیل عملکرد" [ref=f1e37] [cursor=pointer]
+      - group [ref=f1e38]:
+        - generic "مدیریت داده فروش" [ref=f1e39] [cursor=pointer]
+      - group [ref=f1e40]:
+        - generic "پنل سرپرست فروش" [ref=f1e41] [cursor=pointer]
+      - group [ref=f1e42]:
+        - generic "گزارشات مدیران" [ref=f1e43] [cursor=pointer]
+      - group [ref=f1e44]:
+        - generic "قوانین مصوب و صورتجلسات" [ref=f1e45] [cursor=pointer]
+      - group [ref=f1e46]:
+        - generic "منابع انسانی" [ref=f1e47] [cursor=pointer]
+      - group [ref=f1e48]:
+        - generic "KPI و ارزیابی عملکرد" [ref=f1e49] [cursor=pointer]
+      - group [ref=f1e50]:
+        - generic "آزمون‌ها و ارزیابی سازمانی" [ref=f1e51] [cursor=pointer]
+      - group [ref=f1e52]:
+        - generic "مالی، انبار و وصول" [ref=f1e53] [cursor=pointer]
+      - group [ref=f1e54]:
+        - generic "سایت و محتوا" [ref=f1e55] [cursor=pointer]
+      - group [ref=f1e56]:
+        - generic "مکاتبات اداری" [ref=f1e57] [cursor=pointer]
+      - group [ref=f1e58]:
+        - generic "ایمیل سازمانی" [ref=f1e59] [cursor=pointer]
+      - group [ref=f1e60]:
+        - generic "هوش مصنوعی و گزارش‌گیری" [ref=f1e61] [cursor=pointer]
+      - group [ref=f1e62]:
+        - generic "تنظیمات" [ref=f1e63] [cursor=pointer]
+      - group [ref=f1e64]:
+        - generic "ابزارهای سیستم" [ref=f1e65] [cursor=pointer]
+  - main [ref=f1e66]:
+    - generic [ref=f1e67]:
+      - generic [ref=f1e68]:
+        - strong [ref=f1e69]: مرکز اقدامات
+        - generic [ref=f1e70]: شرکت پخش سبحان
+      - generic [ref=f1e71]:
+        - link "هوش مصنوعی سبحان در دسترس نیست" [ref=f1e72] [cursor=pointer]:
+          - /url: /admin/sobhan-api-settings.php
+          - generic [ref=f1e74]: AI قطع
+        - button "اعلان‌ها" [ref=f1e76] [cursor=pointer]:
+          - generic [ref=f1e78]: "0"
+        - generic [ref=f1e79]:
+          - generic [ref=f1e80]: مدیر تست نصب تازه
+          - link "ظاهر" [ref=f1e81] [cursor=pointer]:
+            - /url: /admin/theme-settings.php
+          - link "خروج" [ref=f1e82] [cursor=pointer]:
+            - /url: /logout.php
+    - generic [ref=f1e84]:
+      - generic [ref=f1e85]:
+        - generic [ref=f1e86]:
+          - generic [ref=f1e87]: UNIVERSAL ACTION HUB
+          - heading "مرکز اقدامات سازمانی" [level=1] [ref=f1e88]
+          - paragraph [ref=f1e89]: تمام اقدام‌های دستی، گزارش‌ها، مصوبات، OKR، KPI، برنامه کاری و پیشنهادهای هوشمند در یک مسیر قابل پیگیری جمع می‌شوند.
+        - generic [ref=f1e90]:
+          - link "قالب‌های اقدام" [ref=f1e91] [cursor=pointer]:
+            - /url: /admin/action-templates.php
+          - link "انواع اقدام" [ref=f1e92] [cursor=pointer]:
+            - /url: /admin/action-types.php
+      - navigation "فیلتر سریع" [ref=f1e93]:
+        - link "همه قابل دسترس" [ref=f1e94] [cursor=pointer]:
+          - /url: /admin/action-hub.php
+        - link "محول‌شده به من" [ref=f1e95] [cursor=pointer]:
+          - /url: /admin/action-hub.php?mine=assigned
+        - link "ایجادشده توسط من" [ref=f1e96] [cursor=pointer]:
+          - /url: /admin/action-hub.php?mine=created
+      - group [ref=f1e97]:
+        - generic "ایجاد اقدام جدید با قالب یا بدون قالب، همراه اتصال اختیاری به برنامه کاری ＋" [ref=f1e98] [cursor=pointer]:
+          - generic [ref=f1e99]:
+            - generic [ref=f1e100]: ایجاد اقدام جدید
+            - generic [ref=f1e101]: با قالب یا بدون قالب، همراه اتصال اختیاری به برنامه کاری
+          - generic [ref=f1e102]: ＋
+        - generic [ref=f1e103]:
+          - generic [ref=f1e104]:
+            - generic [ref=f1e105]:
+              - generic [ref=f1e106]: عنوان *
+              - textbox "عنوان *" [ref=f1e107]
+            - generic [ref=f1e108]:
+              - generic [ref=f1e109]: نوع اقدام *
+              - combobox "نوع اقدام *" [ref=f1e110]:
+                - option "انتخاب کنید" [selected]
+                - option "عمومی"
+            - generic [ref=f1e111]:
+              - generic [ref=f1e112]: قالب اقدام
+              - combobox "قالب اقدام" [ref=f1e113]:
+                - option "بدون قالب" [selected]
+            - generic [ref=f1e114]:
+              - generic [ref=f1e115]: مسئول اقدام *
+              - combobox "مسئول اقدام *" [ref=f1e116]:
+                - option "مدیر تست نصب تازه" [selected]
+            - generic [ref=f1e117]:
+              - generic [ref=f1e118]: اولویت
+              - combobox "اولویت" [ref=f1e119]:
+                - option "کم"
+                - option "عادی" [selected]
+                - option "بالا"
+                - option "فوری"
+            - generic [ref=f1e120]:
+              - generic [ref=f1e121]: وضعیت اولیه
+              - combobox "وضعیت اولیه" [ref=f1e122]:
+                - option "جدید" [selected]
+                - option "در حال انجام"
+                - option "متوقف"
+                - option "نیازمند بررسی"
+                - option "انجام‌شده"
+                - option "لغوشده"
+                - option "سررسید گذشته"
+            - generic [ref=f1e123]:
+              - generic [ref=f1e124]: منبع اقدام
+              - combobox "منبع اقدام" [ref=f1e125]:
+                - option "گزارش مدیر"
+                - option "گزارش کار روزانه"
+                - option "برنامه کاری"
+                - option "مصوبه جلسه"
+                - option "OKR"
+                - option "KPI"
+                - option "مکاتبه"
+                - option "اقدام دستی" [selected]
+                - option "پیشنهاد هوش مصنوعی"
+                - option "اقدام فروش قدیمی"
+                - option "اقدام سرپرست قدیمی"
+            - generic [ref=f1e126]:
+              - generic [ref=f1e127]: شناسه مرجع
+              - spinbutton "شناسه مرجع" [ref=f1e128]
+            - generic [ref=f1e129]:
+              - generic [ref=f1e130]: تاریخ شروع
+              - textbox "تاریخ شروع" [ref=f1e131]:
+                - /placeholder: 1405/04/25
+            - generic [ref=f1e132]:
+              - generic [ref=f1e133]: سررسید
+              - textbox "سررسید" [ref=f1e134]:
+                - /placeholder: 1405/04/25
+            - generic [ref=f1e135]:
+              - generic [ref=f1e136]: شرح اقدام
+              - textbox "شرح اقدام" [ref=f1e137]
+          - generic [ref=f1e138]:
+            - checkbox "هم‌زمان در برنامه کاری مسئول نیز ثبت شود" [ref=f1e139]
+            - text: هم‌زمان در برنامه کاری مسئول نیز ثبت شود
+          - button "ثبت اقدام" [ref=f1e141] [cursor=pointer]
+      - generic [ref=f1e142]:
+        - generic [ref=f1e143]:
+          - generic [ref=f1e144]: جستجو
+          - textbox "جستجو" [ref=f1e145]:
+            - /placeholder: عنوان یا شرح
+        - generic [ref=f1e146]:
+          - generic [ref=f1e147]: وضعیت
+          - combobox "وضعیت" [ref=f1e148]:
+            - option "همه" [selected]
+            - option "جدید"
+            - option "در حال انجام"
+            - option "متوقف"
+            - option "نیازمند بررسی"
+            - option "انجام‌شده"
+            - option "لغوشده"
+            - option "سررسید گذشته"
+        - generic [ref=f1e149]:
+          - generic [ref=f1e150]: اولویت
+          - combobox "اولویت" [ref=f1e151]:
+            - option "همه" [selected]
+            - option "کم"
+            - option "عادی"
+            - option "بالا"
+            - option "فوری"
+        - generic [ref=f1e152]:
+          - generic [ref=f1e153]: نوع
+          - combobox "نوع" [ref=f1e154]:
+            - option "همه" [selected]
+            - option "عمومی"
+        - button "اعمال فیلتر" [ref=f1e155] [cursor=pointer]
+      - generic [ref=f1e157]:
+        - generic [ref=f1e158]: هنوز اقدامی در این محدوده ثبت نشده است.
+        - generic [ref=f1e159]: فرم ایجاد اقدام آماده است؛ اولین اقدام واقعی را با مسئول و سررسید مشخص ثبت کنید.
+        - link "ایجاد اولین اقدام" [ref=f1e160] [cursor=pointer]:
+          - /url: "#action-composer"

@@ -1,5 +1,47 @@
 # Sobhan Project Rules
 
+## Task Mode and Phase Execution
+
+Determine the task mode from the user's latest explicit request.
+
+### Implementation Mode
+
+Use implementation mode when the user asks to implement, fix, update, build, refactor, harden, complete, continue, or execute a named phase.
+
+- Execute the requested repository changes in the same task.
+- A phase prompt is not documentation-only by default.
+- Work only on the requested phase; do not silently advance to later phases.
+- A newer explicit phase request authorizes that phase even if an earlier phase said not to implement it yet.
+- Start with a short impact analysis, then inspect the relevant code, apply the smallest safe patch, run targeted validation, and review the diff.
+- High risk changes the validation depth; it is not by itself a reason to refuse implementation.
+- When part of a task is blocked, complete every safe in-scope part that remains possible and report the exact blocker.
+
+Implementation is complete only when:
+
+- The requested behavior is implemented in code, configuration, schema/seed, tests, or executable scripts as applicable.
+- Targeted checks were actually run, or a concrete environment blocker is reported.
+- Documentation is updated when behavior, setup, migration, API, or workflow changed.
+- The final response distinguishes completed work from unverified live or production checks.
+
+### Read-Only Mode
+
+Use read-only mode only when the user explicitly asks for audit, review, analysis, diagnosis, report, planning, documentation-only work, or says not to change code.
+
+- Do not modify repository files, data, secrets, or external systems.
+- Provide evidence, findings, risks, and recommended changes.
+- Do not turn an implementation request into read-only mode merely because the area is sensitive.
+
+### Markdown Is Supporting Work
+
+- Markdown is supporting work, not a substitute for implementation.
+- Do not satisfy an implementation phase by creating or updating only `*.md` files unless the user explicitly requested a documentation-only phase.
+- Create or update documentation after or alongside the functional change, not instead of it.
+- If repository evidence shows that no functional change is needed, explain that evidence and run the relevant verification instead of manufacturing a documentation-only deliverable.
+
+### Legitimate Blockers
+
+Stop or request user action only when the required step needs unavailable credentials, production access, destructive approval, a missing business decision that materially changes the result, or an external dependency that cannot be safely bypassed. General risk, a dirty working tree, missing optional tooling, or incomplete live access does not block safe repository-side implementation when it can still proceed without overwriting unrelated work.
+
 ## Architecture
 
 - Preserve classic PHP architecture.

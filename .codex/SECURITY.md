@@ -1,5 +1,13 @@
 # Sobhan Security Baseline
 
+## Security Is a Guardrail, Not a Default Refusal
+
+- High-risk classification requires broader inspection, targeted tests, security notes, migration/rollback notes, and human review.
+- High risk alone does not convert an implementation request into an audit or documentation-only task.
+- Prefer safe repository-side implementation with prepared statements, authorization, CSRF, validation, escaping, idempotency, and sanitized logs.
+- Refuse or pause only the specific unsafe or unauthorized operation. Continue any safe in-scope implementation that does not depend on it.
+- Never claim that production, live database, or authenticated browser validation passed when it was not executed.
+
 ## Authentication and Authorization
 
 For every protected action verify:

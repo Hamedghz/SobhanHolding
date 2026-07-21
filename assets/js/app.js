@@ -80,18 +80,59 @@ if (activeAdminMenuLink) {
   requestAnimationFrame(() => activeAdminMenuLink.scrollIntoView({block: 'nearest'}));
 }
 
-const persianDigits = {'۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9','٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
-document.querySelectorAll('.jalali-date-input').forEach(input => {
-  input.setAttribute('dir', 'ltr');
-  input.addEventListener('input', () => {
-    let value = input.value.replace(/[۰-۹٠-٩]/g, char => persianDigits[char] || char).replace(/[^\d/.-]/g, '').replace(/[.-]/g, '/');
-    const digits = value.replace(/\D/g, '').slice(0, 8);
-    if (digits.length > 4 && digits.length <= 6) value = digits.slice(0, 4) + '/' + digits.slice(4);
-    else if (digits.length > 6) value = digits.slice(0, 4) + '/' + digits.slice(4, 6) + '/' + digits.slice(6);
-    else value = digits;
-    input.value = value;
+const adminMenuSearch = document.querySelector('[data-menu-search]');
+if (adminMenuSearch) {
+  const input = adminMenuSearch.querySelector('[data-menu-search-input]');
+  const results = adminMenuSearch.querySelector('[data-menu-search-results]');
+  const items = [...adminMenuSearch.querySelectorAll('[data-menu-search-result]')];
+  const empty = adminMenuSearch.querySelector('[data-menu-search-empty]');
+  let focusedIndex = -1;
+  const normalize = value => String(value || '').normalize('NFKD').replace(/[\u064B-\u065F\u0670]/g, '').replace(/[يى]/g, 'ی').replace(/ك/g, 'ک').replace(/[ةۀ]/g, 'ه').replace(/[\u200c\u200d]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  const visibleItems = () => items.filter(item => !item.hidden);
+  const focusItem = index => {
+    const visible = visibleItems();
+    items.forEach(item => item.classList.remove('is-focused'));
+    if (!visible.length) { focusedIndex = -1; return; }
+    focusedIndex = (index + visible.length) % visible.length;
+    visible[focusedIndex].classList.add('is-focused');
+    visible[focusedIndex].scrollIntoView({block: 'nearest'});
+  };
+  const search = () => {
+    const term = normalize(input.value);
+    let count = 0;
+    items.forEach(item => { item.hidden = term === '' || !normalize(item.dataset.searchText).includes(term); if (!item.hidden) count++; });
+    results.hidden = term === '';
+    input.setAttribute('aria-expanded', results.hidden ? 'false' : 'true');
+    empty.hidden = count > 0 || term === '';
+    focusedIndex = -1;
+  };
+  input.addEventListener('input', search);
+  input.addEventListener('keydown', event => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); focusItem(focusedIndex + (event.key === 'ArrowDown' ? 1 : -1)); }
+    if (event.key === 'Enter' && focusedIndex >= 0) { event.preventDefault(); visibleItems()[focusedIndex]?.click(); }
+    if (event.key === 'Escape') { input.value = ''; search(); input.blur(); }
   });
-});
+  document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); input.focus(); input.select(); } });
+  document.addEventListener('click', event => { if (!event.target.closest('[data-menu-search]')) { results.hidden = true; input.setAttribute('aria-expanded', 'false'); } });
+}
+
+const sobhanToastKeys = new Map();
+function sobhanNotify(message, type = 'info') {
+  const region = document.querySelector('[data-toast-region]');
+  if (!region || !message) return;
+  const normalizedType = ['success', 'warning', 'danger', 'info'].includes(type) ? type : 'info';
+  const key = `${normalizedType}:${message}`;
+  if (sobhanToastKeys.has(key)) return;
+  const notice = document.createElement('div');
+  notice.className = `alert alert-${normalizedType}`;
+  notice.setAttribute('role', normalizedType === 'danger' ? 'alert' : 'status');
+  const label = document.createElement('span'); label.textContent = message;
+  const close = document.createElement('button'); close.type = 'button'; close.setAttribute('aria-label', 'بستن پیام'); close.textContent = '×';
+  const dismiss = () => { sobhanToastKeys.delete(key); notice.remove(); };
+  close.addEventListener('click', dismiss); notice.append(label, close); region.appendChild(notice); sobhanToastKeys.set(key, notice); window.setTimeout(dismiss, normalizedType === 'danger' ? 9000 : 5500);
+}
+window.SobhanUI = {...(window.SobhanUI || {}), notify: sobhanNotify};
+document.querySelectorAll('[data-app-notice]').forEach(notice => notice.querySelector('[data-notice-close]')?.addEventListener('click', () => notice.remove()));
 
 document.querySelectorAll('[data-dashboard-refresh]').forEach(form => {
   form.addEventListener('submit', async event => {
@@ -101,10 +142,10 @@ document.querySelectorAll('[data-dashboard-refresh]').forEach(form => {
     try {
       const response = await fetch('/admin/actions/dashboard-refresh.php', {method: 'POST', body: new FormData(form), credentials: 'same-origin'});
       const data = await response.json();
-      alert(data.ok ? (data.job?.message || 'بروزرسانی ثبت شد.') : (data.message || 'بروزرسانی داشبورد ناموفق بود.'));
+      sobhanNotify(data.ok ? (data.job?.message || 'بروزرسانی ثبت شد.') : (data.message || 'بروزرسانی داشبورد ناموفق بود.'), data.ok ? 'success' : 'danger');
       if (data.ok && data.job?.status === 'completed') location.reload();
     } catch (error) {
-      alert('اتصال به سرویس بروزرسانی برقرار نشد.');
+      sobhanNotify('اتصال به سرویس بروزرسانی برقرار نشد.', 'danger');
     } finally {
       if (button) button.disabled = false;
     }
@@ -209,15 +250,15 @@ async function sobhanMarkNotificationRead(payload) {
 
 async function sobhanEnablePushOnDevice(button) {
   if (!sobhanNotificationConfig?.vapidPublicKey) {
-    alert('کلید اعلان مرورگر هنوز آماده نیست.');
+    sobhanNotify('کلید اعلان مرورگر هنوز آماده نیست.', 'warning');
     return;
   }
   if (!sobhanSecurePushContext()) {
-    alert('اعلان مرورگر در محیط عملیاتی فقط با HTTPS فعال می‌شود.');
+    sobhanNotify('اعلان مرورگر در محیط عملیاتی فقط با HTTPS فعال می‌شود.', 'warning');
     return;
   }
   if (!('Notification' in window) || !('PushManager' in window)) {
-    alert('مرورگر این دستگاه از Push Notification پشتیبانی نمی‌کند.');
+    sobhanNotify('مرورگر این دستگاه از Push Notification پشتیبانی نمی‌کند.', 'warning');
     return;
   }
 
@@ -225,13 +266,13 @@ async function sobhanEnablePushOnDevice(button) {
   try {
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-      alert('مجوز اعلان برای این مرورگر صادر نشد.');
+      sobhanNotify('مجوز اعلان برای این مرورگر صادر نشد.', 'warning');
       return;
     }
 
     const registration = await sobhanRegisterServiceWorker();
     if (!registration) {
-      alert('Service Worker فعال نشد.');
+      sobhanNotify('Service Worker فعال نشد.', 'danger');
       return;
     }
 
@@ -248,9 +289,9 @@ async function sobhanEnablePushOnDevice(button) {
       body: JSON.stringify({...subscription.toJSON(), contentEncoding})
     });
     const data = await response.json();
-    alert(data.message || (data.ok ? 'اعلان فعال شد.' : 'فعال‌سازی اعلان انجام نشد.'));
+    sobhanNotify(data.message || (data.ok ? 'اعلان فعال شد.' : 'فعال‌سازی اعلان انجام نشد.'), data.ok ? 'success' : 'danger');
   } catch (error) {
-    alert('فعال‌سازی اعلان روی این دستگاه انجام نشد.');
+    sobhanNotify('فعال‌سازی اعلان روی این دستگاه انجام نشد.', 'danger');
   } finally {
     button.disabled = false;
   }

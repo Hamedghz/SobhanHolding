@@ -28,9 +28,14 @@ function pharmacy_money_value($value): int
     return max(0, (int)$value);
 }
 
+function pharmacy_metrics_headers(): array
+{
+    return ['تاریخ گزارش', 'داروخانه', 'شناسه داروخانه', 'فروش روزانه', 'فروش ماهانه', 'مبلغ خرید', 'هزینه‌ها', 'چک‌های در جریان وصول', 'مبلغ فاکتور باز', 'ترتیب نمایش', 'فعال'];
+}
+
 function pharmacy_rows_for_export(): array
 {
-    $rows = [['تاریخ گزارش', 'داروخانه', 'شناسه داروخانه', 'فروش روزانه', 'فروش ماهانه', 'مبلغ خرید', 'هزینه‌ها', 'چک‌های در جریان وصول', 'مبلغ فاکتور باز', 'ترتیب نمایش', 'فعال']];
+    $rows = [pharmacy_metrics_headers()];
     $items = Database::fetchAll('SELECT m.*, p.title pharmacy_title, p.slug pharmacy_slug FROM pharmacy_dashboard_metrics m JOIN pharmacies p ON p.id = m.pharmacy_id ORDER BY COALESCE(m.report_date, "0000-00-00") DESC, m.sort_order ASC, m.id ASC');
     $totalsByDate = [];
     foreach ($items as $item) {
@@ -83,12 +88,23 @@ function pharmacy_list_for_export(): array
     return $rows;
 }
 
-function pharmacy_export_file(): void
+function pharmacy_template_rows(): array
+{
+    $rows = [pharmacy_metrics_headers()];
+    $pharmacies = Database::fetchAll('SELECT title,slug FROM pharmacies WHERE active=1 ORDER BY sort_order,id');
+    foreach ($pharmacies as $pharmacy) {
+        $rows[] = ['1405/04/25', $pharmacy['title'], $pharmacy['slug'], 0, 0, 0, 0, 0, 0, 0, 'فعال'];
+    }
+    if (!$pharmacies) $rows[] = ['1405/04/25', 'ابتدا داروخانه را در همین صفحه تعریف کنید', 'pharmacy-slug', 0, 0, 0, 0, 0, 0, 0, 'فعال'];
+    return $rows;
+}
+
+function pharmacy_export_file(bool $template = false): void
 {
     CeoDashboardExcel::output([
         'Pharmacies' => pharmacy_list_for_export(),
-        'Metrics' => pharmacy_rows_for_export(),
-    ], 'pharmacy-settings-export-' . date('Y-m-d-H-i') . '.xlsx');
+        'Metrics' => $template ? pharmacy_template_rows() : pharmacy_rows_for_export(),
+    ], $template ? 'pharmacy-import-template.xlsx' : 'pharmacy-settings-export-' . date('Y-m-d-H-i') . '.xlsx');
 }
 
 function pharmacy_validate_import(array $workbook): array
@@ -166,8 +182,9 @@ function pharmacy_apply_import(array $preview, string $mode): array
         }
         $pdo->commit();
     } catch (Throwable $e) {
-        $pdo->rollBack();
-        $result['errors'][] = $e->getMessage();
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('Pharmacy import apply: ' . $e->getMessage());
+        $result['errors'][] = 'ثبت اطلاعات داروخانه انجام نشد. جزئیات فنی در لاگ ثبت شد.';
     }
     return $result;
 }
@@ -175,10 +192,11 @@ function pharmacy_apply_import(array $preview, string $mode): array
 try {
     if (isset($_GET['export'])) {
         if (!$canManage) throw new RuntimeException('برای خروجی اکسل دسترسی ندارید.');
-        pharmacy_export_file();
+        pharmacy_export_file(($_GET['export'] ?? '') === 'template');
     }
 } catch (Throwable $e) {
-    flash($e->getMessage(), 'danger');
+    error_log('Pharmacy export: ' . $e->getMessage());
+    flash('ساخت خروجی اکسل انجام نشد. لطفاً تنظیمات فایل و دسترسی سرور را بررسی کنید.', 'danger');
     redirect('/admin/pharmacy-settings.php#import-export');
 }
 
@@ -282,7 +300,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['pharmacy_import_preview'] = $preview;
             flash('پیش‌نمایش ورود اکسل آماده شد.', $preview['errors'] ? 'danger' : 'success');
         } catch (Throwable $e) {
-            flash($e->getMessage(), 'danger');
+            error_log('Pharmacy import preview: ' . $e->getMessage());
+            flash('خواندن فایل اکسل انجام نشد. قالب فایل و مقادیر ستون‌ها را بررسی کنید.', 'danger');
         }
         redirect('/admin/pharmacy-settings.php#import-export');
     }
@@ -401,6 +420,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
     <h2>ورودی / خروجی اکسل <span class="badge">منبع داروخانه‌ها: فایل استاتیک</span></h2>
     <div class="form-actions">
         <a class="btn btn-primary" href="?export=1">خروجی اکسل تنظیمات داروخانه</a>
+        <a class="btn" href="?export=template">دانلود قالب فایل ورودی</a>
     </div>
     <form method="post" enctype="multipart/form-data" class="admin-form">
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
@@ -409,7 +429,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
             <label class="form-field"><span>حالت ورود اطلاعات</span><select name="import_mode"><option value="append">افزودن رکوردهای جدید</option><option value="update_existing">بروزرسانی رکوردهای موجود</option><option value="replace_same_period">جایگزینی اطلاعات همان بازه/تاریخ</option></select></label>
             <label class="form-field"><span>فایل اکسل</span><input type="file" name="excel_file" accept=".xlsx,.xls" required></label>
         </div>
-        <button class="btn btn-primary">بررسی و پیش‌نمایش</button>
+        <div class="form-actions actions"><a class="btn" href="?export=template">دانلود قالب فایل ورودی</a><button class="btn btn-primary">بررسی و پیش‌نمایش</button></div>
     </form>
     <?php if ($importPreview): ?>
         <div class="stats">

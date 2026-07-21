@@ -1,5 +1,13 @@
 # Sobhan Engineering Task Board
 
+## Task Board Execution Contract
+
+- Selecting a backlog item for implementation means perform the code/config/schema/test work needed for that item, not only write a plan or `*.md` file.
+- A prompt such as `Phase N`, `فاز N`, `continue phase`, or `execute phase` is implementation mode unless it explicitly says documentation-only, audit-only, or no code changes.
+- Complete only the selected phase and its required validations. Do not automatically start the next phase.
+- An audit/review item stays read-only only when the current prompt explicitly requests audit, review, diagnosis, report, or planning.
+- Documentation remains part of the definition of done when applicable, but it is not the sole deliverable for an implementation task.
+
 ## Current Focus
 
 - [ ] Audit and consolidate dashboard and employee-panel duplication

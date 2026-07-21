@@ -1,0 +1,140 @@
+- generic [ref=f4e2]:
+  - complementary [ref=f4e3]:
+    - link "شرکت پخش سبحان پنل مدیریت" [ref=f4e4] [cursor=pointer]:
+      - /url: /admin/
+      - generic [ref=f4e5]: شرکت پخش سبحان
+      - generic [ref=f4e6]: پنل مدیریت
+    - navigation "منوی مدیریت" [ref=f4e7]:
+      - group [ref=f4e8]:
+        - generic "داشبوردها" [ref=f4e9] [cursor=pointer]
+      - group [ref=f4e10]:
+        - generic "OKR و اهداف سازمانی" [ref=f4e11] [cursor=pointer]
+        - generic [ref=f4e12]:
+          - link "داشبورد OKR" [ref=f4e13] [cursor=pointer]:
+            - /url: /admin/okr.php
+          - link "دوره‌های OKR" [ref=f4e15] [cursor=pointer]:
+            - /url: /admin/okr-cycles.php
+      - group [ref=f4e17]:
+        - generic "برنامه کاری من" [ref=f4e18] [cursor=pointer]
+      - group [ref=f4e19]:
+        - generic "گزارش کار روزانه" [ref=f4e20] [cursor=pointer]
+      - group [ref=f4e21]:
+        - generic "مرکز اقدامات" [ref=f4e22] [cursor=pointer]
+      - group [ref=f4e23]:
+        - generic "فروش و تحلیل عملکرد" [ref=f4e24] [cursor=pointer]
+      - group [ref=f4e25]:
+        - generic "مدیریت داده فروش" [ref=f4e26] [cursor=pointer]
+      - group [ref=f4e27]:
+        - generic "پنل سرپرست فروش" [ref=f4e28] [cursor=pointer]
+      - group [ref=f4e29]:
+        - generic "گزارشات مدیران" [ref=f4e30] [cursor=pointer]
+      - group [ref=f4e31]:
+        - generic "قوانین مصوب و صورتجلسات" [ref=f4e32] [cursor=pointer]
+      - group [ref=f4e33]:
+        - generic "منابع انسانی" [ref=f4e34] [cursor=pointer]
+      - group [ref=f4e35]:
+        - generic "KPI و ارزیابی عملکرد" [ref=f4e36] [cursor=pointer]
+      - group [ref=f4e37]:
+        - generic "آزمون‌ها و ارزیابی سازمانی" [ref=f4e38] [cursor=pointer]
+      - group [ref=f4e39]:
+        - generic "مالی، انبار و وصول" [ref=f4e40] [cursor=pointer]
+      - group [ref=f4e41]:
+        - generic "سایت و محتوا" [ref=f4e42] [cursor=pointer]
+      - group [ref=f4e43]:
+        - generic "مکاتبات اداری" [ref=f4e44] [cursor=pointer]
+      - group [ref=f4e45]:
+        - generic "ایمیل سازمانی" [ref=f4e46] [cursor=pointer]
+      - group [ref=f4e47]:
+        - generic "هوش مصنوعی و گزارش‌گیری" [ref=f4e48] [cursor=pointer]
+      - group [ref=f4e49]:
+        - generic "تنظیمات" [ref=f4e50] [cursor=pointer]
+      - group [ref=f4e51]:
+        - generic "ابزارهای سیستم" [ref=f4e52] [cursor=pointer]
+  - main [ref=f4e53]:
+    - generic [ref=f4e54]:
+      - generic [ref=f4e55]:
+        - strong [ref=f4e56]: OKR و اهداف سازمانی
+        - generic [ref=f4e57]: شرکت پخش سبحان
+      - generic [ref=f4e58]:
+        - link "هوش مصنوعی سبحان در دسترس نیست" [ref=f4e59] [cursor=pointer]:
+          - /url: /admin/sobhan-api-settings.php
+          - generic [ref=f4e61]: AI قطع
+        - button "اعلان‌ها" [ref=f4e63] [cursor=pointer]:
+          - generic [ref=f4e65]: "0"
+        - generic [ref=f4e66]:
+          - generic [ref=f4e67]: مدیر نصب آزمایشی
+          - link "ظاهر" [ref=f4e68] [cursor=pointer]:
+            - /url: /admin/theme-settings.php
+          - link "خروج" [ref=f4e69] [cursor=pointer]:
+            - /url: /logout.php
+    - generic [ref=f4e70]:
+      - generic [ref=f4e71]:
+        - generic [ref=f4e72]:
+          - heading "OKR و اهداف سازمانی" [level=1] [ref=f4e73]
+          - paragraph [ref=f4e74]: هدف‌های جهت‌دهنده، نتایج کلیدی قابل‌اندازه‌گیری و اقدام‌های متصل به پلنر
+        - generic [ref=f4e75]:
+          - link "مدیریت دوره‌ها" [ref=f4e76] [cursor=pointer]:
+            - /url: /admin/okr-cycles.php
+          - link "پلنر من" [ref=f4e77] [cursor=pointer]:
+            - /url: /employee/work-planner.php
+      - region "خلاصه OKR" [ref=f4e78]:
+        - article [ref=f4e79]:
+          - text: همه اهداف
+          - strong [ref=f4e80]: "0"
+        - article [ref=f4e81]:
+          - text: فعال
+          - strong [ref=f4e82]: "0"
+        - article [ref=f4e83]:
+          - text: در معرض خطر
+          - strong [ref=f4e84]: "0"
+        - article [ref=f4e85]:
+          - text: عقب‌افتاده
+          - strong [ref=f4e86]: "0"
+        - article [ref=f4e87]:
+          - text: در انتظار تأیید
+          - strong [ref=f4e88]: "0"
+        - article [ref=f4e89]:
+          - text: بدون Check-in
+          - strong [ref=f4e90]: "0"
+        - article [ref=f4e91]:
+          - text: میانگین تحقق
+          - strong [ref=f4e92]: 0٪
+      - generic [ref=f4e93]:
+        - heading "فیلتر داشبورد" [level=2] [ref=f4e94]
+        - generic [ref=f4e95]:
+          - generic [ref=f4e96]:
+            - generic [ref=f4e97]: دوره
+            - combobox "دوره" [ref=f4e98]:
+              - option "همه دوره‌ها" [selected]
+          - generic [ref=f4e99]:
+            - generic [ref=f4e100]: وضعیت
+            - combobox "وضعیت" [ref=f4e101]:
+              - option "همه وضعیت‌ها" [selected]
+              - option "پیش‌نویس"
+              - option "در انتظار تأیید"
+              - option "تأییدشده"
+              - option "فعال"
+              - option "در معرض خطر"
+              - option "عقب‌افتاده"
+              - option "تکمیل‌شده"
+              - option "لغوشده"
+          - generic [ref=f4e102]:
+            - generic [ref=f4e103]: مالک
+            - combobox "مالک" [ref=f4e104]:
+              - option "همه افراد محدوده من" [selected]
+              - option "مدیر نصب آزمایشی"
+        - generic [ref=f4e105]:
+          - button "اعمال فیلتر" [ref=f4e106] [cursor=pointer]
+          - link "پاک‌کردن" [ref=f4e107] [cursor=pointer]:
+            - /url: /admin/okr.php
+      - generic [ref=f4e108]:
+        - heading "برای ایجاد هدف، ابتدا یک دوره OKR بسازید." [level=2] [ref=f4e109]
+        - paragraph [ref=f4e110]: بدون دوره باز، تاریخ و چرخه Check-in هدف قابل کنترل نیست.
+        - link "ایجاد اولین دوره OKR" [ref=f4e111] [cursor=pointer]:
+          - /url: /admin/okr-cycles.php#cycle-form
+      - region "فهرست اهداف" [ref=f4e112]:
+        - generic [ref=f4e113]:
+          - heading "هنوز هدفی در این محدوده ثبت نشده است." [level=2] [ref=f4e114]
+          - paragraph [ref=f4e115]: ابتدا یک دوره OKR بسازید و سپس Objective و نتایج کلیدی آن را تعریف کنید.
+          - link "مدیریت دوره‌ها" [ref=f4e116] [cursor=pointer]:
+            - /url: /admin/okr-cycles.php#cycle-form

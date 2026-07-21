@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <link rel="stylesheet" href="/assets/css/app-compact-ui.css">
+  <link rel="stylesheet" href="/assets/css/action-hub.css">
+  <link rel="stylesheet" href="/assets/css/supervisor-action-hub.css">
+  <title>اقدامات تیم سرپرست</title>
+</head>
+<body class="admin-body app-compact-ui">
+<main class="admin-main" style="max-width:1320px;margin:auto;padding:18px"><section class="admin-content">
+  <section class="supervisor-action-panel" id="supervisor-actions">
+    <header class="supervisor-action-heading" data-action-reveal>
+      <div><span class="action-kicker">TEAM ACTIONS</span><h2>اقدامات تیم فروش</h2><p>ثبت و پیگیری اقدام فقط برای اعضای فعال تیم شما؛ تمام داده‌ها در مرکز اقدامات سازمانی نگهداری می‌شود.</p></div>
+      <button class="btn">نمایش در مرکز اقدامات</button>
+    </header>
+    <nav class="action-tabs supervisor-action-tabs"><a class="is-active">باز <b>۱۲</b></a><a>سررسید گذشته <b>۳</b></a><a>تکمیل‌شده <b>۲۸</b></a></nav>
+    <details class="card action-composer supervisor-action-composer" open data-action-reveal>
+      <summary><span><b>ثبت اقدام برای عضو تیم</b><small>نوع پیش‌فرض عمومی است؛ قالب انتخابی فیلدهای تکمیلی را نمایش می‌دهد.</small></span><span class="action-summary-icon">＋</span></summary>
+      <form>
+        <div class="action-form-grid">
+          <label class="form-field action-span-2"><span>عنوان اقدام</span><input value="پیگیری مشتریان بدون خرید"></label>
+          <label class="form-field"><span>عضو مسئول تیم</span><select><option>سارا محمدی — لاین A</option></select></label>
+          <label class="form-field"><span>نوع اقدام</span><select data-action-type><option value="1" selected>عمومی</option><option value="2">فروش</option></select></label>
+          <label class="form-field"><span>قالب نوع اقدام</span><select data-action-template data-action-auto-template="1"><option value="">بدون قالب</option><option value="10" data-type="1">پیگیری عمومی</option><option value="20" data-type="2">پیگیری فروش</option></select></label>
+          <label class="form-field"><span>موعد انجام</span><input value="۱۴۰۵/۰۴/۲۹"></label>
+          <label class="form-field"><span>اولویت</span><select><option>بالا</option></select></label>
+          <label class="form-field action-span-2"><span>شرح اقدام</span><textarea>تماس با مشتریان مسیر شرق و ثبت نتیجه پیگیری.</textarea></label>
+        </div>
+        <div class="action-dynamic-fields" data-action-dynamic><section data-template-fields="10"><div class="action-subheading"><b>اطلاعات قالب «پیگیری عمومی»</b><small>نتیجه مورد انتظار را وارد کنید.</small></div><div class="action-form-grid"><label class="form-field action-field"><span>نتیجه مورد انتظار</span><input value="ثبت حداقل سه سفارش"></label></div></section><section data-template-fields="20" hidden><label class="form-field"><span>مبلغ هدف</span><input></label></section></div>
+        <label class="action-check action-planner-check"><input type="checkbox" checked> هم‌زمان به برنامه کاری عضو مسئول افزوده شود</label>
+        <button class="btn btn-primary">ثبت اقدام تیمی</button>
+      </form>
+    </details>
+    <div class="action-list supervisor-action-list" data-action-reveal>
+      <a class="action-card" style="--action-color:#2563eb"><span class="action-card-rail"></span><div class="action-card-main"><div class="action-card-title"><span class="action-type-dot"></span><h3>پیگیری مشتریان بدون خرید</h3></div><p>تماس با مشتریان مسیر شرق و ثبت نتیجه پیگیری.</p><div class="action-card-meta"><span>عمومی</span><span>مسئول: سارا محمدی</span><span>موعد: ۱۴۰۵/۰۴/۲۹</span><span>متصل به پلنر</span></div></div><div class="action-card-state"><span class="action-priority is-high">بالا</span><span class="action-status is-in_progress">در حال انجام</span></div></a>
+      <a class="action-card" style="--action-color:#dc2626"><span class="action-card-rail"></span><div class="action-card-main"><div class="action-card-title"><span class="action-type-dot"></span><h3>تکمیل گزارش مسیر غرب</h3></div><p>ثبت جمع‌بندی فروش و دلایل عدم تحقق.</p><div class="action-card-meta"><span>گزارش</span><span>مسئول: علی رضایی</span><span>موعد: ۱۴۰۵/۰۴/۲۶</span></div></div><div class="action-card-state"><span class="action-priority is-urgent">فوری</span><span class="action-status is-overdue">سررسید گذشته</span></div></a>
+    </div>
+  </section>
+</section></main>
+<script>window.SobhanActionHub={users:[{id:1,title:"سارا محمدی"}],orgUnits:[],salesLines:[]};</script>
+<script src="/assets/vendor/motion/motion-12.42.2.min.js"></script>
+<script src="/assets/js/action-hub.js"></script>
+</body>
+</html>

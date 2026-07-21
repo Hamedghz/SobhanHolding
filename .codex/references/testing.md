@@ -1,5 +1,13 @@
 # Sobhan Validation Checklist
 
+## Codex Policy Contract
+
+- `.codex/scripts/policy-contract-test.ps1` passes.
+- Implementation and phase prompts require repository edits and targeted validation when changes are needed.
+- Explicit audit/report/plan-only prompts remain read-only.
+- High-risk wording increases validation requirements without forcing documentation-only output.
+- Markdown cannot be the sole deliverable for an implementation phase unless the user explicitly requested documentation-only work.
+
 ## PHP
 
 - Changed PHP files pass `php -l`.

@@ -1,0 +1,93 @@
+- generic [ref=f2e2]:
+  - complementary [ref=f2e3]:
+    - link "شرکت پخش سبحان پنل مدیریت" [ref=f2e4] [cursor=pointer]:
+      - /url: /admin/
+      - generic [ref=f2e5]: شرکت پخش سبحان
+      - generic [ref=f2e6]: پنل مدیریت
+    - navigation "منوی مدیریت" [ref=f2e7]:
+      - group [ref=f2e8]:
+        - generic "داشبوردها" [ref=f2e9] [cursor=pointer]
+      - group [ref=f2e10]:
+        - generic "برنامه کاری من" [ref=f2e11] [cursor=pointer]
+      - group [ref=f2e12]:
+        - generic "مرکز اقدامات" [ref=f2e13] [cursor=pointer]
+        - link "همه اقدامات" [ref=f2e15] [cursor=pointer]:
+          - /url: /admin/action-hub.php
+      - group [ref=f2e17]:
+        - generic "منابع انسانی" [ref=f2e18] [cursor=pointer]
+      - group [ref=f2e19]:
+        - generic "KPI و ارزیابی عملکرد" [ref=f2e20] [cursor=pointer]
+      - group [ref=f2e21]:
+        - generic "آزمون‌ها و ارزیابی سازمانی" [ref=f2e22] [cursor=pointer]
+      - group [ref=f2e23]:
+        - generic "مالی، انبار و وصول" [ref=f2e24] [cursor=pointer]
+      - group [ref=f2e25]:
+        - generic "سایت و محتوا" [ref=f2e26] [cursor=pointer]
+      - group [ref=f2e27]:
+        - generic "مکاتبات اداری" [ref=f2e28] [cursor=pointer]
+      - group [ref=f2e29]:
+        - generic "تنظیمات" [ref=f2e30] [cursor=pointer]
+      - group [ref=f2e31]:
+        - generic "ابزارهای سیستم" [ref=f2e32] [cursor=pointer]
+  - main [ref=f2e33]:
+    - generic [ref=f2e34]:
+      - generic [ref=f2e35]:
+        - strong [ref=f2e36]: مرکز اقدامات
+        - generic [ref=f2e37]: شرکت پخش سبحان
+      - generic [ref=f2e38]:
+        - link "هوش مصنوعی سبحان در دسترس نیست" [ref=f2e39] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=f2e41]: AI قطع
+        - button "اعلان‌ها" [ref=f2e43] [cursor=pointer]:
+          - generic [ref=f2e45]: "0"
+        - generic [ref=f2e46]:
+          - generic [ref=f2e47]: کاربر فقط مشاهده
+          - link "ظاهر" [ref=f2e48] [cursor=pointer]:
+            - /url: /admin/theme-settings.php
+          - link "خروج" [ref=f2e49] [cursor=pointer]:
+            - /url: /logout.php
+    - generic [ref=f2e51]:
+      - generic [ref=f2e53]:
+        - generic [ref=f2e54]: UNIVERSAL ACTION HUB
+        - heading "مرکز اقدامات سازمانی" [level=1] [ref=f2e55]
+        - paragraph [ref=f2e56]: تمام اقدام‌های دستی، گزارش‌ها، مصوبات، OKR، KPI، برنامه کاری و پیشنهادهای هوشمند در یک مسیر قابل پیگیری جمع می‌شوند.
+      - navigation "فیلتر سریع" [ref=f2e57]:
+        - link "همه قابل دسترس" [ref=f2e58] [cursor=pointer]:
+          - /url: /admin/action-hub.php
+        - link "محول‌شده به من" [ref=f2e59] [cursor=pointer]:
+          - /url: /admin/action-hub.php?mine=assigned
+        - link "ایجادشده توسط من" [ref=f2e60] [cursor=pointer]:
+          - /url: /admin/action-hub.php?mine=created
+      - generic [ref=f2e61]:
+        - generic [ref=f2e62]:
+          - generic [ref=f2e63]: جستجو
+          - textbox "جستجو" [ref=f2e64]:
+            - /placeholder: عنوان یا شرح
+        - generic [ref=f2e65]:
+          - generic [ref=f2e66]: وضعیت
+          - combobox "وضعیت" [ref=f2e67]:
+            - option "همه" [selected]
+            - option "جدید"
+            - option "در حال انجام"
+            - option "متوقف"
+            - option "نیازمند بررسی"
+            - option "انجام‌شده"
+            - option "لغوشده"
+            - option "سررسید گذشته"
+        - generic [ref=f2e68]:
+          - generic [ref=f2e69]: اولویت
+          - combobox "اولویت" [ref=f2e70]:
+            - option "همه" [selected]
+            - option "کم"
+            - option "عادی"
+            - option "بالا"
+            - option "فوری"
+        - generic [ref=f2e71]:
+          - generic [ref=f2e72]: نوع
+          - combobox "نوع" [ref=f2e73]:
+            - option "همه" [selected]
+            - option "عمومی"
+        - button "اعمال فیلتر" [ref=f2e74] [cursor=pointer]
+      - generic [ref=f2e76]:
+        - generic [ref=f2e77]: هنوز اقدامی به شما محول نشده است.
+        - generic [ref=f2e78]: پس از تخصیص اقدام توسط مدیر مجاز، جزئیات و وضعیت آن در این بخش نمایش داده می‌شود.

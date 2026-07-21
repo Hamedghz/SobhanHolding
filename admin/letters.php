@@ -37,8 +37,10 @@ $filters = [
 ];
 foreach ($filters as $key => $clause) if (trim((string)($_GET[$key] ?? '')) !== '') { $where[] = $clause; $params[] = '%' . trim((string)$_GET[$key]) . '%'; }
 foreach (['status', 'importance', 'confidentiality'] as $key) if (trim((string)($_GET[$key] ?? '')) !== '') { $where[] = 'l.' . $key . '=?'; $params[] = $_GET[$key]; }
-if (!empty($_GET['date_from'])) { $where[] = 'l.letter_date>=?'; $params[] = $_GET['date_from']; }
-if (!empty($_GET['date_to'])) { $where[] = 'l.letter_date<=?'; $params[] = $_GET['date_to']; }
+$dateFrom = app_date_to_iso($_GET['date_from'] ?? '');
+$dateTo = app_date_to_iso($_GET['date_to'] ?? '');
+if ($dateFrom) { $where[] = 'l.letter_date>=?'; $params[] = $dateFrom; }
+if ($dateTo) { $where[] = 'l.letter_date<=?'; $params[] = $dateTo; }
 if (!Auth::isAdmin() && !LetterModule::can('confidential')) { $where[] = '(l.confidentiality="normal" OR l.created_by=? OR l.approved_by=? OR s.user_id=?)'; $params[] = (int)Auth::user()['id']; $params[] = (int)Auth::user()['id']; $params[] = (int)Auth::user()['id']; }
 $letters = Database::fetchAll('SELECT l.*,u.name creator_name,s.signer_name FROM organizational_letters l LEFT JOIN users u ON u.id=l.created_by LEFT JOIN letter_signatures s ON s.id=l.signature_id WHERE ' . implode(' AND ', $where) . ' ORDER BY l.letter_date DESC,l.id DESC LIMIT 500', $params);
 require __DIR__ . '/../views/partials/admin-header.php'; ?>
@@ -46,7 +48,7 @@ require __DIR__ . '/../views/partials/admin-header.php'; ?>
 <nav class="letter-tabs"><a class="is-active" href="/admin/letters.php">نامه‌ها</a><?php if (LetterModule::can('settings')): ?><a href="/admin/letter-templates.php">قالب‌ها</a><a href="/admin/letter-letterheads.php">سربرگ‌ها</a><a href="/admin/letter-signatures.php">امضاها</a><a href="/admin/letter-settings.php">تنظیمات</a><?php endif; ?></nav>
 <section class="card letter-filter-card"><form method="get" class="letter-filter-grid">
     <label><span>شماره نامه</span><input name="letter_number" value="<?= e($_GET['letter_number'] ?? '') ?>"></label><label><span>موضوع</span><input name="subject" value="<?= e($_GET['subject'] ?? '') ?>"></label><label><span>گیرنده</span><input name="recipient" value="<?= e($_GET['recipient'] ?? '') ?>"></label><label><span>سازمان</span><input name="organization" value="<?= e($_GET['organization'] ?? '') ?>"></label><label><span>واحد صادرکننده</span><input name="sender_unit" value="<?= e($_GET['sender_unit'] ?? '') ?>"></label>
-    <label><span>از تاریخ</span><input type="date" name="date_from" value="<?= e($_GET['date_from'] ?? '') ?>"></label><label><span>تا تاریخ</span><input type="date" name="date_to" value="<?= e($_GET['date_to'] ?? '') ?>"></label>
+    <label><span>از تاریخ</span><?=app_date_input('date_from',$_GET['date_from']??null)?></label><label><span>تا تاریخ</span><?=app_date_input('date_to',$_GET['date_to']??null)?></label>
     <label><span>وضعیت</span><select name="status"><option value="">همه</option><?php foreach ($statusLabels as $v=>$l): ?><option value="<?= e($v) ?>" <?= ($_GET['status'] ?? '')===$v?'selected':'' ?>><?= e($l) ?></option><?php endforeach; ?></select></label>
     <label><span>محرمانگی</span><select name="confidentiality"><option value="">همه</option><?php foreach ($confidentialityLabels as $v=>$l): ?><option value="<?= e($v) ?>" <?= ($_GET['confidentiality'] ?? '')===$v?'selected':'' ?>><?= e($l) ?></option><?php endforeach; ?></select></label>
     <label><span>اهمیت</span><select name="importance"><option value="">همه</option><?php foreach ($importanceLabels as $v=>$l): ?><option value="<?= e($v) ?>" <?= ($_GET['importance'] ?? '')===$v?'selected':'' ?>><?= e($l) ?></option><?php endforeach; ?></select></label>

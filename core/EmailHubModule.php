@@ -22,6 +22,16 @@ class EmailHubModule
         ];
         foreach ($sql as $statement) $pdo->exec($statement);
 
+        foreach (['access_token_expires_at'=>'DATETIME NULL','sync_lock_token'=>'CHAR(64) NULL','sync_lock_expires_at'=>'DATETIME NULL'] as $column=>$definition) {
+            if (!Database::columnExists('email_accounts', $column)) $pdo->exec("ALTER TABLE email_accounts ADD `{$column}` {$definition}");
+        }
+        $columnTypeStmt = $pdo->prepare("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='email_accounts' AND COLUMN_NAME='sync_status' LIMIT 1");
+        $columnTypeStmt->execute();
+        $syncStatusType = (string)$columnTypeStmt->fetchColumn();
+        if (!str_contains($syncStatusType, "'partial'") || !str_contains($syncStatusType, "'needs_reauth'")) {
+            $pdo->exec("ALTER TABLE email_accounts MODIFY sync_status ENUM('never','syncing','ok','partial','needs_reauth','error') NOT NULL DEFAULT 'never'");
+        }
+
         $providers = [
             ['Gmail','gmail','gmail','imap.gmail.com',993,'ssl','smtp.gmail.com',587,'tls','app_password'],
             ['Yahoo','yahoo','yahoo','imap.mail.yahoo.com',993,'ssl','smtp.mail.yahoo.com',587,'tls','app_password'],
@@ -103,6 +113,28 @@ class EmailHubModule
 
     public static function log(?int $accountId,?int $messageId,string $action,string $description='',?string $technical=null,array $meta=[]): void
     {
-        try{Database::execute('INSERT INTO email_logs(account_id,message_id,user_id,action,description,technical_details,ip_address,user_agent,meta_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,NOW())',[$accountId,$messageId,(int)(Auth::user()['id']??0)?:null,$action,mb_substr($description,0,500),$technical,substr((string)($_SERVER['REMOTE_ADDR']??''),0,45),substr((string)($_SERVER['HTTP_USER_AGENT']??''),0,255),$meta?json_encode($meta,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES):null]);}catch(Throwable $ignored){}
+        try{Database::execute('INSERT INTO email_logs(account_id,message_id,user_id,action,description,technical_details,ip_address,user_agent,meta_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,NOW())',[$accountId,$messageId,(int)(Auth::user()['id']??0)?:null,$action,self::truncate($description,500),self::safeTechnical($technical),substr((string)($_SERVER['REMOTE_ADDR']??''),0,45),substr((string)($_SERVER['HTTP_USER_AGENT']??''),0,255),$meta?json_encode(self::redact($meta),JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES):null]);}catch(Throwable $ignored){}
+    }
+
+    private static function safeTechnical(?string $value): ?string
+    {
+        if ($value === null || trim($value) === '') return null;
+        $value = preg_replace('/(?:access|refresh|id)[_-]?token\s*[=:]\s*[^\s,;]+/iu', 'token=[redacted]', $value) ?? $value;
+        $value = preg_replace('/(?:password|client[_-]?secret)\s*[=:]\s*[^\s,;]+/iu', 'secret=[redacted]', $value) ?? $value;
+        return self::truncate($value, 1000);
+    }
+
+    private static function redact(array $meta): array
+    {
+        foreach ($meta as $key => $value) {
+            if (preg_match('/token|password|secret|body|content/i', (string)$key)) $meta[$key] = '[redacted]';
+            elseif (is_array($value)) $meta[$key] = self::redact($value);
+        }
+        return $meta;
+    }
+
+    private static function truncate(string $value, int $length): string
+    {
+        return function_exists('mb_substr') ? mb_substr($value, 0, $length) : substr($value, 0, $length);
     }
 }

@@ -1,0 +1,205 @@
+- generic [ref=f3e2]:
+  - complementary [ref=f3e3]:
+    - link "شرکت پخش سبحان پنل مدیریت" [ref=f3e4] [cursor=pointer]:
+      - /url: /admin/
+      - generic [ref=f3e5]: شرکت پخش سبحان
+      - generic [ref=f3e6]: پنل مدیریت
+    - navigation "منوی مدیریت" [ref=f3e7]:
+      - group [ref=f3e8]:
+        - generic "داشبوردها" [ref=f3e9] [cursor=pointer]
+      - group [ref=f3e10]:
+        - generic "OKR و اهداف سازمانی" [ref=f3e11] [cursor=pointer]
+      - group [ref=f3e12]:
+        - generic "برنامه کاری من" [ref=f3e13] [cursor=pointer]
+      - group [ref=f3e14]:
+        - generic "گزارش کار روزانه" [ref=f3e15] [cursor=pointer]
+        - generic [ref=f3e16]:
+          - link "گزارش کار روزانه" [ref=f3e17] [cursor=pointer]:
+            - /url: /admin/daily-work-report.php
+          - link "قالب‌های گزارش کار" [ref=f3e19] [cursor=pointer]:
+            - /url: /admin/daily-report-templates.php
+      - group [ref=f3e21]:
+        - generic "مرکز اقدامات" [ref=f3e22] [cursor=pointer]
+      - group [ref=f3e23]:
+        - generic "فروش و تحلیل عملکرد" [ref=f3e24] [cursor=pointer]
+      - group [ref=f3e25]:
+        - generic "مدیریت داده فروش" [ref=f3e26] [cursor=pointer]
+      - group [ref=f3e27]:
+        - generic "پنل سرپرست فروش" [ref=f3e28] [cursor=pointer]
+      - group [ref=f3e29]:
+        - generic "گزارشات مدیران" [ref=f3e30] [cursor=pointer]
+      - group [ref=f3e31]:
+        - generic "قوانین مصوب و صورتجلسات" [ref=f3e32] [cursor=pointer]
+      - group [ref=f3e33]:
+        - generic "منابع انسانی" [ref=f3e34] [cursor=pointer]
+      - group [ref=f3e35]:
+        - generic "KPI و ارزیابی عملکرد" [ref=f3e36] [cursor=pointer]
+      - group [ref=f3e37]:
+        - generic "آزمون‌ها و ارزیابی سازمانی" [ref=f3e38] [cursor=pointer]
+      - group [ref=f3e39]:
+        - generic "مالی، انبار و وصول" [ref=f3e40] [cursor=pointer]
+      - group [ref=f3e41]:
+        - generic "سایت و محتوا" [ref=f3e42] [cursor=pointer]
+      - group [ref=f3e43]:
+        - generic "مکاتبات اداری" [ref=f3e44] [cursor=pointer]
+      - group [ref=f3e45]:
+        - generic "ایمیل سازمانی" [ref=f3e46] [cursor=pointer]
+      - group [ref=f3e47]:
+        - generic "هوش مصنوعی و گزارش‌گیری" [ref=f3e48] [cursor=pointer]
+      - group [ref=f3e49]:
+        - generic "تنظیمات" [ref=f3e50] [cursor=pointer]
+      - group [ref=f3e51]:
+        - generic "ابزارهای سیستم" [ref=f3e52] [cursor=pointer]
+  - main [ref=f3e53]:
+    - generic [ref=f3e54]:
+      - generic [ref=f3e55]:
+        - strong [ref=f3e56]: گزارش کار روزانه
+        - generic [ref=f3e57]: شرکت پخش سبحان
+      - generic [ref=f3e58]:
+        - link "هوش مصنوعی سبحان در دسترس نیست" [ref=f3e59] [cursor=pointer]:
+          - /url: /admin/sobhan-api-settings.php
+          - generic [ref=f3e61]: AI قطع
+        - button "اعلان‌ها" [ref=f3e63] [cursor=pointer]:
+          - generic [ref=f3e65]: "0"
+        - generic [ref=f3e66]:
+          - generic [ref=f3e67]: مدیر تست نصب تازه
+          - link "ظاهر" [ref=f3e68] [cursor=pointer]:
+            - /url: /admin/theme-settings.php
+          - link "خروج" [ref=f3e69] [cursor=pointer]:
+            - /url: /logout.php
+    - generic [ref=f3e71]:
+      - generic [ref=f3e72]:
+        - generic [ref=f3e73]:
+          - generic [ref=f3e74]: DAILY WORK REPORT
+          - heading "گزارش کار روزانه" [level=1] [ref=f3e75]
+          - paragraph [ref=f3e76]: فعالیت‌های دستی و داده‌های واقعی Action Hub، پلنر، KPI، حضور و ورود اطلاعات در یک گزارش قابل پیگیری جمع می‌شوند.
+        - generic [ref=f3e77]:
+          - link "مدیریت قالب‌ها" [ref=f3e78] [cursor=pointer]:
+            - /url: /admin/daily-report-templates.php
+          - link "اقدامات من" [ref=f3e79] [cursor=pointer]:
+            - /url: /admin/action-hub.php?mine=assigned
+      - generic [ref=f3e80]:
+        - generic [ref=f3e81]:
+          - generic [ref=f3e82]: کاربر گزارش
+          - combobox "کاربر گزارش" [ref=f3e83]:
+            - option "مدیر تست نصب تازه" [selected]
+        - generic [ref=f3e84]:
+          - generic [ref=f3e85]: تاریخ گزارش
+          - textbox "تاریخ گزارش" [ref=f3e86]:
+            - /placeholder: 1405/04/25
+            - text: 1405/04/27
+        - generic [ref=f3e87]:
+          - generic [ref=f3e88]: قالب گزارش
+          - combobox "قالب گزارش" [ref=f3e89]:
+            - option "گزارش کار روزانه — نسخه 1" [selected]
+        - button "نمایش گزارش" [ref=f3e90] [cursor=pointer]
+      - generic [ref=f3e91]:
+        - generic [ref=f3e92]:
+          - generic [ref=f3e93]: کاربر
+          - strong [ref=f3e94]: مدیر تست نصب تازه
+        - generic [ref=f3e95]:
+          - generic [ref=f3e96]: تاریخ
+          - strong [ref=f3e97]: 1405/04/27
+        - generic [ref=f3e98]:
+          - generic [ref=f3e99]: قالب
+          - strong [ref=f3e100]: گزارش کار روزانه
+        - generic [ref=f3e101]:
+          - generic [ref=f3e102]: وضعیت
+          - strong [ref=f3e103]: ثبت‌نشده
+      - generic [ref=f3e104]:
+        - generic [ref=f3e105]:
+          - article [ref=f3e106]:
+            - generic [ref=f3e107]:
+              - generic [ref=f3e109]:
+                - heading "اقدامات انجام‌شده امروز" [level=2] [ref=f3e110]
+                - text: اقدامات محول‌شده
+              - generic [ref=f3e111]: "0.00"
+            - paragraph [ref=f3e112]: موردی ثبت نشده است.
+          - article [ref=f3e113]:
+            - generic [ref=f3e114]:
+              - generic [ref=f3e116]:
+                - heading "اقدامات باز" [level=2] [ref=f3e117]
+                - text: اقدامات محول‌شده
+              - generic [ref=f3e118]: "0.00"
+            - paragraph [ref=f3e119]: موردی ثبت نشده است.
+          - article [ref=f3e120]:
+            - generic [ref=f3e121]:
+              - generic [ref=f3e123]:
+                - heading "تسک‌های تکمیل‌شده" [level=2] [ref=f3e124]
+                - text: وظایف تکمیل‌شده
+              - generic [ref=f3e125]: "0.00"
+            - paragraph [ref=f3e126]: موردی ثبت نشده است.
+          - article [ref=f3e127]:
+            - generic [ref=f3e128]:
+              - generic [ref=f3e130]:
+                - heading "حضور و کارکرد امروز" [level=2] [ref=f3e131]
+                - text: حضور و کارکرد
+              - generic [ref=f3e132]: "0.00"
+            - paragraph [ref=f3e133]: برای این روز کارکردی ثبت نشده است.
+          - article [ref=f3e134]:
+            - generic [ref=f3e135]:
+              - generic [ref=f3e137]:
+                - heading "وضعیت KPI" [level=2] [ref=f3e138]
+                - text: مقادیر KPI
+              - generic [ref=f3e139]: "0.00"
+            - paragraph [ref=f3e140]: دوره KPI فعالی یافت نشد.
+          - article [ref=f3e141]:
+            - generic [ref=f3e142]:
+              - generic [ref=f3e144]:
+                - heading "فعالیت ورود اطلاعات" [level=2] [ref=f3e145]
+                - text: داده‌های واردشده
+              - generic [ref=f3e146]: "0.00"
+            - paragraph [ref=f3e147]: موردی ثبت نشده است.
+          - generic [ref=f3e148]:
+            - generic [ref=f3e149]: مشکلات و موانع
+            - textbox "مشکلات و موانع موانع، وابستگی‌ها و موارد نیازمند تصمیم را بنویسید." [ref=f3e150]:
+              - /placeholder: ""
+            - generic [ref=f3e151]: موانع، وابستگی‌ها و موارد نیازمند تصمیم را بنویسید.
+          - generic [ref=f3e152]:
+            - generic [ref=f3e153]: اقدامات و پیشنهادات
+            - textbox "اقدامات و پیشنهادات پیشنهاد یا اقدام لازم را ثبت کنید؛ برای واگذاری از سازنده اقدام استفاده کنید." [ref=f3e154]:
+              - /placeholder: ""
+            - generic [ref=f3e155]: پیشنهاد یا اقدام لازم را ثبت کنید؛ برای واگذاری از سازنده اقدام استفاده کنید.
+          - generic [ref=f3e156]:
+            - generic [ref=f3e157]: برنامه فردا *
+            - textbox "برنامه فردا * اولویت‌های روز بعد را ثبت کنید." [ref=f3e158]:
+              - /placeholder: ""
+            - generic [ref=f3e159]: اولویت‌های روز بعد را ثبت کنید.
+          - article [ref=f3e160]:
+            - generic [ref=f3e161]:
+              - generic [ref=f3e163]:
+                - heading "جمع پیشرفت روز" [level=2] [ref=f3e164]
+                - text: فیلد محاسباتی
+              - generic [ref=f3e165]: "0.00"
+            - paragraph [ref=f3e166]: "0"
+        - generic [ref=f3e167]:
+          - button "ذخیره پیش‌نویس" [ref=f3e168] [cursor=pointer]
+          - button "ثبت و ارسال گزارش" [ref=f3e169] [cursor=pointer]
+      - group [ref=f3e170]:
+        - generic "ساخت اقدام از «اقدامات و پیشنهادات» گزارش فقط لینک اقدام را نگه می‌دارد؛ مالکیت و وضعیت در مرکز اقدامات مدیریت می‌شود. ＋" [ref=f3e171] [cursor=pointer]:
+          - generic [ref=f3e172]:
+            - generic [ref=f3e173]: ساخت اقدام از «اقدامات و پیشنهادات»
+            - generic [ref=f3e174]: گزارش فقط لینک اقدام را نگه می‌دارد؛ مالکیت و وضعیت در مرکز اقدامات مدیریت می‌شود.
+          - generic [ref=f3e175]: ＋
+        - option "مدیر تست نصب تازه" [selected]
+        - option "عمومی" [selected]
+        - option "کم"
+        - option "عادی" [selected]
+        - option "بالا"
+        - option "فوری"
+      - generic [ref=f3e176]:
+        - generic [ref=f3e177]:
+          - heading "گزارش‌های اخیر قابل دسترس" [level=2] [ref=f3e178]
+          - generic [ref=f3e179]: 0 گزارش
+        - table [ref=f3e181]:
+          - rowgroup [ref=f3e182]:
+            - row [ref=f3e183]:
+              - columnheader "تاریخ" [ref=f3e184]
+              - columnheader "کاربر" [ref=f3e185]
+              - columnheader "قالب" [ref=f3e186]
+              - columnheader "وضعیت" [ref=f3e187]
+              - columnheader "اقدام پیوندی" [ref=f3e188]
+              - columnheader "نمایش" [ref=f3e189]
+          - rowgroup [ref=f3e190]:
+            - row [ref=f3e191]:
+              - cell "هنوز گزارشی ثبت نشده است." [ref=f3e192]

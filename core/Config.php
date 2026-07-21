@@ -4,16 +4,16 @@ class Config
     public static function all(): array
     {
         $path = __DIR__ . '/../config/config.php';
-        if (!file_exists($path)) {
-            return self::defaults();
-        }
+        $config = file_exists($path) ? require $path : [];
+        if (!is_array($config)) $config = [];
 
-        $config = require $path;
-        if (!is_array($config)) {
-            return self::defaults();
-        }
+        // New installations keep credentials outside the tracked template.
+        // Reading config.php first preserves compatibility with older installs.
+        $localPath = __DIR__ . '/../config/local.php';
+        $local = file_exists($localPath) ? require $localPath : [];
+        if (!is_array($local)) $local = [];
 
-        return array_replace_recursive(self::defaults(), $config);
+        return array_replace_recursive(self::defaults(), $config, $local);
     }
 
     public static function db(): array
@@ -55,6 +55,7 @@ class Config
             'installed' => false,
             'db' => [
                 'host' => '',
+                'port' => 3306,
                 'name' => '',
                 'user' => '',
                 'pass' => '',

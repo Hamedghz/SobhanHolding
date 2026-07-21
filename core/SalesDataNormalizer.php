@@ -24,9 +24,39 @@ class SalesDataNormalizer
     {
         $value = self::normalizePersianArabicDigits($value);
         $value = preg_replace('/^(?:\xEF\xBB\xBF|\x{FEFF})/u', '', $value) ?? $value;
-        $value = strtr($value, ['ي'=>'ی','ى'=>'ی','ك'=>'ک','ۀ'=>'ه','ة'=>'ه','‌'=>' ','ـ'=>'']);
+        $value = strtr($value, ['ي'=>'ی','ى'=>'ی','ك'=>'ک','ۀ'=>'ه','ة'=>'ه','‌'=>' ','‍'=>' ','ـ'=>'',"\r"=>' ',"\n"=>' ']);
+        $value = preg_replace('/\s*%\s*/u', '%', $value) ?? $value;
         $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
-        return mb_strtolower(trim($value));
+        $normalized = function_exists('mb_strtolower') ? mb_strtolower(trim($value), 'UTF-8') : strtolower(trim($value));
+        return self::headerAliases()[$normalized] ?? $normalized;
+    }
+
+    public static function headerAliases(): array
+    {
+        static $aliases;
+        if ($aliases !== null) return $aliases;
+        $raw = [
+            'مبغ تخفیف 1' => 'مبلغ تخفیف 1',
+            'نام  تامین کننده' => 'نام تامین کننده',
+            'mobile' => 'موبایل',
+            'مبلغ مالیات صارده' => 'مبلغ مالیات صادره',
+            'تعدادفروش کارتن' => 'تعداد فروش کارتن',
+            'مدیرفروش' => 'مدیر فروش',
+            'کدپرسنلی' => 'کد پرسنلی',
+            'نام خانوادگي' => 'نام خانوادگی',
+            'ساعت شروع بكار' => 'ساعت شروع به کار',
+            'ساعت پايان كار' => 'ساعت پایان کار',
+            'اضافه كاري' => 'اضافه کاری',
+        ];
+        $aliases = [];
+        foreach ($raw as $from => $to) {
+            $from = trim(preg_replace('/\s+/u', ' ', strtr($from, ['ي'=>'ی','ى'=>'ی','ك'=>'ک','‌'=>' '])) ?? $from);
+            $to = trim(preg_replace('/\s+/u', ' ', strtr($to, ['ي'=>'ی','ى'=>'ی','ك'=>'ک','‌'=>' '])) ?? $to);
+            $from = function_exists('mb_strtolower') ? mb_strtolower($from, 'UTF-8') : strtolower($from);
+            $to = function_exists('mb_strtolower') ? mb_strtolower($to, 'UTF-8') : strtolower($to);
+            $aliases[$from] = $to;
+        }
+        return $aliases;
     }
 
     public static function normalizeHeaders(array $headers): array
@@ -97,7 +127,7 @@ class SalesDataNormalizer
         ];
         $result = [];
         $requiredKeys = array_values(self::REQUIRED);
-        $numericKeys = ['quantity','carton_quantity','unit_quantity','net_carton_quantity','unit_price','gross_amount','discount_amount','net_amount','tax_amount','duty_amount','tax_duty_amount','weight','volume','product_weight','product_volume','fifo_cost','average_cost','purchase_cost','coefficient','sales_coefficient'];
+        $numericKeys = ['quantity','units_per_carton','carton_quantity','unit_quantity','net_carton_quantity','unit_price','gross_amount','discount_amount','gross_after_discount','net_amount','tax_amount','duty_amount','tax_duty_amount','weight','volume','product_weight','product_volume','fifo_cost','average_cost','purchase_cost','coefficient','sales_coefficient'];
         foreach ($headers as $header => $key) {
             $result[] = [
                 'source_header' => $header,

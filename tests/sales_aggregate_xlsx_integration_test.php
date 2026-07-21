@@ -1,10 +1,21 @@
 <?php
-$root=dirname(__DIR__);require_once $root.'/core/SalesAggregateImportService.php';
-$path='/fixture/sales.xlsx';if(!is_file($path))throw new RuntimeException('XLSX fixture missing.');
+$root=dirname(__DIR__);
+require_once $root.'/core/SalesAggregateImportService.php';
+require_once $root.'/tests/support/import_integration_bootstrap.php';
+require_once $root.'/tests/support/xlsx_fixture.php';
+$pdo=importIntegrationPdo($root);
+seedImportIntegrationMappings($pdo);
+$headers=['نوع فاکتور','شماره فاکتور','تاریخ','کد فروشنده','نام فروشنده','کد مشتری','نام مشتری','کد کالا','نام کالا','تعداد کل','مبلغ ناخالص','مجموع مبلغ تخفیف سطری','مبلغ خالص','کد یکتا','ستون فرمول'];
+$rows=[['فروش','X-1001','1404/04/25','V-XLSX','ویزیتور فایل','C-XLSX','مشتری فایل','P-XLSX','کالای فایل','1','100000','5000','95000','XLSX-U-1','2']];
+$path=tempnam(sys_get_temp_dir(),'sales-xlsx-').'.xlsx';
+createXlsxFixture($path,'Data','tbltajmi',$headers,$rows,['O2'=>'1+1']);
 $result=SalesAggregateImportService::readUploadedFile(['error'=>UPLOAD_ERR_OK,'tmp_name'=>$path,'size'=>filesize($path),'name'=>'name-must-not-matter.xlsx'],'skip_duplicates',1);
+@unlink($path);
 if($result['needs_selection']||$result['summary']['valid_rows']!==1)throw new RuntimeException('XLSX staging failed.');
 $batch=Database::fetch('SELECT detected_sheet,detected_table FROM sales_import_batches WHERE id=?',[$result['batch_id']]);
 if(($batch['detected_table']??'')!=='tbltajmi'||($batch['detected_sheet']??'')!=='Data')throw new RuntimeException('tbltajmi detection failed.');
 $staged=Database::fetch('SELECT raw_json FROM staging_sales_data WHERE import_batch_id=?',[$result['batch_id']]);
 if(str_contains((string)($staged['raw_json']??''),'=1+1'))throw new RuntimeException('Formula text must not be executed or imported.');
+$commit=SalesAggregateImportService::commitValidRows($result['batch_id'],1,true);
+if($commit!==['imported'=>1,'updated'=>0,'skipped'=>0])throw new RuntimeException('XLSX commit failed.');
 echo "Sales aggregate XLSX integration: PASS\n";

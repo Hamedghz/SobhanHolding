@@ -1,0 +1,74 @@
+input[data-jalali-date],
+.app-jalali-date-input {
+    direction: ltr;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+}
+
+input[data-jalali-date].is-invalid,
+.app-jalali-date-input.is-invalid {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, .12);
+}
+
+.jdp-container {
+    direction: rtl;
+    font-family: inherit;
+    border-radius: 12px;
+    box-shadow: 0 18px 50px rgba(15, 23, 42, .2);
+}
+
+.jdp-container,
+.jdp-container button,
+.jdp-container select {
+    font-family: inherit;
+}
+
+.jdp-container .app-date-disabled {
+    opacity: .4;
+    text-decoration: line-through;
+}
+
+.app-period-custom[hidden],
+.app-custom-period[hidden] {
+    display: none !important;
+}
+
+.app-period-custom,
+.app-custom-period {
+    grid-column: 1 / -1;
+    padding: 12px;
+    border: 1px dashed var(--border, #dbe2ea);
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+[data-period-selector] {
+    min-width: min(100%, 220px);
+}
+
+.has-custom-period [data-period-selector] {
+    border-color: var(--primary, #087f8c);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #087f8c) 14%, transparent);
+}
+
+@media (max-width: 760px) {
+    .jdp-container {
+        position: fixed !important;
+        inset: auto 10px 10px 10px !important;
+        width: auto !important;
+        max-width: none !important;
+        max-height: min(82vh, 680px);
+        overflow: auto;
+        border-radius: 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .jdp-container,
+    .jdp-container * {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+    }
+}

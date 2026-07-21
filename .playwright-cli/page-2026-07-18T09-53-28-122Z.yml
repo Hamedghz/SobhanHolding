@@ -1,0 +1,101 @@
+- generic [ref=f11e2]:
+  - complementary [ref=f11e3]:
+    - link [ref=f11e4] [cursor=pointer]:
+      - /url: /admin/
+      - generic [ref=f11e5]: شرکت پخش سبحان
+      - generic [ref=f11e6]: پنل مدیریت
+    - navigation [ref=f11e7]:
+      - group [ref=f11e8]:
+        - generic [ref=f11e9] [cursor=pointer]: داشبوردها
+        - generic [ref=f11e10]:
+          - link [ref=f11e11] [cursor=pointer]:
+            - /url: /admin/index.php
+            - generic [ref=f11e12]: داشبورد اصلی
+          - link [ref=f11e13] [cursor=pointer]:
+            - /url: /admin/ceo-dashboard.php
+            - generic [ref=f11e14]: پنل مدیرعامل
+          - link [ref=f11e15] [cursor=pointer]:
+            - /url: /admin/manager-dashboard.php
+            - generic [ref=f11e16]: پنل مدیران فروش
+          - link [ref=f11e17] [cursor=pointer]:
+            - /url: /admin/supervisor-dashboard.php
+            - generic [ref=f11e18]: پنل سرپرست فروش
+          - link [ref=f11e19] [cursor=pointer]:
+            - /url: /admin/employee-dashboard.php
+            - generic [ref=f11e20]: پنل کارمند
+      - group [ref=f11e21]:
+        - generic [ref=f11e22] [cursor=pointer]: OKR و اهداف سازمانی
+      - group [ref=f11e23]:
+        - generic [ref=f11e24] [cursor=pointer]: برنامه کاری من
+      - group [ref=f11e25]:
+        - generic [ref=f11e26] [cursor=pointer]: گزارش کار روزانه
+      - group [ref=f11e27]:
+        - generic [ref=f11e28] [cursor=pointer]: مرکز اقدامات
+      - group [ref=f11e29]:
+        - generic [ref=f11e30] [cursor=pointer]: فروش و تحلیل عملکرد
+      - group [ref=f11e31]:
+        - generic [ref=f11e32] [cursor=pointer]: مدیریت داده فروش
+      - group [ref=f11e33]:
+        - generic [ref=f11e34] [cursor=pointer]: پنل سرپرست فروش
+      - group [ref=f11e35]:
+        - generic [ref=f11e36] [cursor=pointer]: گزارشات مدیران
+      - group [ref=f11e37]:
+        - generic [ref=f11e38] [cursor=pointer]: قوانین مصوب و صورتجلسات
+      - group [ref=f11e39]:
+        - generic [ref=f11e40] [cursor=pointer]: منابع انسانی
+      - group [ref=f11e41]:
+        - generic [ref=f11e42] [cursor=pointer]: KPI و ارزیابی عملکرد
+      - group [ref=f11e43]:
+        - generic [ref=f11e44] [cursor=pointer]: آزمون‌ها و ارزیابی سازمانی
+      - group [ref=f11e45]:
+        - generic [ref=f11e46] [cursor=pointer]: مالی، انبار و وصول
+      - group [ref=f11e47]:
+        - generic [ref=f11e48] [cursor=pointer]: سایت و محتوا
+      - group [ref=f11e49]:
+        - generic [ref=f11e50] [cursor=pointer]: مکاتبات اداری
+      - group [ref=f11e51]:
+        - generic [ref=f11e52] [cursor=pointer]: ایمیل سازمانی
+      - group [ref=f11e53]:
+        - generic [ref=f11e54] [cursor=pointer]: هوش مصنوعی و گزارش‌گیری
+      - group [ref=f11e55]:
+        - generic [ref=f11e56] [cursor=pointer]: تنظیمات
+      - group [ref=f11e57]:
+        - generic [ref=f11e58] [cursor=pointer]: ابزارهای سیستم
+  - main [ref=f11e59]:
+    - generic [ref=f11e60]:
+      - button "باز کردن منو" [ref=f11e61] [cursor=pointer]
+      - strong [ref=f11e66]: داشبورد مدیران فروش
+      - generic [ref=f11e67]:
+        - link "هوش مصنوعی سبحان در دسترس نیست" [ref=f11e68] [cursor=pointer]:
+          - /url: /admin/sobhan-api-settings.php
+          - generic [ref=f11e70]: AI قطع
+        - button "اعلان‌ها" [ref=f11e72] [cursor=pointer]:
+          - generic [ref=f11e74]: "0"
+        - generic [ref=f11e75]:
+          - link "ظاهر" [ref=f11e76] [cursor=pointer]:
+            - /url: /admin/theme-settings.php
+          - link "خروج" [ref=f11e77] [cursor=pointer]:
+            - /url: /logout.php
+    - generic [ref=f11e78]:
+      - generic [ref=f11e79]:
+        - generic [ref=f11e80]:
+          - text: "منبع بروزرسانی:"
+          - strong [ref=f11e81]: گزارش ایمپورت‌شده / دیتابیس
+        - generic [ref=f11e82]: "آخرین بروزرسانی: ثبت نشده"
+        - link "تنظیم نمایش" [ref=f11e83] [cursor=pointer]:
+          - /url: /admin/dashboard-settings.php?scope=sales_manager
+        - button "بروزرسانی داشبورد" [ref=f11e85] [cursor=pointer]
+      - generic [ref=f11e86]:
+        - generic [ref=f11e87]:
+          - text: پنل مستقل مدیران فروش
+          - heading "داشبورد مدیران فروش" [level=1] [ref=f11e88]
+          - paragraph [ref=f11e89]: برای شروع یک فایل گزارش وارد کنید.
+        - generic [ref=f11e91]:
+          - text: دوره گزارش
+          - combobox "دوره گزارش" [ref=f11e92]:
+            - option "داده فعال Import / View" [selected]
+      - generic [ref=f11e93]:
+        - heading "هنوز گزارشی وجود ندارد" [level=2] [ref=f11e94]
+        - paragraph [ref=f11e95]: ابتدا داده معتبر را از مسیر ورود اطلاعات فعال کنید؛ تنظیمات داشبورد جای ورود عدد کسب‌وکار نیست.
+        - link "ورود اطلاعات فروش" [ref=f11e96] [cursor=pointer]:
+          - /url: /admin/import-center.php?source=sales_aggregate

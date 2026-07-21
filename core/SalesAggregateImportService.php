@@ -3,6 +3,7 @@ require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/SalesAggregateRepository.php';
 require_once __DIR__ . '/SalesDataNormalizer.php';
 require_once __DIR__ . '/SalesReferenceRepository.php';
+require_once __DIR__ . '/SpreadsheetImportReader.php';
 
 class SalesAggregateImportService
 {
@@ -159,6 +160,8 @@ class SalesAggregateImportService
     {
         $uniqueCode = trim((string)($normalized['unique_code'] ?? ''));
         if ($uniqueCode !== '') return sha1('sales_aggregate|' . $uniqueCode);
+        $sourceIdentifier = trim((string)($normalized['identifier'] ?? ''));
+        if ($sourceIdentifier !== '') return sha1('sales_aggregate|identifier|' . $sourceIdentifier);
         $parts = ['invoice_number','invoice_type','sub_invoice_number','product_code','customer_code','visitor_code','invoice_date_raw'];
         return sha1('sales_aggregate|' . implode('|', array_map(static fn($key) => trim((string)($normalized[$key] ?? '')), $parts)));
     }
@@ -170,23 +173,29 @@ class SalesAggregateImportService
 
     public static function storeToStaging(int $batchId, array $candidate): array
     {
-        $rows = $candidate['rows'] ?? [];
-        if (!$rows) throw new InvalidArgumentException('منبع انتخاب‌شده فاقد داده است.');
-        $headers = array_map(static fn($v) => trim((string)$v), array_shift($rows));
-        $mapping = self::mapColumns($headers);
-        if ($mapping['missing_required']) throw new InvalidArgumentException('سرستون‌های الزامی یافت نشد: ' . implode('، ', $mapping['missing_required']));
         $batch = Database::fetch('SELECT import_mode,metadata_json FROM sales_import_batches WHERE id=? AND source_module="sales_aggregate"', [$batchId]);
         if (!$batch) throw new InvalidArgumentException('Batch پیدا نشد.');
+        $pdo=Database::connection();$startedHere=!$pdo->inTransaction();if($startedHere)$pdo->beginTransaction();
+        try {
         $mode = in_array($batch['import_mode'], self::MODES, true) ? $batch['import_mode'] : 'replace_reference';
         $seen = [];
         $counts = ['total_rows'=>0,'valid_rows'=>0,'invalid_rows'=>0,'duplicate_rows'=>0,'ready_rows'=>0];
-        foreach ($rows as $offset => $values) {
+        $headers = null;
+        $mapping = null;
+        foreach (SpreadsheetImportReader::candidateRows($candidate) as $item) {
+            $values = $item['values'];
+            if ($headers === null) {
+                $headers = array_map(static fn($v) => trim((string)$v), $values);
+                $mapping = self::mapColumns($headers);
+                if ($mapping['missing_required']) throw new InvalidArgumentException('سرستون‌های الزامی یافت نشد: ' . implode('، ', $mapping['missing_required']));
+                continue;
+            }
             if ($counts['total_rows'] >= self::MAX_ROWS) throw new InvalidArgumentException('تعداد ردیف‌های فایل بیش از حد مجاز است.');
             if (!array_filter($values, static fn($v) => trim((string)$v) !== '')) continue;
-            $rowNumber = $offset + 2;
+            $rowNumber = (int)$item['row_number'];
             $raw = [];
             foreach ($headers as $index=>$header) if ($header !== '') $raw[$header] = (string)($values[$index] ?? '');
-            $normalized = self::normalizeMappedRow($values, $mapping['columns']);
+            $normalized = self::normalizeMappedRow($values, $mapping['columns'] ?? []);
             $sourceKey = self::buildSourceUniqueKey($normalized);
             $duplicate = self::detectDuplicate($sourceKey, $seen);
             $seen[$sourceKey] = true;
@@ -200,11 +209,17 @@ class SalesAggregateImportService
             if ($status === 'invalid') $counts['invalid_rows']++; else $counts['valid_rows']++;
             if ($status === 'valid') $counts['ready_rows']++;
         }
+        if ($headers === null) throw new InvalidArgumentException('منبع انتخاب‌شده فاقد داده است.');
         $metadata = json_decode((string)$batch['metadata_json'], true) ?: [];
         $metadata['selected_candidate'] = self::candidateMetadata($candidate);
         SalesAggregateRepository::updateBatchDetection($batchId,$candidate,'preview',$metadata);
         SalesAggregateRepository::updateBatchCounts($batchId,$counts,'preview');
+        if($startedHere)$pdo->commit();
         return $counts;
+        } catch (Throwable $e) {
+            if($startedHere&&$pdo->inTransaction())$pdo->rollBack();
+            throw $e;
+        }
     }
 
     public static function generateImportSummary(int $batchId): array
@@ -241,35 +256,32 @@ class SalesAggregateImportService
             if ($batch['import_mode'] === 'fail_on_duplicate' && (int)$batch['duplicate_rows'] > 0) {
                 throw new DomainException('داده تکراری یافت شد؛ ورود نهایی لغو شد.');
             }
-            $rows = SalesAggregateRepository::stagingRows($batchId,'valid');
-            if (!$rows && (int)$batch['total_rows'] > 0 && !in_array($batch['import_mode'], ['skip_duplicates','append'], true)) {
+            $validCount = SalesAggregateRepository::stagingCount($batchId,'valid');
+            if ($validCount === 0 && (int)$batch['total_rows'] > 0 && !in_array($batch['import_mode'], ['skip_duplicates','append'], true)) {
                 throw new DomainException('هیچ ردیف معتبری برای ورود نهایی وجود ندارد.');
             }
             $imported = $updated = $skipped = 0;
             if (in_array($batch['import_mode'], ['skip_duplicates','append'], true)) {
-                $duplicates = SalesAggregateRepository::stagingRows($batchId,'duplicate');
-                foreach ($duplicates as $duplicate) {
-                    SalesAggregateRepository::markStaging((int)$duplicate['id'],'skipped');
-                    $skipped++;
+                $afterDuplicateId = 0;
+                while ($duplicates = SalesAggregateRepository::stagingRowsChunk($batchId,'duplicate',$afterDuplicateId)) {
+                    foreach ($duplicates as $duplicate) { $afterDuplicateId=(int)$duplicate['id'];SalesAggregateRepository::markStaging($afterDuplicateId,'skipped');$skipped++; }
                 }
             }
-            foreach ($rows as $row) {
-                $data = json_decode((string)$row['normalized_json'], true) ?: [];
-                $data['period_key'] = $batch['period_key'] ?? null;
-                $raw = json_decode((string)$row['raw_json'], true) ?: [];
-                $existing = SalesAggregateRepository::finalRowBySourceKey((string)$row['source_unique_key'],true);
-                if ($existing && $batch['import_mode'] === 'fail_on_duplicate') throw new DomainException('داده تکراری یافت شد؛ ورود نهایی لغو شد.');
-                if ($existing && in_array($batch['import_mode'], ['skip_duplicates','append'], true)) {
-                    SalesAggregateRepository::markStaging((int)$row['id'],'skipped'); $skipped++; continue;
-                }
-                if ($existing) {
-                    SalesAggregateRepository::updateFinal((int)$existing['id'],$batchId,(string)$row['source_unique_key'],$data,$raw);
-                    SalesAggregateRepository::markStaging((int)$row['id'],'committed'); $updated++;
-                } else {
-                    SalesAggregateRepository::insertFinal($batchId,(string)$row['source_unique_key'],$data,$raw);
-                    SalesAggregateRepository::markStaging((int)$row['id'],'committed'); $imported++;
+            $afterValidId = 0;
+            while ($rows = SalesAggregateRepository::stagingRowsChunk($batchId,'valid',$afterValidId)) {
+                foreach ($rows as $row) {
+                    $afterValidId = (int)$row['id'];
+                    $data = json_decode((string)$row['normalized_json'], true) ?: [];
+                    $data['period_key'] = $batch['period_key'] ?? null;
+                    $raw = json_decode((string)$row['raw_json'], true) ?: [];
+                    $existing = SalesAggregateRepository::finalRowBySourceKey((string)$row['source_unique_key'],true);
+                    if ($existing && $batch['import_mode'] === 'fail_on_duplicate') throw new DomainException('داده تکراری یافت شد؛ ورود نهایی لغو شد.');
+                    if ($existing && in_array($batch['import_mode'], ['skip_duplicates','append'], true)) { SalesAggregateRepository::markStaging($afterValidId,'skipped');$skipped++;continue; }
+                    if ($existing) { SalesAggregateRepository::updateFinal((int)$existing['id'],$batchId,(string)$row['source_unique_key'],$data,$raw);SalesAggregateRepository::markStaging($afterValidId,'committed');$updated++; }
+                    else { SalesAggregateRepository::insertFinal($batchId,(string)$row['source_unique_key'],$data,$raw);SalesAggregateRepository::markStaging($afterValidId,'committed');$imported++; }
                 }
             }
+            SalesAggregateRepository::finalizeReferenceAliases($batchId);
             SalesAggregateRepository::finishBatch($batchId,'committed',$imported,$updated,$skipped);
             SalesReferenceRepository::setActiveReferenceBatch($batchId, $actorId);
             $pdo->commit();
@@ -339,7 +351,7 @@ class SalesAggregateImportService
     {
         $identity = $detection.'|'.($sheet['name']??'').'|'.$tableName.'|'.$ref;
         return ['key'=>hash('sha256',$identity),'sheet_name'=>(string)($sheet['name']??''),'table_name'=>$tableName?:null,
-            'detection'=>$detection,'ref'=>$ref?:null,'headers'=>$rows[0]??[],'rows'=>$rows];
+            'detection'=>$detection,'ref'=>$ref?:null,'headers'=>$rows[0]??[],'rows'=>$rows,'stream'=>$sheet['stream']??null];
     }
 
     private static function candidateMetadata(array $candidate): array
@@ -373,7 +385,7 @@ class SalesAggregateImportService
         $prefix = fread($handle, 3);
         if ($prefix !== "\xEF\xBB\xBF") rewind($handle);
         $rows=[];
-        while (($row=fgetcsv($handle,0,$delimiter))!==false) {
+        while (($row=fgetcsv($handle,0,$delimiter,'"','\\'))!==false) {
             if (count($rows)>=self::MAX_ROWS+1) { fclose($handle); throw new InvalidArgumentException('تعداد ردیف‌های فایل بیش از حد مجاز است.'); }
             if (isset($row[0])) $row[0]=preg_replace('/^\xEF\xBB\xBF/','',(string)$row[0]);
             $rows[]=$row;

@@ -141,14 +141,8 @@ class HrModule
         $meta = $data['meta'];
         $seedKey = (string)$meta['seed_key'];
         $seedVersion = (string)$meta['seed_version'];
-        $counts = ['tests' => 0, 'questions' => 0, 'updated' => 0, 'packages' => 0, 'package_links' => 0, 'archived' => 0, 'deleted' => 0];
-
-        [$responseCount, $resultCount, $submittedCount] = self::assessmentUsageCounts($pdo);
-        if ($responseCount === 0 && $resultCount === 0 && $submittedCount === 0) {
-            $counts['deleted'] = self::deletePreviousSeededAssessmentData($pdo, $seedKey);
-        } else {
-            $counts['archived'] = self::archivePreviousSeededAssessmentData($pdo, $seedKey, $seedVersion);
-        }
+        $counts = ['tests' => 0, 'questions' => 0, 'updated' => 0, 'packages' => 0, 'package_links' => 0, 'archived' => 0];
+        $counts['archived'] = self::archivePreviousSeededAssessmentData($pdo, $seedKey, $seedVersion);
 
         $testStmt = $pdo->prepare('INSERT INTO hr_assessment_tests(title,code,category,description,scoring_type,time_limit_minutes,active,sort_order,seeded,seed_key,seed_version,is_seeded,is_archived,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,1,?,?,1,0,NOW(),NOW()) ON DUPLICATE KEY UPDATE title=VALUES(title),category=VALUES(category),description=VALUES(description),scoring_type=VALUES(scoring_type),time_limit_minutes=VALUES(time_limit_minutes),active=VALUES(active),sort_order=VALUES(sort_order),seeded=1,seed_key=VALUES(seed_key),seed_version=VALUES(seed_version),is_seeded=1,is_archived=0,updated_at=NOW()');
         $dimStmt = $pdo->prepare('INSERT INTO hr_assessment_dimensions(test_id,dimension_key,dimension_label,description,sort_order,seed_key,seed_version,is_seeded,created_at,updated_at) VALUES (?,?,?,?,?,?,?,1,NOW(),NOW()) ON DUPLICATE KEY UPDATE dimension_label=VALUES(dimension_label),description=VALUES(description),sort_order=VALUES(sort_order),seed_key=VALUES(seed_key),seed_version=VALUES(seed_version),is_seeded=1,updated_at=NOW()');
@@ -236,25 +230,6 @@ class HrModule
         $seedVersionStmt->execute([$seedKey, $seedVersion, $meta['source_title'] ?? null, $meta['source_file'] ?? null, $userId, 'safe_hr_assessment_seed']);
 
         return $counts;
-    }
-
-    private static function assessmentUsageCounts(PDO $pdo): array
-    {
-        return [
-            (int)$pdo->query('SELECT COUNT(*) FROM hr_assessment_responses')->fetchColumn(),
-            (int)$pdo->query('SELECT COUNT(*) FROM hr_assessment_results')->fetchColumn(),
-            (int)$pdo->query('SELECT COUNT(*) FROM hr_assessment_assignments WHERE status="submitted"')->fetchColumn(),
-        ];
-    }
-
-    private static function deletePreviousSeededAssessmentData(PDO $pdo, string $seedKey): int
-    {
-        $legacyCodes = array_merge(array_keys(self::testDefinitions()), array_map(static fn(array $item): string => (string)$item['test_code'], self::sobhanAssessmentData()['tests']));
-        $placeholders = implode(',', array_fill(0, count($legacyCodes), '?'));
-        $sql = 'DELETE FROM hr_assessment_tests WHERE ((COALESCE(is_seeded,0)=1 OR COALESCE(seeded,0)=1 OR seed_key IS NOT NULL) AND (seed_key <> ? OR seed_key IS NULL)) OR (code IN (' . $placeholders . ') AND (COALESCE(is_seeded,0)=1 OR COALESCE(seeded,0)=1))';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute(array_merge([$seedKey], $legacyCodes));
-        return $stmt->rowCount();
     }
 
     private static function archivePreviousSeededAssessmentData(PDO $pdo, string $seedKey, string $seedVersion): int

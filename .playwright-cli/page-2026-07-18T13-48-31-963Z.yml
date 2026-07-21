@@ -1,0 +1,11 @@
+- main [ref=f3e2]:
+  - heading "ورود به سامانه" [level=1] [ref=f3e3]
+  - paragraph [ref=f3e4]: شرکت پخش سبحان
+  - generic [ref=f3e5]:
+    - generic [ref=f3e6]:
+      - generic [ref=f3e7]: نام کاربری یا ایمیل
+      - textbox "نام کاربری یا ایمیل" [active] [ref=f3e8]
+    - generic [ref=f3e9]:
+      - generic [ref=f3e10]: رمز عبور
+      - textbox "رمز عبور" [ref=f3e11]
+    - button "ورود" [ref=f3e12] [cursor=pointer]

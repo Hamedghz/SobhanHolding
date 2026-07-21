@@ -20,6 +20,10 @@ class NotificationService
         'internal_message' => 'پیام داخلی',
         'personal_planner_reminder' => 'یادآوری برنامه کاری من',
         'due_date_reminder' => 'یادآوری مهلت انجام',
+        'okr_checkin_reminder' => 'یادآوری Check-in اهداف',
+        'okr_due_date_reminder' => 'یادآوری مهلت OKR',
+        'okr_risk_alert' => 'هشدار هدف در معرض خطر',
+        'okr_decision_linked' => 'اتصال مصوبه به OKR',
         'test' => 'اعلان آزمایشی',
     ];
 
@@ -333,6 +337,16 @@ class NotificationService
         return $notificationId;
     }
 
+    public static function safeNotify(callable $callback): mixed
+    {
+        try {
+            return $callback();
+        } catch (Throwable $e) {
+            error_log('Notification safe delivery: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public static function listForUser(int $userId, int $limit = 10, bool $unreadOnly = false): array
     {
         $limit = max(1, min(50, $limit));
@@ -475,7 +489,9 @@ class NotificationService
             str_contains($event,'approval')=>'approval',
             str_contains($event,'forwarded_report'),str_contains($event,'sale'),str_contains($event,'manager_dashboard')=>'sales',
             str_contains($event,'hr'),str_contains($event,'assessment'),str_contains($event,'payroll')=>'hr',
-            str_contains($event,'management'),str_contains($event,'meeting'),str_contains($event,'resolution'),str_contains($event,'finance')=>'management',default=>'system',
+            str_contains($event,'management'),str_contains($event,'meeting'),str_contains($event,'resolution'),str_contains($event,'finance')=>'management',
+            str_contains($event,'okr')=>'okr',
+            default=>'system',
         };
     }
 

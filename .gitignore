@@ -33,6 +33,8 @@ storage/private/messenger/*
 
 # Runtime installer lock and uploaded content
 install.lock
+config/local.php
+config/local.php.tmp
 config/email.key
 config/sms.key
 uploads/carousel/*

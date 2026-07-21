@@ -8,6 +8,8 @@ if($scope-match'(?i)\b(DROP|TRUNCATE|RENAME)\b'){throw 'Destructive SQL token fo
 foreach($status in @('open','assigned','in_progress','waiting_user','waiting_admin','resolved','closed','cancelled')){if($scope-notmatch[regex]::Escape($status)){throw "Missing status: $status"}}
 if($scope-match'messenger_messages|chat_messages'){throw 'Ticket storage must not use messenger message tables.'}
 if($scope-notmatch'NotificationService'){throw 'Ticket notifications are missing.'}
-$inbox=Get-Content(Join-Path $root 'employee/message-inbox.php')-Raw
-if($inbox-match'TicketService|ticket_messages'){throw 'Ticketing leaked into the messenger inbox.'}
+$removedInbox=Join-Path $root 'employee/message-inbox.php'
+if(Test-Path $removedInbox){throw 'Removed messenger inbox must not be restored for ticketing.'}
+$ticketUi=(Get-Content(Join-Path $root 'employee/tickets.php')-Raw)+(Get-Content(Join-Path $root 'employee/ticket-view.php')-Raw)+(Get-Content(Join-Path $root 'admin/tickets.php')-Raw)
+if($ticketUi-match'message-inbox\.php|messenger'){throw 'Ticketing UI must remain independent from the removed messenger module.'}
 Write-Output "Ticketing contract checks passed ($($required.Count) files)."

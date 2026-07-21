@@ -1,5 +1,15 @@
 # Sobhan Website Project Context
 
+## Codex Execution Expectation
+
+This repository uses action-first phased delivery.
+
+- An explicit implementation or phase prompt means inspect, edit, validate, and report in the same task.
+- Phase names and roadmap references define scope; they do not automatically make the task documentation-only.
+- Documentation-only behavior applies only when the user explicitly requests planning, architecture documentation, audit/report-only work, or no code changes.
+- Safety requirements must shape the implementation through narrower scope, idempotent changes, stronger checks, backup/rollback notes, and honest limitations. They must not be used as a generic reason to produce only Markdown.
+- If runtime, database, browser, or production access is unavailable, complete safe repository changes and static/targeted checks first, then mark only the unavailable validation as pending.
+
 ## Product
 
 Internal operational and management platform for Sobhan Distribution Company.

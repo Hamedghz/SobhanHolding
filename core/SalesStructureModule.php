@@ -11,8 +11,86 @@ class SalesStructureModule
         }
 
         self::seedDefaults($pdo);
+        self::repairUserColumns($pdo);
         $stmt = $pdo->prepare('INSERT INTO modules(module_key,module_title,sort_order,status,created_at) VALUES (?,?,?,"active",NOW()) ON DUPLICATE KEY UPDATE module_title=VALUES(module_title),status="active"');
         $stmt->execute(['sales_structure', 'ساختار فروش، لاین و مناطق', 711]);
+    }
+
+    private static function repairUserColumns(PDO $pdo): void
+    {
+        if (!self::tableExists($pdo, 'users')) return;
+
+        if (!self::columnExists($pdo, 'users', 'kara_system_code')) {
+            $pdo->exec('ALTER TABLE users ADD kara_system_code VARCHAR(100) NULL AFTER employee_no');
+        }
+        if (!self::columnExists($pdo, 'users', 'sales_line_id')) {
+            $pdo->exec('ALTER TABLE users ADD sales_line_id INT UNSIGNED NULL AFTER sales_line');
+        }
+
+        $index = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME=?'
+        );
+        $index->execute(['users', 'idx_users_sales_line_id']);
+        if (!(int)$index->fetchColumn()) {
+            $pdo->exec('ALTER TABLE users ADD INDEX idx_users_sales_line_id(sales_line_id)');
+        }
+
+        $index->execute(['users', 'uq_users_kara_system_code']);
+        if (!(int)$index->fetchColumn()) {
+            $duplicate = $pdo->query(
+                "SELECT kara_system_code FROM users
+                 WHERE kara_system_code IS NOT NULL AND kara_system_code<>''
+                 GROUP BY kara_system_code HAVING COUNT(*)>1 LIMIT 1"
+            )->fetchColumn();
+            if ($duplicate === false) {
+                $pdo->exec('ALTER TABLE users ADD UNIQUE KEY uq_users_kara_system_code(kara_system_code)');
+            } else {
+                error_log('SalesStructureModule: duplicate kara_system_code values prevented unique index creation.');
+            }
+        }
+
+        $pdo->exec(
+            "UPDATE users u
+             JOIN sales_lines sl ON sl.code=u.sales_line
+             SET u.sales_line_id=sl.id
+             WHERE u.sales_line_id IS NULL AND u.sales_line IS NOT NULL AND u.sales_line<>''"
+        );
+
+        $constraint = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+             WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME=? AND CONSTRAINT_NAME=?'
+        );
+        $constraint->execute(['users', 'fk_users_sales_line']);
+        if (!(int)$constraint->fetchColumn()) {
+            try {
+                $pdo->exec(
+                    'ALTER TABLE users ADD CONSTRAINT fk_users_sales_line
+                     FOREIGN KEY (sales_line_id) REFERENCES sales_lines(id) ON DELETE SET NULL'
+                );
+            } catch (Throwable $e) {
+                error_log('SalesStructureModule sales line foreign key: ' . $e->getMessage());
+            }
+        }
+    }
+
+    private static function tableExists(PDO $pdo, string $table): bool
+    {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?'
+        );
+        $stmt->execute([$table]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private static function columnExists(PDO $pdo, string $table, string $column): bool
+    {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?'
+        );
+        $stmt->execute([$table, $column]);
+        return (int)$stmt->fetchColumn() > 0;
     }
 
     public static function schema(): array
@@ -153,7 +231,7 @@ class SalesStructureModule
     public static function supervisors(): array
     {
         return Database::fetchAll(
-            "SELECT u.id,u.name,u.sales_line,u.parent_user_id FROM users u
+            "SELECT u.id,u.name,u.sales_line,u.sales_line_id,u.parent_user_id,u.organization_manager_id FROM users u
              LEFT JOIN org_roles r ON r.id=u.org_role_id
              WHERE u.status='active' AND (r.code='SALES_SUPERVISOR' OR u.role_key='SALES_SUPERVISOR')
              ORDER BY u.display_order,u.name"
@@ -163,7 +241,7 @@ class SalesStructureModule
     public static function visitors(): array
     {
         return Database::fetchAll(
-            "SELECT u.id,u.name,u.sales_line,u.parent_user_id,u.supervisor_id,u.organization_manager_id FROM users u
+            "SELECT u.id,u.name,u.sales_line,u.sales_line_id,u.parent_user_id,u.supervisor_id,u.organization_manager_id FROM users u
              LEFT JOIN org_roles r ON r.id=u.org_role_id
              WHERE u.status='active' AND (r.code='VISITOR' OR u.role_key='VISITOR')
              ORDER BY u.display_order,u.name"
@@ -210,14 +288,14 @@ class SalesStructureModule
     public static function syncSupervisorCompatibilityFields(int $supervisorId, int $lineId, ?int $actorId = null): void
     {
         $line=Database::fetch('SELECT code,manager_user_id FROM sales_lines WHERE id=?',[$lineId]);if(!$line)return;
-        Database::execute('UPDATE users SET sales_line=?,parent_user_id=?,organization_manager_id=?,updated_at=NOW() WHERE id=?',[$line['code'],$line['manager_user_id'],$line['manager_user_id'],$supervisorId]);
+        Database::execute('UPDATE users SET sales_line_id=?,sales_line=?,parent_user_id=?,organization_manager_id=?,updated_at=NOW() WHERE id=?',[$lineId,$line['code'],$line['manager_user_id'],$line['manager_user_id'],$supervisorId]);
         if(!empty($line['manager_user_id']))Database::execute('INSERT IGNORE INTO manager_employees(manager_id,employee_id,assigned_by,created_at) VALUES (?,?,?,NOW())',[(int)$line['manager_user_id'],$supervisorId,$actorId]);
     }
 
     public static function syncUserCompatibilityFields(int $visitorId, int $lineId, ?int $actorId = null): void
     {
         $line=Database::fetch('SELECT code,manager_user_id,supervisor_user_id FROM sales_lines WHERE id=?',[$lineId]);if(!$line)return;
-        Database::execute('UPDATE users SET sales_line=?,supervisor_id=?,parent_user_id=?,organization_manager_id=?,updated_at=NOW() WHERE id=?',[$line['code'],$line['supervisor_user_id'],$line['supervisor_user_id'],$line['manager_user_id'],$visitorId]);
+        Database::execute('UPDATE users SET sales_line_id=?,sales_line=?,supervisor_id=?,parent_user_id=?,organization_manager_id=?,updated_at=NOW() WHERE id=?',[$lineId,$line['code'],$line['supervisor_user_id'],$line['supervisor_user_id'],$line['manager_user_id'],$visitorId]);
         if(!empty($line['supervisor_user_id']))Database::execute('INSERT IGNORE INTO manager_employees(manager_id,employee_id,assigned_by,created_at) VALUES (?,?,?,NOW())',[(int)$line['supervisor_user_id'],$visitorId,$actorId]);
     }
 

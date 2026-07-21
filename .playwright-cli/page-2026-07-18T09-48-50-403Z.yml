@@ -1,0 +1,204 @@
+- generic [ref=f8e2]:
+  - complementary [ref=f8e3]:
+    - link "شرکت پخش سبحان پنل مدیریت" [ref=f8e4] [cursor=pointer]:
+      - /url: /admin/
+      - generic [ref=f8e5]: شرکت پخش سبحان
+      - generic [ref=f8e6]: پنل مدیریت
+    - navigation "منوی مدیریت" [ref=f8e7]:
+      - group [ref=f8e8]:
+        - generic "داشبوردها" [ref=f8e9] [cursor=pointer]
+      - group [ref=f8e10]:
+        - generic "OKR و اهداف سازمانی" [ref=f8e11] [cursor=pointer]
+      - group [ref=f8e12]:
+        - generic "برنامه کاری من" [ref=f8e13] [cursor=pointer]
+      - group [ref=f8e14]:
+        - generic "گزارش کار روزانه" [ref=f8e15] [cursor=pointer]
+      - group [ref=f8e16]:
+        - generic "مرکز اقدامات" [ref=f8e17] [cursor=pointer]
+      - group [ref=f8e18]:
+        - generic "فروش و تحلیل عملکرد" [ref=f8e19] [cursor=pointer]
+      - group [ref=f8e20]:
+        - generic "مدیریت داده فروش" [ref=f8e21] [cursor=pointer]
+        - generic [ref=f8e22]:
+          - link "مرکز یکپارچه ورود اطلاعات" [ref=f8e23] [cursor=pointer]:
+            - /url: /admin/import-center.php
+          - link "ضرایب، اولویت‌ها و اهداف" [ref=f8e25] [cursor=pointer]:
+            - /url: /admin/sales-planning.php
+          - link "ورود اطلاعات فروش تجمیعی" [ref=f8e27] [cursor=pointer]:
+            - /url: /admin/import-center.php?source=sales_aggregate
+          - link "آپدیت موجودی انبار" [ref=f8e29] [cursor=pointer]:
+            - /url: /admin/import-center.php?source=inventory_aggregate
+          - link "تاریخچه ورود اطلاعات" [ref=f8e31] [cursor=pointer]:
+            - /url: /admin/import-history.php
+          - link "خطاهای ورود اطلاعات" [ref=f8e33] [cursor=pointer]:
+            - /url: /admin/import-errors.php
+          - link "وضعیت دیتای مرجع سایت" [ref=f8e35] [cursor=pointer]:
+            - /url: /admin/sales-reference-status.php
+          - link "وضعیت اتصال SobhanAI" [ref=f8e37] [cursor=pointer]:
+            - /url: /admin/sales-data-index.php?section=ai
+          - link "Viewهای گزارش‌گیری" [ref=f8e39] [cursor=pointer]:
+            - /url: /admin/sales-data-index.php?section=views
+      - group [ref=f8e41]:
+        - generic "پنل سرپرست فروش" [ref=f8e42] [cursor=pointer]
+      - group [ref=f8e43]:
+        - generic "گزارشات مدیران" [ref=f8e44] [cursor=pointer]
+      - group [ref=f8e45]:
+        - generic "قوانین مصوب و صورتجلسات" [ref=f8e46] [cursor=pointer]
+      - group [ref=f8e47]:
+        - generic "منابع انسانی" [ref=f8e48] [cursor=pointer]
+      - group [ref=f8e49]:
+        - generic "KPI و ارزیابی عملکرد" [ref=f8e50] [cursor=pointer]
+      - group [ref=f8e51]:
+        - generic "آزمون‌ها و ارزیابی سازمانی" [ref=f8e52] [cursor=pointer]
+      - group [ref=f8e53]:
+        - generic "مالی، انبار و وصول" [ref=f8e54] [cursor=pointer]
+      - group [ref=f8e55]:
+        - generic "سایت و محتوا" [ref=f8e56] [cursor=pointer]
+      - group [ref=f8e57]:
+        - generic "مکاتبات اداری" [ref=f8e58] [cursor=pointer]
+      - group [ref=f8e59]:
+        - generic "ایمیل سازمانی" [ref=f8e60] [cursor=pointer]
+      - group [ref=f8e61]:
+        - generic "هوش مصنوعی و گزارش‌گیری" [ref=f8e62] [cursor=pointer]
+      - group [ref=f8e63]:
+        - generic "تنظیمات" [ref=f8e64] [cursor=pointer]
+      - group [ref=f8e65]:
+        - generic "ابزارهای سیستم" [ref=f8e66] [cursor=pointer]
+  - main [ref=f8e67]:
+    - generic [ref=f8e68]:
+      - generic [ref=f8e69]:
+        - strong [ref=f8e70]: مرکز یکپارچه ورود اطلاعات
+        - generic [ref=f8e71]: شرکت پخش سبحان
+      - generic [ref=f8e72]:
+        - link "هوش مصنوعی سبحان در دسترس نیست" [ref=f8e73] [cursor=pointer]:
+          - /url: /admin/sobhan-api-settings.php
+          - generic [ref=f8e75]: AI قطع
+        - button "اعلان‌ها" [ref=f8e77] [cursor=pointer]:
+          - generic [ref=f8e79]: "0"
+        - generic [ref=f8e80]:
+          - generic [ref=f8e81]: مدیر پذیرش
+          - link "ظاهر" [ref=f8e82] [cursor=pointer]:
+            - /url: /admin/theme-settings.php
+          - link "خروج" [ref=f8e83] [cursor=pointer]:
+            - /url: /logout.php
+    - generic [ref=f8e85]:
+      - generic [ref=f8e86]:
+        - generic [ref=f8e87]:
+          - text: Data Import Center
+          - heading "مرکز یکپارچه ورود اطلاعات" [level=1] [ref=f8e88]
+          - paragraph [ref=f8e89]: تشخیص خودکار Table و Sheet، پیش‌نمایش، staging، خطاهای ردیفی و فعال‌سازی امن Batch در یک مسیر.
+        - generic [ref=f8e90]:
+          - generic [ref=f8e91]: سقف برنامه
+          - strong [ref=f8e92]: 50 MB
+          - generic [ref=f8e93]: محدودیت PHP کمتر از تنظیم برنامه است
+      - navigation "نوع ورود اطلاعات" [ref=f8e94]:
+        - link "تشخیص خودکار" [ref=f8e95] [cursor=pointer]:
+          - /url: /admin/import-center.php
+        - link "ورود تجمیعی فروش" [ref=f8e96] [cursor=pointer]:
+          - /url: /admin/import-center.php?source=sales_aggregate
+        - link "ورود تجمیعی خرید" [ref=f8e97] [cursor=pointer]:
+          - /url: /admin/import-center.php?source=purchase_aggregate
+        - link "ورود موجودی انبار" [ref=f8e98] [cursor=pointer]:
+          - /url: /admin/import-center.php?source=inventory_aggregate
+        - link "ورود تارگت" [ref=f8e99] [cursor=pointer]:
+          - /url: /admin/import-center.php?source=sales_targets
+        - link "ورود اولویت کالا" [ref=f8e100] [cursor=pointer]:
+          - /url: /admin/import-center.php?source=product_priorities
+        - link "ورود ضرایب صنف" [ref=f8e101] [cursor=pointer]:
+          - /url: /admin/import-center.php?source=customer_coefficients
+        - link "ورود کارکرد" [ref=f8e102] [cursor=pointer]:
+          - /url: /admin/import-center.php?source=attendance
+      - generic [ref=f8e103]:
+        - article [ref=f8e104]:
+          - generic [ref=f8e105]:
+            - generic [ref=f8e106]:
+              - text: مرحله ۱
+              - heading "بارگذاری و تشخیص" [level=2] [ref=f8e107]
+            - generic [ref=f8e108]:
+              - link "دانلود قالب ورود تجمیعی فروش" [ref=f8e109] [cursor=pointer]:
+                - /url: /admin/import-template.php?source=sales_aggregate
+              - generic [ref=f8e110]: Auto mapping
+          - generic [ref=f8e111]:
+            - generic [ref=f8e112] [cursor=pointer]:
+              - button "فایل Excel یا CSV را انتخاب کنید نام فایل برای تشخیص استفاده نمی‌شود؛ Table، Sheet و امضای سرستون ملاک است." [ref=f8e113]
+              - strong [ref=f8e114]: فایل Excel یا CSV را انتخاب کنید
+              - generic [ref=f8e115]: نام فایل برای تشخیص استفاده نمی‌شود؛ Table، Sheet و امضای سرستون ملاک است.
+            - generic [ref=f8e116]:
+              - generic [ref=f8e117]:
+                - text: نوع منبع
+                - combobox "نوع منبع" [ref=f8e118]:
+                  - option "تشخیص خودکار"
+                  - option "ورود تجمیعی فروش" [selected]
+                  - option "ورود تجمیعی خرید"
+                  - option "ورود موجودی انبار"
+                  - option "ورود تارگت"
+                  - option "ورود اولویت کالا"
+                  - option "ورود ضرایب صنف"
+                  - option "ورود کارکرد"
+              - generic [ref=f8e119]:
+                - text: روش ورود
+                - combobox "روش ورود" [ref=f8e120]:
+                  - option "مرجع جدید و فعال‌سازی پس از تایید" [selected]
+                  - option "بروزرسانی کلیدهای موجود"
+                  - option "نادیده‌گرفتن تکراری‌ها"
+                  - option "توقف در صورت تکراری"
+              - generic [ref=f8e121]:
+                - text: کلید دوره
+                - textbox "کلید دوره" [ref=f8e122]:
+                  - /placeholder: مثلاً 1405-04
+              - generic [ref=f8e123]:
+                - text: تاریخ snapshot / کارکرد
+                - textbox "تاریخ snapshot / کارکرد" [ref=f8e124]:
+                  - /placeholder: 1405/04/25
+              - generic [ref=f8e125]:
+                - text: شناسه دوره
+                - spinbutton "شناسه دوره" [ref=f8e126]
+            - button "بررسی فایل و ساخت پیش‌نمایش" [ref=f8e127] [cursor=pointer]
+          - generic [ref=f8e128]: تنظیم 50 مگابایت از سقف مؤثر PHP بیشتر است؛ ابتدا تنظیم سرور اصلاح شود.
+          - group [ref=f8e129]:
+            - generic "مقادیر مؤثر PHP / Server" [ref=f8e130] [cursor=pointer]
+        - complementary [ref=f8e131]:
+          - generic [ref=f8e133]:
+            - text: مسیر کنترل‌شده
+            - heading "وضعیت Pipeline" [level=2] [ref=f8e134]
+          - generic [ref=f8e135]:
+            - generic [ref=f8e136]: "1"
+            - generic [ref=f8e137]: بارگذاری
+          - generic [ref=f8e138]:
+            - generic [ref=f8e139]: "2"
+            - generic [ref=f8e140]: بررسی فایل
+          - generic [ref=f8e141]:
+            - generic [ref=f8e142]: "3"
+            - generic [ref=f8e143]: تشخیص منبع
+          - generic [ref=f8e144]:
+            - generic [ref=f8e145]: "4"
+            - generic [ref=f8e146]: نرمال‌سازی
+          - generic [ref=f8e147]:
+            - generic [ref=f8e148]: "5"
+            - generic [ref=f8e149]: Staging
+          - generic [ref=f8e150]:
+            - generic [ref=f8e151]: "6"
+            - generic [ref=f8e152]: اعتبارسنجی
+          - generic [ref=f8e153]:
+            - generic [ref=f8e154]: "7"
+            - generic [ref=f8e155]: ثبت نهایی
+          - generic [ref=f8e156]:
+            - generic [ref=f8e157]: "8"
+            - generic [ref=f8e158]: فعال‌سازی
+      - generic [ref=f8e159]:
+        - generic [ref=f8e160]:
+          - generic [ref=f8e161]:
+            - text: آخرین فعالیت‌ها
+            - heading "تاریخچه ورود اطلاعات" [level=2] [ref=f8e162]
+          - link "مشاهده همه" [ref=f8e163] [cursor=pointer]:
+            - /url: /admin/import-history.php
+        - table [ref=f8e165]:
+          - rowgroup [ref=f8e166]:
+            - row [ref=f8e167]:
+              - columnheader "Batch" [ref=f8e168]
+              - columnheader "منبع" [ref=f8e169]
+              - columnheader "فایل" [ref=f8e170]
+              - columnheader "وضعیت" [ref=f8e171]
+              - columnheader "معتبر / خطادار" [ref=f8e172]
+              - columnheader "تاریخ" [ref=f8e173]
+          - rowgroup

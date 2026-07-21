@@ -3,14 +3,19 @@ $root=dirname(__DIR__);
 $required=['core/SalesDataNormalizer.php','core/SalesAggregateRepository.php','core/SalesAggregateImportService.php','admin/sales-aggregate-import.php','install/sales_aggregate_mapping_seed.php','docs/sales-aggregate-import.md','storage/sales-imports/.htaccess'];
 foreach($required as $file)if(!is_file($root.'/'.$file))throw new RuntimeException('Missing file: '.$file);
 $serviceSource=file_get_contents($root.'/core/SalesAggregateImportService.php');
+$repositorySource=file_get_contents($root.'/core/SalesAggregateRepository.php');
 if(preg_match('/\b(DROP|TRUNCATE|RENAME\s+TABLE|eval\s*\()\b/i',$serviceSource))throw new RuntimeException('Unsafe operation found.');
 foreach(['readUploadedFile','detectWorkbookSource','normalizeHeaders','mapColumns','normalizePersianArabicDigits','normalizeDate','normalizeDecimal','validateRow','buildSourceUniqueKey','detectDuplicate','storeToStaging','generateImportSummary','commitValidRows','rollbackBatch'] as $method)if(!str_contains($serviceSource,'function '.$method))throw new RuntimeException('Missing method: '.$method);
 foreach(['is_uploaded_file','FILEINFO_MIME_TYPE','move_uploaded_file','awaiting_source_selection','staging_sales_data','beginTransaction','verifyCsrf'] as $token){$sources=$serviceSource.file_get_contents($root.'/admin/sales-aggregate-import.php');if(!str_contains($sources,$token))throw new RuntimeException('Missing security/import contract: '.$token);}
+foreach(['stagingRowsChunk','stagingCount','finalizeReferenceAliases'] as $token)if(!str_contains($repositorySource,$token))throw new RuntimeException('Large commit batching contract is missing: '.$token);
+if(!str_contains($serviceSource,'$startedHere=!$pdo->inTransaction()'))throw new RuntimeException('Sales staging is not transaction-safe.');
 require_once $root.'/core/SalesAggregateImportService.php';
 if(SalesAggregateImportService::normalizePersianArabicDigits('۱۲٣')!=='123')throw new RuntimeException('Digit normalization failed.');
 if(SalesAggregateImportService::normalizeDecimal('۱٬۲۳۴.۵۰')!=='1234.5')throw new RuntimeException('Decimal normalization failed.');
 if(SalesAggregateImportService::normalizeDate('1403/03/01')!=='2024-05-21')throw new RuntimeException('Jalali normalization failed.');
 $key=SalesAggregateImportService::buildSourceUniqueKey(['unique_code'=>'ABC-1']);if($key!==sha1('sales_aggregate|ABC-1'))throw new RuntimeException('Unique-code key failed.');
+$identifier=SalesAggregateImportService::buildSourceUniqueKey(['identifier'=>'171547','invoice_number'=>'4104','product_code'=>'4050012']);if($identifier!==sha1('sales_aggregate|identifier|171547'))throw new RuntimeException('Source-identifier key failed.');
+$otherIdentifier=SalesAggregateImportService::buildSourceUniqueKey(['identifier'=>'171548','invoice_number'=>'4104','product_code'=>'4050012']);if($identifier===$otherIdentifier)throw new RuntimeException('Independent source identifiers collapsed.');
 $fallback=SalesAggregateImportService::buildSourceUniqueKey(['invoice_number'=>'1','invoice_type'=>'sale','sub_invoice_number'=>'2','product_code'=>'P','customer_code'=>'C','visitor_code'=>'V','invoice_date_raw'=>'1403/03/01']);if($fallback!==sha1('sales_aggregate|1|sale|2|P|C|V|1403/03/01'))throw new RuntimeException('SHA1 fallback failed.');
 $headers=array_keys(SalesDataNormalizer::REQUIRED);$rows=[$headers,array_fill(0,count($headers),'x')];
 $workbook=['sheets'=>[

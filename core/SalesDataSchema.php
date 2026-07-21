@@ -108,7 +108,7 @@ class SalesDataSchema
     private static function repairInventoryAggregateColumns(PDO $pdo): void
     {
         if (!self::tableExists($pdo, 'inventory_aggregate_rows')) return;
-        $text = ['source_type'=>'VARCHAR(30) NULL','index_code'=>'VARCHAR(100) NULL','index_name'=>'VARCHAR(255) NULL','expire_date_raw'=>'VARCHAR(100) NULL','manufacturer_code'=>'VARCHAR(100) NULL','manufacturer_name'=>'VARCHAR(255) NULL','product_tree_group_code'=>'VARCHAR(100) NULL','product_tree_group_name'=>'VARCHAR(255) NULL','barcode'=>'VARCHAR(191) NULL','control_code'=>'VARCHAR(191) NULL','group_code'=>'VARCHAR(100) NULL','group_name'=>'VARCHAR(255) NULL','brand_name'=>'VARCHAR(255) NULL','last_purchase_date_raw'=>'VARCHAR(100) NULL'];
+        $text = ['source_type'=>'VARCHAR(30) NULL','period_key'=>'VARCHAR(50) NULL','index_code'=>'VARCHAR(100) NULL','index_name'=>'VARCHAR(255) NULL','expire_date_raw'=>'VARCHAR(100) NULL','manufacturer_code'=>'VARCHAR(100) NULL','manufacturer_name'=>'VARCHAR(255) NULL','product_tree_group_code'=>'VARCHAR(100) NULL','product_tree_group_name'=>'VARCHAR(255) NULL','barcode'=>'VARCHAR(191) NULL','control_code'=>'VARCHAR(191) NULL','group_code'=>'VARCHAR(100) NULL','group_name'=>'VARCHAR(255) NULL','brand_name'=>'VARCHAR(255) NULL','last_purchase_date_raw'=>'VARCHAR(100) NULL'];
         $dates = ['expire_date'=>'DATE NULL','last_purchase_date'=>'DATE NULL'];
         $numbers = ['consumer_price','sales_carton_qty','sales_part_qty','sales_total_qty','sales_total_amount','sales_discount_amount','sales_tax_amount','sales_duty_amount','sales_payable_amount','sales_return_carton_qty','sales_return_part_qty','sales_return_total_qty','purchase_carton_qty','purchase_part_qty','purchase_total_qty','opening_carton_qty','opening_part_qty','opening_total_qty','inbound_carton_qty','inbound_part_qty','inbound_total_qty','outbound_carton_qty','outbound_part_qty','outbound_total_qty','current_period_carton_qty','current_period_part_qty','current_period_total_qty','carton_size','last_cost_price','last_purchase_price','stock_value_by_last_cost','stock_value_by_sale_price_1','retail_price','wholesale_price','sale_price_3','sale_price_4','sale_price_5','sale_price_6','sale_price_7','sale_price_8','sale_price_9','sale_price_10','sale_price_11','sale_price_12','retail_commission','wholesale_commission','commission_3','commission_4','commission_5','commission_6','commission_7','commission_8','commission_9','commission_10','commission_11','commission_12','current_weight','current_volume','retail_collection_days','current_base_stock','current_part_stock','current_total_stock'];
         foreach (array_merge($text,$dates,array_fill_keys($numbers,'DECIMAL(20,4) NULL')) as $column=>$definition) {
@@ -240,6 +240,7 @@ class SalesDataSchema
                 import_batch_id BIGINT UNSIGNED NULL,
                 source_type VARCHAR(30) NULL,
                 source_unique_key VARCHAR(191) NULL,
+                period_key VARCHAR(50) NULL,
                 product_code VARCHAR(100) NULL,
                 product_name VARCHAR(255) NULL,
                 index_code VARCHAR(100) NULL,index_name VARCHAR(255) NULL,consumer_price DECIMAL(20,4) NULL,expire_date DATE NULL,expire_date_raw VARCHAR(100) NULL,
@@ -289,24 +290,34 @@ class SalesDataSchema
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 import_batch_id BIGINT UNSIGNED NULL,
                 source_unique_key VARCHAR(191) NULL,
+                period_id BIGINT UNSIGNED NULL,
+                guild_identity_key VARCHAR(191) NULL,
                 customer_class_code VARCHAR(100) NULL,
                 customer_class_title VARCHAR(255) NULL,
+                normalized_guild_name VARCHAR(191) NULL,
                 coefficient DECIMAL(12,6) NULL,
                 effective_from DATE NULL,
                 effective_to DATE NULL,
+                version_no INT UNSIGNED NOT NULL DEFAULT 1,
+                source_type VARCHAR(30) NOT NULL DEFAULT 'import',
                 active TINYINT(1) NOT NULL DEFAULT 1,
+                created_by INT UNSIGNED NULL,
                 raw_json LONGTEXT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NULL,
                 INDEX idx_sales_coeff_batch (import_batch_id),
                 INDEX idx_sales_coeff_unique_key (source_unique_key),
                 INDEX idx_sales_coeff_class (customer_class_code),
-                INDEX idx_sales_coeff_effective (effective_from,effective_to)
+                INDEX idx_sales_coeff_effective (effective_from,effective_to),
+                INDEX idx_sales_coeff_period (period_id),
+                INDEX idx_sales_coeff_identity (guild_identity_key),
+                INDEX idx_sales_coeff_active_version (active,version_no)
             ){$engine}",
             "CREATE TABLE IF NOT EXISTS product_priorities (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 import_batch_id BIGINT UNSIGNED NULL,
                 source_unique_key VARCHAR(191) NULL,
+                period_id BIGINT UNSIGNED NULL,
                 product_code VARCHAR(100) NULL,
                 product_name VARCHAR(255) NULL,
                 brand_code VARCHAR(100) NULL,
@@ -315,7 +326,9 @@ class SalesDataSchema
                 priority_rank INT NULL,
                 inventory_quantity DECIMAL(18,4) NULL,
                 inventory_value DECIMAL(20,2) NULL,
+                status VARCHAR(30) NOT NULL DEFAULT 'active',
                 active TINYINT(1) NOT NULL DEFAULT 1,
+                created_by INT UNSIGNED NULL,
                 raw_json LONGTEXT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NULL,
@@ -323,21 +336,33 @@ class SalesDataSchema
                 INDEX idx_product_priorities_unique_key (source_unique_key),
                 INDEX idx_product_priorities_product (product_code),
                 INDEX idx_product_priorities_brand (brand_code),
-                INDEX idx_product_priorities_priority (priority_code)
+                INDEX idx_product_priorities_priority (priority_code),
+                INDEX idx_product_priorities_period (period_id),
+                INDEX idx_product_priorities_status (status,active)
             ){$engine}",
             "CREATE TABLE IF NOT EXISTS sales_targets (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 import_batch_id BIGINT UNSIGNED NULL,
                 source_unique_key VARCHAR(191) NULL,
+                period_id BIGINT UNSIGNED NULL,
+                visitor_user_id INT UNSIGNED NULL,
+                line_id INT UNSIGNED NULL,
                 target_year SMALLINT NULL,
                 target_month TINYINT NULL,
                 line_code VARCHAR(100) NULL,
                 product_code VARCHAR(100) NULL,
+                product_name VARCHAR(255) NULL,
+                brand_code VARCHAR(100) NULL,
+                brand_name VARCHAR(255) NULL,
                 priority_code VARCHAR(100) NULL,
                 visitor_code VARCHAR(100) NULL,
                 supervisor_code VARCHAR(100) NULL,
                 target_quantity DECIMAL(18,4) NULL,
                 target_amount DECIMAL(20,2) NULL,
+                allocation_percent DECIMAL(8,4) NULL,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                source_type VARCHAR(30) NOT NULL DEFAULT 'import',
+                created_by INT UNSIGNED NULL,
                 raw_json LONGTEXT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NULL,
@@ -346,7 +371,12 @@ class SalesDataSchema
                 INDEX idx_sales_targets_period (target_year,target_month),
                 INDEX idx_sales_targets_line (line_code),
                 INDEX idx_sales_targets_product (product_code),
-                INDEX idx_sales_targets_visitor (visitor_code)
+                INDEX idx_sales_targets_visitor (visitor_code),
+                INDEX idx_sales_targets_period_id (period_id),
+                INDEX idx_sales_targets_visitor_user (visitor_user_id),
+                INDEX idx_sales_targets_line_id (line_id),
+                INDEX idx_sales_targets_grain (period_id,visitor_user_id,line_id,product_code),
+                INDEX idx_sales_targets_active (active)
             ){$engine}",
             "CREATE TABLE IF NOT EXISTS commission_formula_settings (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

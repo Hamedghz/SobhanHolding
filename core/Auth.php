@@ -112,7 +112,12 @@ class Auth
         if (!$user) return false;
         if (in_array($user['role'] ?? '', ['admin', 'super_admin'], true)) return true;
 
-        $aliases = [
+        $aliases = self::permissionAliases();
+        /*
+         * Legacy keys remain readable for backward compatibility. New writes and
+         * menu metadata should use the canonical key returned by canonicalPermissionKey().
+         */
+        $legacyAliases = [
             'view_ceo_dashboard' => ['ceo_dashboard'],
             'ceo_dashboard' => ['view_ceo_dashboard'],
             'view_sobhan_api_settings' => ['manage_sobhan_api_settings'],
@@ -123,6 +128,7 @@ class Auth
             'manager_dashboard.ai' => ['manager_dashboard.ai_run'],
             'manager_dashboard.ai_run' => ['manager_dashboard.ai'],
         ];
+        $aliases = array_replace($legacyAliases, $aliases);
 
         $column = match ($action) {
             'create' => 'can_create',
@@ -146,6 +152,25 @@ class Auth
         if (in_array($moduleKey, ['files', 'survey_results'], true) && in_array($action, ['view', 'create'], true) && self::isManager()) return true;
         if ($moduleKey === 'files' && in_array($action, ['view', 'create'], true) && self::isEmployee()) return true;
         return false;
+    }
+
+    public static function permissionAliases(): array
+    {
+        return [
+            'view_ceo_dashboard' => ['ceo_dashboard'],
+            'manage_sobhan_api_settings' => ['view_sobhan_api_settings'],
+            'view_ai_chat' => ['ai_chat'],
+            'use_ai_assistant' => ['ai_assistant'],
+            'manager_dashboard.ai_run' => ['manager_dashboard.ai'],
+        ];
+    }
+
+    public static function canonicalPermissionKey(string $key): string
+    {
+        foreach (self::permissionAliases() as $canonical => $aliases) {
+            if ($key === $canonical || in_array($key, $aliases, true)) return $canonical;
+        }
+        return $key;
     }
 
     public static function requirePermission(string $moduleKey, string $action = 'view'): void

@@ -7,6 +7,14 @@ final class HrAttendanceModule
     {
         foreach (self::schema() as $sql) $pdo->exec($sql);
         foreach (['effective_to'=>'DATE NULL AFTER effective_from','allowed_checkin_from'=>'TIME NULL','allowed_checkin_to'=>'TIME NULL','allowed_checkout_from'=>'TIME NULL','allowed_checkout_to'=>'TIME NULL'] as $column=>$definition) self::ensureColumn($pdo,'hr_attendance_settings',$column,$definition);
+        foreach ([
+            'leave_type' => 'VARCHAR(100) NULL AFTER day_status',
+            'mission_details' => 'TEXT NULL AFTER leave_type',
+            'import_time_notes' => 'TEXT NULL AFTER notes',
+        ] as $column => $definition) {
+            self::ensureColumn($pdo, 'hr_attendance_entries', $column, $definition);
+        }
+        self::ensureDayStatusCompatibility($pdo);
         self::seed($pdo);
         try { self::repairView($pdo); } catch (Throwable $e) { error_log('HR attendance summary view: '.$e->getMessage()); }
     }
@@ -87,9 +95,12 @@ final class HrAttendanceModule
                 normal_overtime_minutes INT UNSIGNED NOT NULL DEFAULT 0,
                 holiday_overtime_minutes INT UNSIGNED NOT NULL DEFAULT 0,
                 work_minutes INT UNSIGNED NOT NULL DEFAULT 0,
-                day_status ENUM('present','absent','leave','mission','holiday','half_day') NOT NULL DEFAULT 'present',
+                day_status VARCHAR(30) NOT NULL DEFAULT 'present',
+                leave_type VARCHAR(100) NULL,
+                mission_details TEXT NULL,
                 overtime_status ENUM('none','pending','approved','rejected') NOT NULL DEFAULT 'none',
                 notes TEXT NULL,
+                import_time_notes TEXT NULL,
                 attachment_path VARCHAR(500) NULL,
                 created_by INT UNSIGNED NULL,
                 approved_by INT UNSIGNED NULL,
@@ -119,6 +130,20 @@ final class HrAttendanceModule
                 CONSTRAINT fk_hr_attendance_log_entry FOREIGN KEY(attendance_entry_id) REFERENCES hr_attendance_entries(id),
                 CONSTRAINT fk_hr_attendance_log_actor FOREIGN KEY(performed_by) REFERENCES users(id) ON DELETE SET NULL
             ){$engine}",
+            "CREATE TABLE IF NOT EXISTS hr_attendance_identity_mappings (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                source_field VARCHAR(40) NOT NULL,
+                external_code VARCHAR(100) NOT NULL,
+                user_id INT UNSIGNED NOT NULL,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                created_by INT UNSIGNED NULL,
+                created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_hr_attendance_identity(source_field,external_code),
+                INDEX idx_hr_attendance_identity_user(user_id,active),
+                CONSTRAINT fk_hr_attendance_identity_user FOREIGN KEY(user_id) REFERENCES users(id),
+                CONSTRAINT fk_hr_attendance_identity_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+            ){$engine}",
         ];
     }
 
@@ -141,6 +166,18 @@ final class HrAttendanceModule
         $stmt=$pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?');$stmt->execute([$table,$column]);if(!(int)$stmt->fetchColumn())$pdo->exec("ALTER TABLE `{$table}` ADD `{$column}` {$definition}");
     }
 
+    private static function ensureDayStatusCompatibility(PDO $pdo): void
+    {
+        $stmt = $pdo->prepare(
+            'SELECT DATA_TYPE FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?'
+        );
+        $stmt->execute(['hr_attendance_entries', 'day_status']);
+        if (strtolower((string)$stmt->fetchColumn()) === 'enum') {
+            $pdo->exec("ALTER TABLE hr_attendance_entries MODIFY day_status VARCHAR(30) NOT NULL DEFAULT 'present'");
+        }
+    }
+
     private static function repairView(PDO $pdo): void
     {
         $pdo->exec("CREATE OR REPLACE VIEW vw_hr_attendance_monthly_summary AS
@@ -152,7 +189,7 @@ final class HrAttendanceModule
                 SUM(day_status='absent') AS absent_days,
                 SUM(day_status='leave') AS leave_days,
                 SUM(day_status='mission') AS mission_days,
-                SUM(day_status IN ('present','half_day')) AS present_days,
+                SUM(day_status IN ('present','half_day','holiday_work')) AS present_days,
                 ROUND(GREATEST(0,10-(((SUM(late_minutes)+SUM(early_leave_minutes))/30)*0.5)-(SUM(day_status='absent')*2)),2) AS attendance_score_suggestion
             FROM hr_attendance_entries
             GROUP BY employee_id,YEAR(attendance_date),MONTH(attendance_date)");

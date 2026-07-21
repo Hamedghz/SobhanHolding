@@ -1,28 +1,24 @@
 <?php
+
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/Database.php';
-require_once __DIR__ . '/../core/Response.php';
-require_once __DIR__ . '/../services/SalesOperationsService.php';
-SalesOperationsService::boot(); SalesOperationsService::requireSalesManagerPermission('sales_manager.scripts.manage');
-$user=Auth::user(); $errors=[];
-if($_SERVER['REQUEST_METHOD']==='POST'){
- try{
-  if(!Auth::verifyCsrf($_POST['csrf_token']??null)) throw new RuntimeException('درخواست نامعتبر است.');
-  $title=trim((string)($_POST['title']??''));$code=trim((string)($_POST['script_code']??''));$body=trim((string)($_POST['script_body']??''));
-  if($title===''||$code===''||$body==='') throw new RuntimeException('عنوان، کد و متن اسکریپت اجباری هستند.');
-  $id=(int)($_POST['id']??0);$supervisorId=(int)($_POST['supervisor_id']??0);$visitorId=(int)($_POST['visitor_id']??0);if($supervisorId&&!SalesOperationsService::canAccessSupervisor($supervisorId,$user))throw new InvalidArgumentException('سرپرست انتخاب‌شده خارج از تیم شماست.');if($visitorId&&!SalesOperationsService::canAccessSalesUser($visitorId,(int)$user['id'],$user))throw new InvalidArgumentException('ویزیتور انتخاب‌شده خارج از تیم شماست.');if($id&&!SalesOperationsService::canViewAll($user)){ $owned=Database::fetch('SELECT id FROM sales_scripts WHERE id=? AND created_by=?',[$id,(int)$user['id']]);if(!$owned)throw new InvalidArgumentException('دسترسی ویرایش این اسکریپت را ندارید.');}$params=[$title,$code,$body,$_POST['target_scope']??'sales_line',$_POST['sales_line']??null,$supervisorId?:null,$visitorId?:null,(int)($_POST['brand_id']??0)?:null,(int)($_POST['product_id']??0)?:null,$_POST['customer_type']??null,!empty($_POST['active'])?1:0,(int)$user['id']];
-  if($id){Database::execute('UPDATE sales_scripts SET title=?,script_code=?,script_body=?,target_scope=?,sales_line=?,supervisor_id=?,visitor_id=?,brand_id=?,product_id=?,customer_type=?,active=?,created_by=COALESCE(created_by,?),updated_at=NOW() WHERE id=?',array_merge($params,[$id]));}
-  else{Database::execute('INSERT INTO sales_scripts(title,script_code,script_body,target_scope,sales_line,supervisor_id,visitor_id,brand_id,product_id,customer_type,active,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW(),NOW())',$params);}
-  flash('اسکریپت فروش ذخیره شد.');redirect('/admin/sales-scripts.php');
- }catch(Throwable $e){$errors[]=SalesOperationsService::uiError($e,'ذخیره اسکریپت فروش انجام نشد.');}
+require_once __DIR__ . '/../services/ActionHubService.php';
+
+Auth::requireLogin();
+ActionHubService::boot();
+
+$scriptId = max(0, (int)($_GET['edit'] ?? 0));
+$templateId = 0;
+if ($scriptId > 0) {
+    $template = Database::fetch(
+        'SELECT id FROM action_templates
+         WHERE legacy_source_type="sales_script" AND legacy_source_id=? LIMIT 1',
+        [$scriptId]
+    );
+    $templateId = (int)($template['id'] ?? 0);
 }
-$editId=(int)($_GET['edit']??0);$edit=$editId?(SalesOperationsService::canViewAll($user)?Database::fetch('SELECT * FROM sales_scripts WHERE id=?',[$editId]):Database::fetch('SELECT * FROM sales_scripts WHERE id=? AND created_by=?',[$editId,(int)$user['id']])):null;
-$scripts=SalesOperationsService::canViewAll($user)?Database::fetchAll('SELECT s.*,u.name creator_name FROM sales_scripts s LEFT JOIN users u ON u.id=s.created_by ORDER BY s.created_at DESC LIMIT 200'):Database::fetchAll('SELECT s.*,u.name creator_name FROM sales_scripts s LEFT JOIN users u ON u.id=s.created_by WHERE s.created_by=? ORDER BY s.created_at DESC LIMIT 200',[(int)$user['id']]);
-$supervisorIds=SalesOperationsService::getSalesManagerSupervisorIds((int)$user['id']);if(SalesOperationsService::canViewAll($user)){$supervisors=Database::fetchAll('SELECT id,name,sales_line FROM users WHERE status="active" AND (role_key IN ("SALES_SUPERVISOR","supervisor") OR id IN (SELECT supervisor_id FROM sales_team_assignments WHERE active=1)) ORDER BY name');$visitors=Database::fetchAll('SELECT id,name,sales_line FROM users WHERE status="active" AND (role_key IN ("VISITOR","visitor") OR supervisor_id IS NOT NULL) ORDER BY name LIMIT 500');}else{$supPh=implode(',',array_fill(0,max(1,count($supervisorIds)),'?'));$supervisors=$supervisorIds?Database::fetchAll("SELECT id,name,sales_line FROM users WHERE id IN ({$supPh}) ORDER BY name",$supervisorIds):[];$teamIds=SalesOperationsService::getSalesManagerTeamUserIds((int)$user['id'],$user);$teamPh=implode(',',array_fill(0,count($teamIds),'?'));$visitors=Database::fetchAll("SELECT id,name,sales_line FROM users WHERE status=\"active\" AND id IN ({$teamPh}) AND id<>? ORDER BY name LIMIT 500",array_merge($teamIds,[(int)$user['id']]));}
-$pageTitle='اسکریپت‌های فروش';require __DIR__ . '/../views/partials/admin-header.php';
-?>
-<div class="section-heading-row"><div><h1>اسکریپت‌های فروش</h1><p class="muted">تعریف متن اسکریپت، placeholderها و محدوده تخصیص برای سرپرستان، ویزیتورها و لاین فروش.</p></div><div class="actions"><a class="btn" href="/admin/sales-script-fields.php">فیلدهای داینامیک</a></div></div>
-<?php foreach($errors as $error):?><div class="alert alert-danger"><?=e($error)?></div><?php endforeach;?>
-<form class="card admin-form" method="post"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="id" value="<?=e((string)($edit['id']??0))?>"><h2><?=$edit?'ویرایش اسکریپت':'ایجاد اسکریپت فروش'?></h2><div class="grid grid-3"><label class="form-field"><span>عنوان</span><input name="title" required value="<?=e($edit['title']??'')?>"></label><label class="form-field"><span>کد اسکریپت</span><input name="script_code" required value="<?=e($edit['script_code']??'')?>" placeholder="مثلاً TARGET_FOLLOWUP"></label><label class="form-field"><span>محدوده هدف</span><select name="target_scope"><option value="all">همه</option><option value="sales_line">لاین فروش</option><option value="supervisor">سرپرست</option><option value="visitor">ویزیتور</option><option value="brand">برند</option><option value="product">کالا</option><option value="customer_type">نوع مشتری</option></select></label><label class="form-field"><span>لاین فروش</span><input name="sales_line" value="<?=e($edit['sales_line']??'')?>"></label><label class="form-field"><span>سرپرست</span><select name="supervisor_id"><option value="0">بدون انتخاب</option><?php foreach($supervisors as $s):?><option value="<?=(int)$s['id']?>" <?=((int)($edit['supervisor_id']??0)===(int)$s['id'])?'selected':''?>><?=e($s['name'])?></option><?php endforeach;?></select></label><label class="form-field"><span>ویزیتور</span><select name="visitor_id"><option value="0">بدون انتخاب</option><?php foreach($visitors as $v):?><option value="<?=(int)$v['id']?>" <?=((int)($edit['visitor_id']??0)===(int)$v['id'])?'selected':''?>><?=e($v['name'])?></option><?php endforeach;?></select></label><label class="form-field"><span>شناسه برند</span><input type="number" name="brand_id" value="<?=e((string)($edit['brand_id']??''))?>"></label><label class="form-field"><span>شناسه کالا</span><input type="number" name="product_id" value="<?=e((string)($edit['product_id']??''))?>"></label><label class="form-field"><span>نوع مشتری</span><input name="customer_type" value="<?=e($edit['customer_type']??'')?>"></label></div><label class="form-field"><span>متن اسکریپت</span><textarea name="script_body" rows="7" required><?=e($edit['script_body']??'')?></textarea><small class="muted">Placeholderهای مجاز: {customer_name} {customer_code} {visitor_name} {supervisor_name} {sales_line} {brand_name} {product_name} {last_purchase_date} {last_purchase_amount} {customer_balance} {suggested_action}</small></label><label><input type="checkbox" name="active" value="1" <?=($edit['active']??1)?'checked':''?>> فعال</label><div class="form-actions"><button class="btn btn-primary">ذخیره</button><?php if($edit):?><a class="btn" href="/admin/sales-scripts.php">انصراف</a><?php endif;?></div></form>
-<section class="card"><h2>لیست اسکریپت‌ها</h2><div class="table-wrap"><table><thead><tr><th>عنوان</th><th>کد</th><th>محدوده</th><th>لاین</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody><?php foreach($scripts as $s):?><tr><td><?=e($s['title'])?></td><td><?=e($s['script_code'])?></td><td><?=e($s['target_scope'])?></td><td><?=e($s['sales_line']??'-')?></td><td><?=((int)$s['active']===1)?'فعال':'غیرفعال'?></td><td><a class="btn btn-sm" href="/admin/sales-scripts.php?edit=<?=(int)$s['id']?>">ویرایش</a><a class="btn btn-sm" href="/admin/sales-script-fields.php?script_id=<?=(int)$s['id']?>">فیلدها</a></td></tr><?php endforeach;?><?php if(!$scripts):?><tr><td colspan="6">اسکریپتی ثبت نشده است.</td></tr><?php endif;?></tbody></table></div></section>
-<?php require __DIR__ . '/../views/partials/admin-footer.php'; ?>
+
+$destination = '/admin/action-templates.php?legacy=1';
+if ($templateId > 0) $destination .= '&template_id=' . $templateId;
+header('Location: ' . $destination, true, 302);
+exit;

@@ -10,42 +10,47 @@ function admin_menu_registry(): array
             ['title' => 'پنل سرپرست فروش', 'url' => '/admin/supervisor-dashboard.php', 'permission' => 'supervisor.panel.view', 'active_paths' => ['/admin/supervisor-dashboard.php','/admin/supervisor-sales-report.php','/admin/supervisor-actions.php','/admin/supervisor-action-view.php']],
             ['title' => 'پنل کارمند', 'url' => '/admin/employee-dashboard.php', 'permission' => 'employee_portal', 'fallback_role' => 'employee', 'active' => ['employee-dashboard.php']],
         ]],
+        'okr' => ['title' => 'OKR و اهداف سازمانی', 'items' => [
+            ['title' => 'داشبورد OKR', 'url' => '/admin/okr.php', 'okr_capability' => 'view', 'active_paths' => ['/admin/okr.php','/admin/okr-objective.php','/admin/okr-evidence.php']],
+            ['title' => 'دوره‌های OKR', 'url' => '/admin/okr-cycles.php', 'permission' => 'okr.cycles', 'action' => 'edit', 'active' => ['okr-cycles.php']],
+        ]],
         'personal_planner' => ['title' => 'برنامه کاری من', 'items' => [
             ['title' => 'برنامه کاری شخصی', 'url' => '/employee/work-planner.php', 'permission' => 'dashboard', 'active_paths' => ['/employee/work-planner.php']],
         ]],
+        'daily_reports' => ['title' => 'گزارش کار روزانه', 'items' => [
+            ['title' => 'گزارش کار روزانه', 'url' => '/admin/daily-work-report.php', 'daily_report_capability' => 'view', 'active_paths' => ['/admin/daily-work-report.php','/admin/sales-manager-daily-work-log.php']],
+            ['title' => 'قالب‌های گزارش کار', 'url' => '/admin/daily-report-templates.php', 'daily_report_capability' => 'manage', 'active_paths' => ['/admin/daily-report-templates.php']],
+        ]],
+        'action_hub' => ['title' => 'مرکز اقدامات', 'items' => [
+            ['title' => 'همه اقدامات', 'url' => '/admin/action-hub.php', 'action_hub_capability' => true, 'active_paths' => ['/admin/action-hub.php','/admin/action-view.php','/admin/action-file.php','/admin/sales-actions.php']],
+            ['title' => 'قالب‌های اقدام', 'url' => '/admin/action-templates.php', 'any' => ['action_hub.manage_templates','sales_manager.scripts.manage'], 'active_paths' => ['/admin/action-templates.php','/admin/sales-scripts.php','/admin/sales-script-fields.php']],
+            ['title' => 'انواع اقدام', 'url' => '/admin/action-types.php', 'permission' => 'action_hub.manage_types', 'action' => 'edit', 'active_paths' => ['/admin/action-types.php']],
+        ]],
         'sales' => ['title' => 'فروش و تحلیل عملکرد', 'items' => [
-            ['title' => 'ورود گزارش فروش', 'url' => '/admin/manager-dashboard-import.php', 'permission' => 'manager_dashboard.import', 'active' => ['manager-dashboard-import.php']],
+            ['title' => 'ورود گزارش فروش', 'url' => '/admin/import-center.php?source=sales_aggregate', 'any' => ['import_center.upload','sales_reference_upload','sales_data_import'], 'query_equals' => ['source' => 'sales_aggregate']],
             ['title' => 'خروجی گزارش فروش', 'url' => '/admin/manager-dashboard-export.php', 'permission' => 'manager_dashboard.export', 'active' => ['manager-dashboard-export.php']],
             ['title' => 'گزارش عملکرد سرپرستان', 'url' => '/admin/sales-manager-supervisor-reports.php', 'permission' => 'sales_manager.supervisors.view', 'active_paths' => ['/admin/sales-manager-supervisor-reports.php']],
-            ['title' => 'اسکریپت‌های فروش', 'url' => '/admin/sales-scripts.php', 'permission' => 'sales_manager.scripts.manage', 'active_paths' => ['/admin/sales-scripts.php','/admin/sales-script-fields.php']],
-            ['title' => 'اقدامات فروش', 'url' => '/admin/sales-actions.php', 'permission' => 'sales_manager.actions.manage', 'active_paths' => ['/admin/sales-actions.php']],
             ['title' => 'پیشنهاد اردر خرید', 'url' => '/admin/sales-purchase-suggestions.php', 'permission' => 'sales_manager.purchase_suggestions.manage', 'active_paths' => ['/admin/sales-purchase-suggestions.php']],
             ['title' => 'استعلام بودجه آفر', 'url' => '/admin/sales-offer-budget.php', 'permission' => 'sales_manager.offer_budget.manage', 'active_paths' => ['/admin/sales-offer-budget.php','/admin/sales-offer-budget-view.php']],
-            ['title' => 'گزارش‌کار روزانه مدیر فروش', 'url' => '/admin/sales-manager-daily-work-log.php', 'permission' => 'sales_manager.daily_logs.manage', 'active_paths' => ['/admin/sales-manager-daily-work-log.php']],
-            ['title' => 'اطلاعات لاین‌ها', 'url' => '/admin/ceo-dashboard-settings.php#lines', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-lines.php']],
-            ['title' => 'اطلاعات ویزیتورها', 'url' => '/admin/ceo-dashboard-settings.php#visitors', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-visitors.php']],
+            ['title' => 'ورود فروش تجمیعی لاین‌ها', 'url' => '/admin/import-center.php?source=sales_aggregate', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'sales_aggregate']],
+            ['title' => 'کاربران و ویزیتورها', 'url' => '/admin/users.php', 'permission' => 'users', 'active' => ['users.php']],
             ['title' => 'ساختار فروش، لاین و مناطق', 'url' => '/admin/sales-structure.php', 'permission' => 'sales_structure', 'active' => ['sales-structure.php']],
         ]],
         'sales_data' => ['title' => 'مدیریت داده فروش', 'items' => [
-            ['title' => 'ورود اطلاعات فروش تجمیعی', 'url' => '/admin/sales-aggregate-import.php', 'any' => ['sales_reference_upload','sales_data_import'], 'active' => ['sales-aggregate-import.php']],
-            ['title' => 'آپدیت موجودی انبار', 'url' => '/admin/inventory-aggregate-import.php', 'any' => ['sales_reference_upload','sales_data_import'], 'active' => ['inventory-aggregate-import.php']],
-            ['title' => 'تاریخچه ورود اطلاعات مرجع', 'url' => '/admin/sales-reference-batches.php', 'any' => ['sales_reference_view_batches','sales_data_view'], 'active' => ['sales-reference-batches.php']],
-            ['title' => 'خطاهای ورود اطلاعات مرجع', 'url' => '/admin/sales-reference-errors.php', 'any' => ['sales_reference_view_errors','sales_data_view_errors'], 'active' => ['sales-reference-errors.php']],
+            ['title' => 'مرکز یکپارچه ورود اطلاعات', 'url' => '/admin/import-center.php', 'any' => ['import_center.view','import_center.upload','sales_reference_upload','sales_data_import'], 'active_paths' => ['/admin/import-center.php']],
+            ['title' => 'ضرایب، اولویت‌ها و اهداف', 'url' => '/admin/sales-planning.php', 'any' => ['sales_planning.view','sales_planning.manage','sales_planning.reports','sales_data_view_reports'], 'active_paths' => ['/admin/sales-planning.php']],
+            ['title' => 'ورود اطلاعات فروش تجمیعی', 'url' => '/admin/import-center.php?source=sales_aggregate', 'any' => ['import_center.upload','sales_reference_upload','sales_data_import'], 'query_equals' => ['source' => 'sales_aggregate']],
+            ['title' => 'آپدیت موجودی انبار', 'url' => '/admin/import-center.php?source=inventory_aggregate', 'any' => ['import_center.upload','sales_reference_upload','sales_data_import'], 'query_equals' => ['source' => 'inventory_aggregate']],
+            ['title' => 'تاریخچه ورود اطلاعات', 'url' => '/admin/import-history.php', 'any' => ['import_center.view','sales_reference_view_batches','sales_data_view'], 'active_paths' => ['/admin/import-history.php','/admin/sales-reference-batches.php']],
+            ['title' => 'خطاهای ورود اطلاعات', 'url' => '/admin/import-errors.php', 'any' => ['import_center.view','sales_reference_view_errors','sales_data_view_errors'], 'active_paths' => ['/admin/import-errors.php','/admin/sales-reference-errors.php']],
             ['title' => 'وضعیت دیتای مرجع سایت', 'url' => '/admin/sales-reference-status.php', 'any' => ['sales_reference_view_status','sales_data_view'], 'active' => ['sales-reference-status.php']],
-            ['title' => 'ورود اطلاعات ویزیتورها', 'url' => '/admin/sales-data-index.php?source=sales_team', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'sales_team']],
-            ['title' => 'ورود ضرایب صنف', 'url' => '/admin/sales-data-index.php?source=customer_coefficients', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'customer_coefficients']],
-            ['title' => 'ورود اولویت کالا', 'url' => '/admin/sales-data-index.php?source=product_priorities', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'product_priorities']],
-            ['title' => 'ورود تارگت فروش', 'url' => '/admin/sales-data-index.php?source=sales_targets', 'permission' => 'sales_data_import', 'query_equals' => ['source' => 'sales_targets']],
-            ['title' => 'تاریخچه ایمپورت‌ها', 'url' => '/admin/sales-data-batches.php', 'permission' => 'sales_data_view', 'active' => ['sales-data-batches.php']],
-            ['title' => 'خطاهای ورود اطلاعات', 'url' => '/admin/sales-data-errors.php', 'permission' => 'sales_data_view_errors', 'active' => ['sales-data-errors.php']],
-            ['title' => 'نگاشت ستون‌ها', 'url' => '/admin/sales-data-mapping.php', 'permission' => 'sales_data_manage_mapping', 'active' => ['sales-data-mapping.php']],
             ['title' => 'وضعیت اتصال SobhanAI', 'url' => '/admin/sales-data-index.php?section=ai', 'permission' => 'sales_data_sync_ai', 'query_equals' => ['section' => 'ai']],
             ['title' => 'Viewهای گزارش‌گیری', 'url' => '/admin/sales-data-index.php?section=views', 'permission' => 'sales_data_view_reports', 'query_equals' => ['section' => 'views']],
         ]],
         'sales_supervisor' => ['title' => 'پنل سرپرست فروش', 'items' => [
             ['title' => 'داشبورد سرپرست', 'url' => '/admin/supervisor-dashboard.php', 'permission' => 'supervisor.panel.view', 'active' => ['supervisor-dashboard.php']],
             ['title' => 'گزارش فروش ویزیتورها', 'url' => '/admin/supervisor-sales-report.php', 'permission' => 'supervisor.sales.view', 'active' => ['supervisor-sales-report.php']],
-            ['title' => 'اسکریپت فروش و اقدامات', 'url' => '/admin/supervisor-actions.php', 'permission' => 'supervisor.actions.manage', 'active_paths' => ['/admin/supervisor-actions.php','/admin/supervisor-action-view.php']],
+            ['title' => 'اقدامات تیم', 'url' => '/admin/supervisor-dashboard.php?action_panel=1#supervisor-actions', 'permission' => 'supervisor.actions.manage', 'active_paths' => ['/admin/supervisor-dashboard.php','/admin/supervisor-actions.php','/admin/supervisor-action-view.php','/admin/action-view.php']],
         ]],
         'management_reports' => ['title' => 'گزارشات مدیران', 'items' => [
             ['title' => 'آماده‌سازی گزارش مدیران فروش', 'url' => '/admin/management-report-prepare.php?type=sales', 'management_report_type' => 'sales', 'active_paths' => ['/admin/management-report-prepare.php']],
@@ -134,10 +139,12 @@ function admin_menu_registry(): array
             ['title' => 'ظاهر پنل من', 'url' => '/admin/theme-settings.php', 'permission' => 'dashboard', 'active' => ['theme-settings.php']],
             ['title' => 'تنظیمات اعلان‌ها', 'url' => '/admin/notification-settings.php', 'permission' => 'dashboard', 'active' => ['notification-settings.php']],
             ['title' => 'تنظیمات عمومی', 'url' => '/admin/settings.php', 'permission' => 'settings', 'active' => ['settings.php']],
-            ['title' => 'تنظیمات داشبورد مدیرعامل', 'url' => '/admin/ceo-dashboard-settings.php', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'active' => ['ceo-dashboard-settings.php']],
-            ['title' => 'تنظیمات داشبورد مدیران', 'url' => '/admin/manager-dashboard-settings.php', 'any' => ['manager_dashboard.settings', 'manager_dashboard.ai_settings'], 'active' => ['manager-dashboard-settings.php']],
+            ['title' => 'تنظیمات داشبورد مدیرعامل', 'url' => '/admin/dashboard-settings.php?scope=ceo', 'permission' => 'ceo_dashboard', 'action' => 'edit', 'query_equals' => ['scope' => 'ceo']],
+            ['title' => 'تنظیمات داشبورد مدیران', 'url' => '/admin/dashboard-settings.php?scope=sales_manager', 'any' => ['manager_dashboard.settings', 'manager_dashboard.ai_settings'], 'query_equals' => ['scope' => 'sales_manager']],
+            ['title' => 'تنظیمات نمایش سرپرست', 'url' => '/admin/dashboard-settings.php?scope=supervisor', 'permission' => 'admin.supervisor_settings.manage', 'query_equals' => ['scope' => 'supervisor']],
             ['title' => 'تنظیمات پنل سرپرستان', 'url' => '/admin/supervisor-settings.php', 'permission' => 'admin.supervisor_settings.manage', 'active' => ['supervisor-settings.php']],
-            ['title' => 'تنظیمات فرمول بودجه آفر', 'url' => '/admin/sales-offer-formula-settings.php', 'roles' => ['admin', 'super_admin'], 'active' => ['sales-offer-formula-settings.php']],
+            ['title' => 'فرمول‌ساز تصویری', 'url' => '/admin/formula-builder.php', 'roles' => ['admin', 'super_admin'], 'any' => ['formula_builder.view', 'formula_builder.manage', 'sales_data_manage_formulas'], 'active_paths' => ['/admin/formula-builder.php','/admin/formula-test.php','/admin/sales-offer-formula-settings.php']],
+            ['title' => 'نگاشت پیشرفته ستون‌ها', 'url' => '/admin/sales-data-mapping.php', 'super_admin' => true, 'active' => ['sales-data-mapping.php']],
         ]],
         'system' => ['title' => 'ابزارهای سیستم', 'items' => [
             ['title' => 'بکاپ فایل‌های سایت', 'url' => '/admin/uploaded-files-backup.php', 'permission' => 'file_backup.manage', 'active' => ['uploaded-files-backup.php']],
@@ -156,6 +163,20 @@ function admin_menu_registry(): array
 
 function admin_menu_allowed(array $item): bool
 {
+    if (isset($item['daily_report_capability'])) {
+        if (!class_exists('DailyWorkReportService')) require_once __DIR__ . '/../services/DailyWorkReportService.php';
+        return $item['daily_report_capability'] === 'manage'
+            ? DailyWorkReportService::canManageTemplates()
+            : DailyWorkReportService::canView();
+    }
+    if (!empty($item['action_hub_capability'])) {
+        if (!class_exists('ActionHubService')) require_once __DIR__ . '/../services/ActionHubService.php';
+        return ActionHubService::canView();
+    }
+    if (isset($item['okr_capability'])) {
+        if (!class_exists('OkrService')) require_once __DIR__ . '/OkrService.php';
+        return OkrService::menuAllowed();
+    }
     if (!empty($item['attendance_own'])) return (bool)Auth::user();
     if (!empty($item['management_governance'])) {
         if (!class_exists('ManagementMeetingsRepository')) require_once __DIR__ . '/ManagementMeetingsRepository.php';
@@ -207,4 +228,58 @@ function admin_menu_is_active(array $item, string $path): bool
     if (isset($item['active_paths'])) return in_array($pathOnly, $item['active_paths'], true);
     $currentFile = basename($pathOnly);
     return in_array($currentFile, $item['active'] ?? [basename(parse_url($item['url'], PHP_URL_PATH) ?: $item['url'])], true);
+}
+
+function admin_menu_visible_registry(): array
+{
+    static $visible = null;
+    if ($visible !== null) return $visible;
+    $visible = [];
+    foreach (admin_menu_registry() as $groupKey => $group) {
+        $items = array_values(array_filter($group['items'] ?? [], 'admin_menu_allowed'));
+        if ($items) $visible[$groupKey] = ['title' => (string)$group['title'], 'items' => $items];
+    }
+    return $visible;
+}
+
+function admin_menu_search_index(): array
+{
+    $results = [];
+    foreach (admin_menu_visible_registry() as $groupKey => $group) {
+        foreach ($group['items'] as $index => $item) {
+            $url = (string)($item['url'] ?? '');
+            $path = parse_url($url, PHP_URL_PATH) ?: '';
+            if ($path === '' || !str_starts_with($path, '/')) continue;
+            $results[] = [
+                'key' => $groupKey . '-' . $index,
+                'title' => (string)($item['title'] ?? ''),
+                'group' => (string)$group['title'],
+                'url' => $url,
+            ];
+        }
+    }
+    return $results;
+}
+
+function admin_menu_permission_catalog(): array
+{
+    $catalog = [];
+    foreach (admin_menu_registry() as $group) {
+        foreach ($group['items'] ?? [] as $item) {
+            $keys = [];
+            if (!empty($item['permission'])) $keys[] = (string)$item['permission'];
+            foreach ($item['any'] ?? [] as $key) $keys[] = (string)$key;
+            foreach ($item['all'] ?? [] as $key) $keys[] = (string)$key;
+            foreach ($keys as $key) {
+                $canonical = Auth::canonicalPermissionKey($key);
+                if (isset($catalog[$canonical])) continue;
+                $catalog[$canonical] = [
+                    'group' => (string)($group['title'] ?? 'سایر'),
+                    'route' => (string)($item['url'] ?? '-'),
+                    'description' => 'دسترسی به ' . (string)($item['title'] ?? $canonical),
+                ];
+            }
+        }
+    }
+    return $catalog;
 }

@@ -4,19 +4,23 @@ require_once __DIR__ . '/core/Installer.php';
 $lock = __DIR__ . '/install.lock';
 $errors = [];
 $success = false;
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+if (empty($_SESSION['installer_csrf'])) {
+    $_SESSION['installer_csrf'] = bin2hex(random_bytes(32));
+}
 
 function h($value): string
 {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
-function safeError(Throwable $exception, string $password): string
+function safeError(Throwable $exception): string
 {
-    $message = $exception->getMessage();
-    if ($password !== '') {
-        $message = str_replace($password, '********', $message);
-    }
-    return h($message);
+    $code = preg_replace('/[^A-Za-z0-9_.-]/', '', (string)$exception->getCode()) ?: 'unknown';
+    error_log('Installer failure: type=' . get_class($exception) . ' code=' . $code);
+    return 'اتصال به دیتابیس یا ایجاد ساختار انجام نشد. اطلاعات اتصال و سطح دسترسی کاربر دیتابیس را بررسی کنید.';
 }
 
 if (file_exists($lock)) {
@@ -28,7 +32,11 @@ if (file_exists($lock)) {
 $requirements = Installer::requirements();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!hash_equals((string)$_SESSION['installer_csrf'], (string)($_POST['csrf_token'] ?? ''))) {
+        $errors[] = 'اعتبار فرم نصب منقضی شده است. صفحه را تازه‌سازی و دوباره تلاش کنید.';
+    }
     $dbHost = trim($_POST['db_host'] ?? '');
+    $dbPort = (int)($_POST['db_port'] ?? 3306);
     $dbNameRaw = trim($_POST['db_name'] ?? '');
     $dbName = Installer::cleanDatabaseName($dbNameRaw);
     $dbUser = trim($_POST['db_user'] ?? '');
@@ -39,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $adminUsername = trim($_POST['admin_username'] ?? '');
     $adminPassword = (string)($_POST['admin_password'] ?? '');
 
-    foreach (['db_host', 'db_name', 'db_user', 'app_url', 'admin_name', 'admin_email', 'admin_username', 'admin_password'] as $field) {
+    foreach (['db_host', 'db_port', 'db_name', 'db_user', 'app_url', 'admin_name', 'admin_email', 'admin_username', 'admin_password'] as $field) {
         if (trim((string)($_POST[$field] ?? '')) === '') {
             $errors[] = 'فیلدهای ضروری را کامل کنید.';
             break;
@@ -48,6 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($dbName === '' || $dbName !== $dbNameRaw) {
         $errors[] = 'نام دیتابیس فقط می‌تواند شامل حروف انگلیسی، عدد و خط زیر باشد.';
+    }
+
+    if ($dbPort < 1 || $dbPort > 65535) {
+        $errors[] = 'پورت دیتابیس باید عددی بین ۱ تا ۶۵۵۳۵ باشد.';
     }
 
     if (!filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
@@ -64,8 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
         try {
-            $serverDsn = 'mysql:host=' . $dbHost . ';charset=utf8mb4';
-            $dbDsn = 'mysql:host=' . $dbHost . ';dbname=' . $dbName . ';charset=utf8mb4';
+            $serverDsn = 'mysql:host=' . $dbHost . ';port=' . $dbPort . ';charset=utf8mb4';
+            $dbDsn = 'mysql:host=' . $dbHost . ';port=' . $dbPort . ';dbname=' . $dbName . ';charset=utf8mb4';
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -94,12 +106,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->beginTransaction();
             $stmt = $pdo->prepare('INSERT INTO users (name, email, username, password_hash, role, status, created_at, updated_at) VALUES (?, ?, ?, ?, "admin", "active", NOW(), NOW())');
             $stmt->execute([$adminName, $adminEmail, $adminUsername, password_hash($adminPassword, PASSWORD_DEFAULT)]);
+            $adminUserId = (int)$pdo->lastInsertId();
             $pdo->commit();
+
+            // Populate only safe system/reference data. Operational sales,
+            // attendance, finance and user-entered records are never fabricated.
+            Installer::seedFreshDatabase($pdo, $adminUserId);
 
             Installer::writeConfig([
                 'installed' => true,
                 'db' => [
                     'host' => $dbHost,
+                    'port' => $dbPort,
                     'name' => $dbName,
                     'user' => $dbUser,
                     'pass' => $dbPass,
@@ -118,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $errors[] = 'خطا در اتصال یا نصب دیتابیس: ' . safeError($exception, $dbPass);
+            $errors[] = safeError($exception);
         }
     }
 }
@@ -136,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h1>نصب سامانه</h1>
 
     <?php if ($success): ?>
-        <div class="alert alert-success">ساختار دیتابیس و حساب مدیر ایجاد شد. پس از ورود، Seedهای موردنیاز را از بخش «بروزرسانی SQL و Seed» به‌صورت انتخابی اجرا کنید.</div>
+        <div class="alert alert-success">ساختار دیتابیس، حساب مدیر و داده‌های پایه امن ایجاد شد. سامانه آماده ورود است.</div>
         <a class="btn btn-primary" href="/login.php">ورود</a>
     <?php else: ?>
         <h3>پیش‌نیازها</h3>
@@ -149,8 +167,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endforeach; ?>
 
         <form method="post">
+            <input type="hidden" name="csrf_token" value="<?= h($_SESSION['installer_csrf']) ?>">
             <div class="grid grid-2">
                 <label class="form-field"><span>هاست دیتابیس</span><input name="db_host" value="<?= h($_POST['db_host'] ?? 'localhost') ?>" required></label>
+                <label class="form-field"><span>پورت دیتابیس</span><input type="number" min="1" max="65535" name="db_port" value="<?= h($_POST['db_port'] ?? '3306') ?>" required></label>
                 <label class="form-field"><span>نام دیتابیس</span><input name="db_name" value="<?= h($_POST['db_name'] ?? '') ?>" required></label>
                 <label class="form-field"><span>نام کاربری دیتابیس</span><input name="db_user" value="<?= h($_POST['db_user'] ?? '') ?>" required></label>
                 <label class="form-field"><span>رمز دیتابیس</span><input type="password" name="db_pass" autocomplete="off"></label>

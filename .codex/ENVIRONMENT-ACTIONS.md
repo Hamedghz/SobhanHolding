@@ -20,6 +20,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .codex/scripts/lint.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .codex/scripts/test.ps1
 ```
 
+## Codex Phase Execution Contract
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .codex/scripts/policy-contract-test.ps1
+```
+
 ## Source Backup
 
 ```powershell

@@ -1,0 +1,424 @@
+/*
+ * Sobhan compact UI system
+ * Scoped to body.app-compact-ui so legacy pages keep their existing layout.
+ */
+.app-compact-ui {
+    --compact-space-1: 4px;
+    --compact-space-2: 8px;
+    --compact-space-3: 12px;
+    --compact-space-4: 16px;
+    --compact-space-5: 20px;
+    --compact-radius: 10px;
+    --compact-control-height: 42px;
+    --compact-shadow: 0 8px 24px rgba(15, 23, 42, .055);
+}
+
+.app-compact-ui .admin-content {
+    padding: var(--compact-space-4);
+}
+
+.app-compact-ui .section-heading-row {
+    align-items: center;
+    margin-bottom: var(--compact-space-3);
+}
+
+.app-compact-ui .section-heading-row h1,
+.app-compact-ui .admin-content > h1 {
+    margin: 0;
+    font-size: clamp(1.25rem, 2vw, 1.65rem);
+    line-height: 1.5;
+}
+
+.app-compact-ui .section-heading-row p {
+    margin: 2px 0 0;
+    line-height: 1.65;
+}
+
+.app-compact-ui .card {
+    padding: var(--compact-space-4);
+    border-radius: var(--compact-radius);
+    box-shadow: var(--compact-shadow);
+}
+
+.app-compact-ui .admin-content > .card + .card,
+.app-compact-ui .admin-content > .card + form.card,
+.app-compact-ui .admin-content > form.card + .card,
+.app-compact-ui .attendance-page > .card + .card,
+.app-compact-ui .attendance-page > form.card + .card {
+    margin-top: var(--compact-space-3);
+}
+
+.app-compact-ui .card > :first-child,
+.app-compact-ui .card > form > :first-child {
+    margin-top: 0;
+}
+
+.app-compact-ui .card h2 {
+    margin: 0 0 var(--compact-space-3);
+    font-size: 1.05rem;
+    line-height: 1.6;
+}
+
+.app-compact-ui .grid,
+.app-compact-ui .grid-2,
+.app-compact-ui .grid-3,
+.app-compact-ui .app-form-grid {
+    gap: var(--compact-space-3);
+}
+
+.app-compact-ui .app-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-compact-ui .app-form-grid.app-form-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-compact-ui .app-form-grid > .full,
+.app-compact-ui .app-form-grid > .grid-span-2 {
+    grid-column: 1 / -1;
+}
+
+.app-compact-ui .form-field {
+    min-width: 0;
+    margin-bottom: var(--compact-space-2);
+}
+
+.app-compact-ui .grid > .form-field,
+.app-compact-ui .app-form-grid > .form-field {
+    margin-bottom: 0;
+}
+
+.app-compact-ui .form-field span,
+.app-compact-ui form label > span {
+    margin-bottom: var(--compact-space-1);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.6;
+}
+
+.app-compact-ui input:not([type="checkbox"]):not([type="radio"]),
+.app-compact-ui select,
+.app-compact-ui textarea,
+.app-compact-ui .btn {
+    min-height: var(--compact-control-height);
+}
+
+.app-compact-ui input:not([type="checkbox"]):not([type="radio"]),
+.app-compact-ui select,
+.app-compact-ui textarea {
+    padding: 8px 10px;
+}
+
+.app-compact-ui textarea {
+    min-height: 82px;
+}
+
+.app-compact-ui .checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: var(--compact-space-2);
+    min-height: var(--compact-control-height);
+    padding: 8px 10px;
+}
+
+.app-compact-ui .checkbox-item input {
+    flex: 0 0 auto;
+}
+
+.app-compact-ui .actions,
+.app-compact-ui .form-actions,
+.app-compact-ui .attendance-actions {
+    gap: var(--compact-space-2);
+}
+
+.app-compact-ui .app-sticky-actions {
+    position: sticky;
+    bottom: 8px;
+    z-index: 4;
+    width: fit-content;
+    max-width: 100%;
+    margin: var(--compact-space-3) 0 0;
+    padding: 7px;
+    border: 1px solid rgba(203, 213, 225, .9);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, .94);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, .12);
+    backdrop-filter: blur(10px);
+}
+
+.app-compact-ui .app-sticky-submit {
+    position: sticky;
+    bottom: 8px;
+    z-index: 4;
+    margin-top: var(--compact-space-3);
+    box-shadow: 0 8px 22px rgba(37, 99, 235, .18);
+}
+
+.app-compact-ui details.app-advanced-section {
+    margin-top: var(--compact-space-3);
+    overflow: clip;
+    border: 1px solid var(--border);
+    border-radius: var(--compact-radius);
+    background: #f8fafc;
+}
+
+.app-compact-ui details.app-advanced-section > summary {
+    min-height: 44px;
+    padding: 10px 12px;
+    color: #334155;
+    cursor: pointer;
+    font-weight: 900;
+    list-style-position: inside;
+}
+
+.app-compact-ui details.app-advanced-section[open] > summary {
+    border-bottom: 1px solid var(--border);
+    background: #fff;
+}
+
+.app-compact-ui details.app-advanced-section > :not(summary) {
+    margin: 0;
+    padding: var(--compact-space-3);
+}
+
+.app-compact-ui .table-wrap {
+    border-radius: var(--compact-radius);
+}
+
+.app-compact-ui table {
+    min-width: 680px;
+}
+
+.app-compact-ui th,
+.app-compact-ui td {
+    padding: 8px 10px;
+    line-height: 1.65;
+}
+
+.app-compact-ui th {
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.app-compact-ui td {
+    font-size: 13px;
+}
+
+.app-compact-ui td small,
+.app-compact-ui td strong {
+    display: block;
+}
+
+.app-compact-ui .badge,
+.app-compact-ui .attendance-badge,
+.app-compact-ui .reference-badge {
+    min-height: 24px;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.app-compact-ui .app-empty-state {
+    padding: 28px 16px !important;
+    color: var(--muted);
+    text-align: center;
+    background: #f8fafc;
+}
+
+.dashboard-widget-layout {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.dashboard-widget-shell {
+    min-width: 0;
+}
+
+.dashboard-widget-size-third { grid-column: span 2; }
+.dashboard-widget-size-half { grid-column: span 3; }
+.dashboard-widget-size-wide { grid-column: 1 / -1; }
+
+.app-compact-ui [aria-busy="true"],
+.app-compact-ui .app-loading {
+    position: relative;
+    min-height: 72px;
+    pointer-events: none;
+    opacity: .7;
+}
+
+.app-compact-ui [aria-busy="true"]::after,
+.app-compact-ui .app-loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 50%;
+    width: 24px;
+    height: 24px;
+    border: 3px solid #cbd5e1;
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: appCompactSpin .7s linear infinite;
+}
+
+@keyframes appCompactSpin {
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+    .app-compact-ui .admin-content {
+        padding: 12px;
+    }
+
+    .app-compact-ui .app-form-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dashboard-widget-size-third,
+    .dashboard-widget-size-half {
+        grid-column: span 3;
+    }
+}
+
+@media (max-width: 700px) {
+    .app-compact-ui .section-heading-row {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .app-compact-ui .section-heading-row .actions,
+    .app-compact-ui .section-heading-row > form {
+        width: 100%;
+    }
+
+    .app-compact-ui .section-heading-row .btn,
+    .app-compact-ui .section-heading-row > form .btn {
+        width: 100%;
+    }
+
+    .app-compact-ui .grid,
+    .app-compact-ui .grid-2,
+    .app-compact-ui .grid-3,
+    .app-compact-ui .app-form-grid,
+    .app-compact-ui .app-form-grid.app-form-grid-2 {
+        grid-template-columns: 1fr;
+    }
+
+    .app-compact-ui .grid-span-2,
+    .app-compact-ui .app-form-grid > .full {
+        grid-column: auto;
+    }
+
+    .dashboard-widget-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-widget-size-third,
+    .dashboard-widget-size-half,
+    .dashboard-widget-size-wide {
+        grid-column: auto;
+    }
+
+    .app-compact-ui .app-sticky-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .app-compact-ui .app-sticky-actions .btn,
+    .app-compact-ui .app-sticky-actions form {
+        flex: 1 1 auto;
+    }
+
+    .app-compact-ui .app-sticky-actions form .btn {
+        width: 100%;
+    }
+
+    .app-compact-ui table.app-mobile-cards {
+        display: block;
+        min-width: 0;
+        border: 0;
+    }
+
+    .app-compact-ui table.app-mobile-cards thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .app-compact-ui table.app-mobile-cards tbody {
+        display: grid;
+        gap: 10px;
+    }
+
+    .app-compact-ui table.app-mobile-cards tr {
+        display: grid;
+        gap: 0;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        background: #fff;
+        box-shadow: 0 5px 16px rgba(15, 23, 42, .045);
+    }
+
+    .app-compact-ui table.app-mobile-cards td {
+        display: grid;
+        grid-template-columns: minmax(88px, .38fr) minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+        min-height: 42px;
+        padding: 9px 10px;
+        border-bottom: 1px solid #edf2f7;
+        overflow-wrap: anywhere;
+    }
+
+    .app-compact-ui table.app-mobile-cards td:last-child {
+        border-bottom: 0;
+    }
+
+    .app-compact-ui table.app-mobile-cards td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 900;
+        line-height: 1.7;
+    }
+
+    .app-compact-ui table.app-mobile-cards td.app-empty-state {
+        display: block;
+    }
+
+    .app-compact-ui table.app-mobile-cards td.app-empty-state::before {
+        content: none;
+    }
+
+    .app-compact-ui table.app-mobile-cards td input,
+    .app-compact-ui table.app-mobile-cards td select,
+    .app-compact-ui table.app-mobile-cards td textarea {
+        min-width: 0;
+    }
+
+    .app-compact-ui .table-wrap:has(> table.app-mobile-cards) {
+        overflow: visible;
+        border: 0;
+        background: transparent;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-compact-ui *,
+    .app-compact-ui *::before,
+    .app-compact-ui *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+}

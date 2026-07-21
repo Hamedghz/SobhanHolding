@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <link rel="stylesheet" href="/assets/css/app-compact-ui.css">
+  <link rel="stylesheet" href="/assets/css/sales-planning.css">
+  <title>برنامه فروش</title>
+</head>
+<body class="admin-body app-compact-ui">
+<main class="admin-main" style="max-width:1440px;margin:auto;padding:18px">
+  <section class="admin-content">
+    <div class="sales-planning-page">
+      <header class="planning-hero" data-planning-reveal>
+        <div><span class="planning-kicker">Sales Planning Control Room</span><h1>ضرایب، اولویت‌ها و اهداف فروش</h1><p>ضرایب نسخه‌دار، اولویت کنترل‌شده و هدف در دانه‌بندی دوره + ویزیتور + لاین + کالا.</p></div>
+        <div class="planning-flow"><span>مرجع</span><i></i><span>تخصیص</span><i></i><span>فروش واقعی</span><i></i><span>تحقق</span></div>
+      </header>
+      <nav class="planning-tabs"><a>ضرایب صنف</a><a>اولویت محصولات</a><a class="is-active">تخصیص هدف</a><a>گزارش تحقق</a></nav>
+      <section class="card planning-filter-card"><form class="planning-filter"><label><span>دوره مؤثر</span><select><option>تیر ۱۴۰۵</option></select></label><button class="btn btn-light">اعمال دوره</button></form><small>دوره از مرجع مرکزی تاریخ انتخاب می‌شود.</small></section>
+      <section class="card planning-editor" data-planning-reveal>
+        <div class="planning-section-title"><div><span>Canonical allocation</span><h2>تخصیص هدف کالایی ویزیتور</h2></div><div class="actions"><button class="btn btn-light">دانلود قالب</button><button class="btn btn-light">ورود Excel</button></div></div>
+        <form class="target-grid" data-target-form>
+          <label><span>دوره</span><select><option>تیر ۱۴۰۵</option></select></label>
+          <label><span>لاین</span><select data-target-line><option value="A">لاین A</option></select></label>
+          <label><span>ویزیتور</span><select data-target-visitor><option value="V001" data-line="A">علی رضایی</option></select></label>
+          <label><span>کد کالا</span><input value="10001"></label>
+          <label><span>هدف تعداد</span><input value="100"></label>
+          <label><span>هدف مبلغ</span><input value="500000000"></label>
+          <label><span>درصد تخصیص</span><input value="25"></label>
+          <button class="btn btn-primary">ثبت هدف</button>
+        </form>
+      </section>
+      <section class="card" data-planning-reveal>
+        <div class="planning-section-title"><div><span>Single source of truth</span><h2>اهداف فعال ویزیتورها</h2></div><span class="planning-count">۳ ردیف</span></div>
+        <div class="table-responsive"><table><thead><tr><th>ویزیتور</th><th>لاین</th><th>کالا</th><th>هدف تعداد</th><th>هدف مبلغ</th><th>تخصیص</th></tr></thead><tbody><tr><td>علی رضایی</td><td>لاین A</td><td>محصول نمونه<small>10001</small></td><td>۱۰۰</td><td>۵۰۰٬۰۰۰٬۰۰۰</td><td><span class="achievement-pill">۲۵٪</span></td></tr></tbody></table></div>
+      </section>
+    </div>
+  </section>
+</main>
+<script src="/assets/vendor/motion/motion-12.42.2.min.js"></script>
+<script src="/assets/js/sales-planning.js"></script>
+</body>
+</html>

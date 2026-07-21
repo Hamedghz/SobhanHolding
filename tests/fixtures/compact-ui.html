@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Compact UI fixture</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/assets/css/app.css">
+    <link rel="stylesheet" href="/assets/css/admin.css">
+    <link rel="stylesheet" href="/assets/css/app-compact-ui.css">
+</head>
+<body class="admin-body app-compact-ui">
+<main class="admin-main" style="margin:0">
+    <section class="admin-content">
+        <div class="section-heading-row">
+            <div><h1>مرکز عملیات فشرده</h1><p class="muted">نمونهٔ آزمون RTL و واکنش‌گرایی</p></div>
+            <div class="actions"><button class="btn btn-primary">اقدام اصلی</button></div>
+        </div>
+        <form class="card admin-form">
+            <h2>فرم چندستونه</h2>
+            <div class="grid grid-3">
+                <label class="form-field"><span>عنوان</span><input value="گزارش روزانه"></label>
+                <label class="form-field"><span>دوره</span><select><option>ماه جاری</option></select></label>
+                <label class="form-field"><span>مسئول</span><input value="کاربر آزمایشی"></label>
+                <label class="form-field"><span>اولویت</span><select><option>عادی</option></select></label>
+                <label class="form-field"><span>مهلت</span><input value="۱۴۰۵/۰۴/۲۵"></label>
+                <label class="form-field"><span>وضعیت</span><select><option>فعال</option></select></label>
+            </div>
+            <details>
+                <summary>تنظیمات پیشرفته</summary>
+                <div class="grid grid-2">
+                    <label class="form-field"><span>منبع</span><input value="داده مرکزی"></label>
+                    <label class="form-field"><span>توضیح</span><textarea>جزئیات تکمیلی</textarea></label>
+                </div>
+            </details>
+            <div class="form-actions"><button class="btn btn-primary">ذخیره</button><button class="btn">انصراف</button></div>
+        </form>
+        <section class="card">
+            <h2>جدول واکنش‌گرا</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>عنوان</th><th>مسئول</th><th>وضعیت</th><th>مهلت</th></tr></thead>
+                    <tbody>
+                        <tr><td>پیگیری مشتریان</td><td>تیم فروش</td><td><span class="badge">در حال انجام</span></td><td>۱۴۰۵/۰۴/۲۸</td></tr>
+                        <tr><td>بستن گزارش ماه</td><td>مدیر واحد</td><td><span class="badge">جدید</span></td><td>۱۴۰۵/۰۴/۳۰</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </section>
+</main>
+<script src="/assets/vendor/motion/motion-12.42.2.min.js"></script>
+<script src="/assets/js/app-compact-ui.js"></script>
+</body>
+</html>

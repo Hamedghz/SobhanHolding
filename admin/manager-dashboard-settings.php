@@ -18,6 +18,7 @@ $permissionLabels = [
     'manager_dashboard.ai_settings'=>'تنظیمات هوش مصنوعی', 'manager_dashboard.ai_run'=>'اجرای تحلیل هوش مصنوعی',
 ];
 $notice = '';
+function manager_skill_schema_fields(?string $json): array{$decoded=json_decode((string)$json,true);if(!is_array($decoded))return[];return array_values(array_filter(array_map('strval',array_keys($decoded)),static fn(string $key):bool=>$key!==''));}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Auth::verifyCsrf($_POST['csrf_token'] ?? null)) { http_response_code(419); exit('درخواست نامعتبر است.'); }
@@ -78,24 +79,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'skills') {
         foreach (ManagerDashboard::enabledSkills(false) as $skill) {
             $id = (int)$skill['id'];
-            $input = trim((string)($_POST['input_schema_json'][$id] ?? ''));
-            $output = trim((string)($_POST['output_schema_json'][$id] ?? ''));
-            if (($input !== '' && json_decode($input, true) === null && json_last_error() !== JSON_ERROR_NONE) || ($output !== '' && json_decode($output, true) === null && json_last_error() !== JSON_ERROR_NONE)) {
-                $notice = 'ساختار JSON مهارت‌ها معتبر نیست.';
-                continue;
-            }
-            Database::execute('UPDATE manager_dashboard_ai_skills SET skill_title_fa=?,skill_description_fa=?,skill_type=?,is_enabled=?,sort_order=?,system_prompt=?,input_schema_json=?,output_schema_json=?,updated_at=NOW() WHERE id=?', [
+            Database::execute('UPDATE manager_dashboard_ai_skills SET skill_title_fa=?,skill_description_fa=?,skill_type=?,is_enabled=?,sort_order=?,system_prompt=?,updated_at=NOW() WHERE id=?', [
                 trim((string)($_POST['skill_title_fa'][$id] ?? $skill['skill_title_fa'])), trim((string)($_POST['skill_description_fa'][$id] ?? '')),
                 trim((string)($_POST['skill_type'][$id] ?? 'analysis')), isset($_POST['is_enabled'][$id])?1:0, (int)($_POST['sort_order'][$id] ?? 0),
-                trim((string)($_POST['system_prompt'][$id] ?? '')), $input, $output, $id,
+                trim((string)($_POST['system_prompt'][$id] ?? '')), $id,
             ]);
         }
         if ($notice === '') flash('مهارت‌های داشبورد ذخیره شد.');
     } elseif ($action === 'rules') {
-        $values=[];
-        foreach (ManagerDashboardCalculator::ruleDefaults() as $key=>$default) $values['rule_'.$key]=(float)($_POST[$key]??$default);
-        ManagerDashboard::saveSettings($values);
-        flash('قوانین محاسبات داشبورد ذخیره شد.');
+        http_response_code(403);
+        exit('ویرایش مستقیم قوانین محاسبات غیرفعال است؛ از فرمول‌ساز تصویری استفاده کنید.');
     } elseif ($action === 'default') {
         Database::execute('UPDATE manager_dashboard_reports SET is_default=0'); Database::execute('UPDATE manager_dashboard_reports SET is_default=1 WHERE id=?',[(int)$_POST['id']]); flash('success','گزارش پیش‌فرض تغییر کرد.');
     } elseif ($action === 'delete') {
@@ -146,8 +139,8 @@ require __DIR__.'/../views/partials/admin-header.php';
 <div class="full actions"><button class="btn">ذخیره تنظیمات داشبورد</button></div></form>
 <form method="post" class="actions"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><button class="btn btn-light" name="action" value="ai_refresh">بروزرسانی اتصال هوش مصنوعی</button><button class="btn btn-light" name="action" value="ai_test">تست اتصال هوش مصنوعی</button></form></section>
 
-<section class="card manager-settings" id="skills"><header><div><h2>مهارت‌های داشبورد مدیران</h2><p>مهارت‌ها تحلیل AI را هدفمند می‌کنند؛ محاسبات قطعی در بک‌اند انجام می‌شود.</p></div></header><form method="post"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="skills"><div class="table-wrap"><table><thead><tr><th>کلید مهارت</th><th>عنوان مهارت</th><th>توضیح مهارت</th><th>نوع</th><th>فعال</th><th>ترتیب</th><th>پرامپت سیستمی مهارت</th><th>ساختار ورودی</th><th>ساختار خروجی</th></tr></thead><tbody><?php foreach($skills as $skill):$id=(int)$skill['id'];?><tr><td><code><?=e($skill['skill_key'])?></code></td><td><input name="skill_title_fa[<?=$id?>]" value="<?=e($skill['skill_title_fa'])?>"></td><td><textarea name="skill_description_fa[<?=$id?>]" rows="3"><?=e($skill['skill_description_fa'])?></textarea></td><td><input name="skill_type[<?=$id?>]" value="<?=e($skill['skill_type'])?>"></td><td><input type="checkbox" name="is_enabled[<?=$id?>]" <?=(int)$skill['is_enabled']?'checked':''?>></td><td><input type="number" name="sort_order[<?=$id?>]" value="<?=(int)$skill['sort_order']?>"></td><td><textarea name="system_prompt[<?=$id?>]" rows="4"><?=e($skill['system_prompt'])?></textarea></td><td><textarea dir="ltr" name="input_schema_json[<?=$id?>]" rows="4"><?=e($skill['input_schema_json'])?></textarea></td><td><textarea dir="ltr" name="output_schema_json[<?=$id?>]" rows="4"><?=e($skill['output_schema_json'])?></textarea></td></tr><?php endforeach?></tbody></table></div><button class="btn">ذخیره مهارت‌ها</button></form></section>
+<section class="card manager-settings" id="skills"><header><div><h2>مهارت‌های داشبورد مدیران</h2><p>مهارت‌ها تحلیل AI را هدفمند می‌کنند؛ قرارداد ورودی و خروجی داخلی است و از این صفحه قابل ویرایش نیست.</p></div></header><form method="post"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="skills"><div class="table-wrap"><table><thead><tr><th>کلید مهارت</th><th>عنوان مهارت</th><th>توضیح مهارت</th><th>نوع</th><th>فعال</th><th>ترتیب</th><th>پرامپت سیستمی مهارت</th><th>داده‌های ورودی</th><th>بخش‌های خروجی</th></tr></thead><tbody><?php foreach($skills as $skill):$id=(int)$skill['id'];$inputFields=manager_skill_schema_fields($skill['input_schema_json']??null);$outputFields=manager_skill_schema_fields($skill['output_schema_json']??null);?><tr><td><code><?=e($skill['skill_key'])?></code></td><td><input name="skill_title_fa[<?=$id?>]" value="<?=e($skill['skill_title_fa'])?>"></td><td><textarea name="skill_description_fa[<?=$id?>]" rows="3"><?=e($skill['skill_description_fa'])?></textarea></td><td><input name="skill_type[<?=$id?>]" value="<?=e($skill['skill_type'])?>"></td><td><input type="checkbox" name="is_enabled[<?=$id?>]" <?=(int)$skill['is_enabled']?'checked':''?>></td><td><input type="number" name="sort_order[<?=$id?>]" value="<?=(int)$skill['sort_order']?>"></td><td><textarea name="system_prompt[<?=$id?>]" rows="4"><?=e($skill['system_prompt'])?></textarea></td><td><?php foreach($inputFields as $field):?><span class="badge"><?=e($field)?></span><?php endforeach?><?php if(!$inputFields):?><span class="muted">قرارداد پیش‌فرض</span><?php endif?></td><td><?php foreach($outputFields as $field):?><span class="badge"><?=e($field)?></span><?php endforeach?><?php if(!$outputFields):?><span class="muted">قرارداد پیش‌فرض</span><?php endif?></td></tr><?php endforeach?></tbody></table></div><button class="btn">ذخیره مهارت‌ها</button></form></section>
 
-<section class="card manager-settings" id="rules"><header><div><h2>قوانین محاسبات داشبورد مدیران</h2><p>این مقادیر در محاسبات محلی و قابل تکرار استفاده می‌شوند.</p></div></header><form method="post" class="manager-form-grid"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="rules"><?php foreach($ruleLabels as $key=>$label):?><label><span><?=e($label)?></span><input type="number" step="0.01" name="<?=e($key)?>" value="<?=e((string)($rules[$key]??0))?>"></label><?php endforeach?><div class="full"><button class="btn">ذخیره قوانین محاسبات</button></div></form></section>
+<section class="card manager-settings" id="rules"><header><div><h2>قوانین محاسبات داشبورد مدیران</h2><p>ویرایش مستقیم اعداد قدیمی متوقف شده است. نسخه‌های جدید باید در فرمول‌ساز، ابتدا Draft و سپس پس از تست منتشر شوند.</p></div></header><div class="actions"><a class="btn btn-primary" href="/admin/formula-builder.php?category=commission">فرمول‌های پورسانت</a><a class="btn" href="/admin/formula-builder.php?category=penalty">ضرایب کاهنده</a><a class="btn" href="/admin/formula-builder.php?category=customer_coverage">پوشش مشتری</a><a class="btn" href="/admin/formula-builder.php?category=brand_bonus">پاداش برند</a></div><p class="muted">مقادیر قدیمی فقط به‌عنوان fallback سازگار باقی می‌مانند و حذف نمی‌شوند.</p></section>
 <?php endif?>
 </section></main></div><script src="/assets/js/app.js"></script></body></html>

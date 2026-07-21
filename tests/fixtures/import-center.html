@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <link rel="stylesheet" href="/assets/css/app-compact-ui.css">
+  <link rel="stylesheet" href="/assets/css/import-center.css">
+  <title>مرکز ورود اطلاعات</title>
+</head>
+<body class="admin-body">
+<main class="admin-main" style="max-width:1440px;margin:auto;padding:18px">
+<div class="import-page">
+  <header class="import-hero"><div><span class="import-eyebrow">Data Import Center</span><h1>مرکز یکپارچه ورود اطلاعات</h1><p>تشخیص خودکار Table و Sheet، پیش‌نمایش، staging، خطاهای ردیفی و فعال‌سازی امن Batch در یک مسیر.</p></div><div class="import-limit"><span>سقف برنامه</span><strong>50 MB</strong><small>با محدودیت سرور سازگار است</small></div></header>
+  <nav class="import-source-tabs"><a class="is-active">تشخیص خودکار</a><a>ورود تجمیعی فروش</a><a>ورود تجمیعی خرید</a><a>ورود موجودی انبار</a><a>ورود تارگت</a><a>ورود اولویت کالا</a><a>ورود ضرایب صنف</a><a>ورود کارکرد</a></nav>
+  <section class="import-workspace">
+    <article class="card import-upload-card"><div class="import-section-title"><div><span>مرحله ۱</span><h2>بارگذاری و تشخیص</h2></div><span class="import-auto-badge">Auto mapping</span></div><form class="admin-form import-upload-form" data-import-form><label class="import-dropzone"><input type="file"><strong>فایل Excel یا CSV را انتخاب کنید</strong><span>نام فایل برای تشخیص استفاده نمی‌شود؛ Table، Sheet و امضای سرستون ملاک است.</span></label><div class="grid grid-2"><label><span>نوع منبع</span><select data-source-select><option>تشخیص خودکار</option><option value="inventory_aggregate">ورود موجودی انبار</option></select></label><label><span>روش ورود</span><select><option>مرجع جدید و فعال‌سازی پس از تایید</option></select></label><label><span>کلید دوره</span><input placeholder="1405-04"></label><label data-snapshot-field><span>تاریخ snapshot</span><input placeholder="1405/04/25"></label><label data-period-field><span>شناسه دوره</span><input type="number" min="1"></label></div><button class="btn btn-primary">بررسی فایل و ساخت پیش‌نمایش</button></form></article>
+    <aside class="card import-flow-card"><div class="import-section-title"><div><span>مسیر کنترل‌شده</span><h2>وضعیت Pipeline</h2></div></div><div class="import-flow-step"><b>۱</b><span>Upload</span></div><div class="import-flow-step"><b>۲</b><span>Inspect</span></div><div class="import-flow-step"><b>۳</b><span>Detect</span></div><div class="import-flow-step"><b>۴</b><span>Normalize</span></div><div class="import-flow-step"><b>۵</b><span>Stage</span></div><div class="import-flow-step"><b>۶</b><span>Validate</span></div><div class="import-flow-step"><b>۷</b><span>Commit</span></div><div class="import-flow-step"><b>۸</b><span>Activate</span></div></aside>
+  </section>
+  <section class="card import-batch-card"><div class="import-section-title"><div><span>Batch #108</span><h2>ورود تجمیعی فروش</h2></div><span class="import-status status-ready_to_commit">ready_to_commit</span></div><div class="import-meta-grid"><span>فایل<strong>sales-dashboard.xlsx</strong></span><span>Sheet<strong>گزارش تجمیعی فروش</strong></span><span>Table<strong>tblsales</strong></span><span>Confidence<strong>100%</strong></span><span>Snapshot<strong>1405/04/25</strong></span></div><div class="import-summary-grid"><article><span>کل ردیف</span><strong>12,480</strong></article><article><span>معتبر</span><strong>12,310</strong></article><article><span>خطادار</span><strong>42</strong></article><article><span>تکراری</span><strong>128</strong></article><article><span>آماده ثبت</span><strong>12,310</strong></article></div><div class="form-actions"><button class="btn btn-primary">Commit و فعال‌سازی Batch</button><button class="btn btn-light">بازگردانی Batch</button></div></section>
+</div>
+</main>
+<script src="/assets/vendor/motion/motion-12.42.2.min.js"></script>
+<script src="/assets/js/app-motion.js"></script>
+<script src="/assets/js/import-center.js"></script>
+</body></html>

@@ -6,6 +6,24 @@ class Database
     private static ?PDO $pdo = null;
     private static bool $migrated = false;
 
+    /**
+     * Run installer/isolated maintenance code against an explicit connection
+     * without reading or replacing the persisted application configuration.
+     */
+    public static function withConnection(PDO $pdo, callable $callback): mixed
+    {
+        $previousPdo = self::$pdo;
+        $previousMigrated = self::$migrated;
+        self::$pdo = $pdo;
+        self::$migrated = true;
+        try {
+            return $callback();
+        } finally {
+            self::$pdo = $previousPdo;
+            self::$migrated = $previousMigrated;
+        }
+    }
+
     public static function connection(): PDO
     {
         if (self::$pdo === null) {
@@ -16,7 +34,8 @@ class Database
                     throw new RuntimeException('Database configuration is incomplete. Run install.php again.');
                 }
             }
-            $dsn = sprintf('mysql:host=%s;dbname=%s;charset=%s', $config['host'], $config['name'], $config['charset'] ?? 'utf8mb4');
+            $port = max(1, min(65535, (int)($config['port'] ?? 3306)));
+            $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $config['host'], $port, $config['name'], $config['charset'] ?? 'utf8mb4');
             self::$pdo = new PDO($dsn, $config['user'], $config['pass'] ?? '', [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -173,8 +192,8 @@ class Database
             "CREATE TABLE IF NOT EXISTS ceo_dashboard_periods (
                 id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 title VARCHAR(150) NOT NULL,
-                from_date DATE NULL,
-                to_date DATE NULL,
+                `from_date` DATE NULL,
+                `to_date` DATE NULL,
                 active TINYINT(1) NOT NULL DEFAULT 1,
                 created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -279,12 +298,22 @@ class Database
         ManagerDashboard::repair($pdo);
         require_once __DIR__ . '/HrModule.php';
         HrModule::repair($pdo);
+        require_once __DIR__ . '/CarouselModule.php';
+        CarouselModule::repair($pdo);
         require_once __DIR__ . '/SystemMaintenance.php';
         SystemMaintenance::repair($pdo);
         require_once __DIR__ . '/OrgModule.php';
         OrgModule::repair($pdo);
+        require_once __DIR__ . '/SalesStructureModule.php';
+        SalesStructureModule::repair($pdo);
+        require_once __DIR__ . '/AppDateModule.php';
+        AppDateModule::repair($pdo);
+        require_once __DIR__ . '/DashboardModule.php';
+        DashboardModule::repair($pdo);
         require_once __DIR__ . '/WorkPlannerModule.php';
         WorkPlannerModule::repair($pdo);
+        require_once __DIR__ . '/OkrModule.php';
+        OkrModule::repair($pdo);
         require_once __DIR__ . '/PersonalPlannerModule.php';
         PersonalPlannerModule::repair($pdo);
         require_once __DIR__ . '/ThemeProfile.php';
@@ -301,6 +330,7 @@ class Database
         ManagementReportsModule::repair($pdo);
         require_once __DIR__ . '/ManagementMeetingsModule.php';
         ManagementMeetingsModule::repair($pdo);
+        OkrModule::repairIntegrations($pdo);
         require_once __DIR__ . '/HrAttendanceModule.php';
         HrAttendanceModule::repair($pdo);
         require_once __DIR__ . '/FileBackupModule.php';
@@ -313,8 +343,22 @@ class Database
         SalesOfferBudgetModule::repair($pdo);
         require_once __DIR__ . '/SalesDataSchema.php';
         SalesDataSchema::repair($pdo);
+        require_once __DIR__ . '/FormulaModule.php';
+        FormulaModule::repair($pdo);
         require_once __DIR__ . '/SalesReferenceSchema.php';
         SalesReferenceSchema::repair($pdo);
+        require_once __DIR__ . '/ImportCenterModule.php';
+        ImportCenterModule::repair($pdo);
+        require_once __DIR__ . '/SalesPlanningModule.php';
+        SalesPlanningModule::repair($pdo);
+        require_once __DIR__ . '/SalesOperationsModule.php';
+        SalesOperationsModule::repair($pdo);
+        require_once __DIR__ . '/ActionHubModule.php';
+        ActionHubModule::repair($pdo);
+        require_once __DIR__ . '/DailyWorkReportModule.php';
+        DailyWorkReportModule::repair($pdo);
+        require_once __DIR__ . '/ReportingViewsModule.php';
+        ReportingViewsModule::repair($pdo);
 
         if (self::tableExists('users')) {
             if (!self::columnExists('users', 'description')) {
@@ -382,9 +426,9 @@ class Database
         }
         $ceoPeriodColumns = [
             'title' => 'ADD title VARCHAR(150) NOT NULL DEFAULT "" AFTER id',
-            'from_date' => 'ADD from_date DATE NULL AFTER title',
-            'to_date' => 'ADD to_date DATE NULL AFTER from_date',
-            'active' => 'ADD active TINYINT(1) NOT NULL DEFAULT 1 AFTER to_date',
+            'from_date' => 'ADD `from_date` DATE NULL AFTER title',
+            'to_date' => 'ADD `to_date` DATE NULL AFTER `from_date`',
+            'active' => 'ADD active TINYINT(1) NOT NULL DEFAULT 1 AFTER `to_date`',
             'created_at' => 'ADD created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP AFTER active',
             'updated_at' => 'ADD updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at',
         ];

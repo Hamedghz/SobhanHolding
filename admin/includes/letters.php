@@ -3,8 +3,9 @@ require_once __DIR__ . '/../../core/Auth.php';
 require_once __DIR__ . '/../../core/Response.php';
 require_once __DIR__ . '/../../core/Upload.php';
 require_once __DIR__ . '/../../core/LetterModule.php';
-$adminExtraStylesheets = array_values(array_unique(array_merge($adminExtraStylesheets ?? [], ['/assets/css/letters.css'])));
-$adminExtraScripts = array_values(array_unique(array_merge($adminExtraScripts ?? [], ['/assets/js/letters.js'])));
+require_once __DIR__ . '/../../lib/ImportSettings.php';
+$adminExtraStylesheets = array_values(array_unique(array_merge($adminExtraStylesheets ?? [], ['/assets/vendor/quill/quill.snow.css', '/assets/css/letters.css'])));
+$adminExtraScripts = array_values(array_unique(array_merge($adminExtraScripts ?? [], ['/assets/vendor/quill/quill.js', '/assets/js/letters.js'])));
 
 function letter_setting(string $key, string $default = ''): string
 {
@@ -33,6 +34,22 @@ function letter_private_upload(array $file, string $category, array $extensions,
     }
     try {require_once __DIR__ . '/../../lib/FileBackupService.php';$result['backup_id']=FileBackupService::registerSavedFile($result['file_path'],$result['original_name'],$result['mime_type'],$result['file_size']);}
     catch(Throwable $e){error_log('Letter backup registration: '.$e->getMessage());$result['backup_id']=null;}
+    return $result;
+}
+
+function letterhead_upload(array $file, string $category, bool $allowPdf = false): array
+{
+    $extensions = $allowPdf ? ['pdf', 'png', 'jpg', 'jpeg', 'webp'] : Upload::IMAGE_EXTENSIONS;
+    $result = letter_private_upload($file, $category, $extensions, ImportSettings::letterheadUploadBytes());
+    if (!$result['ok']) return $result;
+    $allowedMimes = $allowPdf
+        ? ['application/pdf', 'image/png', 'image/jpeg', 'image/webp']
+        : ['image/png', 'image/jpeg', 'image/webp'];
+    if (!in_array((string)$result['mime_type'], $allowedMimes, true)) {
+        $full = dirname(__DIR__, 2) . str_replace('/', DIRECTORY_SEPARATOR, (string)$result['file_path']);
+        if (is_file($full)) @unlink($full);
+        return ['ok' => false, 'error' => 'نوع واقعی فایل سربرگ مجاز نیست.'];
+    }
     return $result;
 }
 
@@ -68,7 +85,8 @@ function letter_document_fragment(array $letter, bool $embedAssets = false): str
     $paper = in_array($letter['paper_size'] ?? '', ['A4', 'A5'], true) ? $letter['paper_size'] : 'A4';
     $orientation = ($letter['orientation'] ?? '') === 'landscape' ? 'landscape' : 'portrait';
     $logo = !empty($letter['logo_path']) ? ($embedAssets ? letter_embedded_asset($letter['logo_path']) : letter_asset_url('letterhead', (int)$letter['letterhead_id'], 'logo_path', (int)($letter['id'] ?? 0))) : '';
-    $background = !empty($letter['background_path']) ? ($embedAssets ? letter_embedded_asset($letter['background_path']) : letter_asset_url('letterhead', (int)$letter['letterhead_id'], 'background_path', (int)($letter['id'] ?? 0))) : '';
+    $backgroundIsImage = str_starts_with((string)($letter['background_mime'] ?? ''), 'image/') || (empty($letter['background_mime']) && !empty($letter['background_path']));
+    $background = $backgroundIsImage && !empty($letter['background_path']) ? ($embedAssets ? letter_embedded_asset($letter['background_path']) : letter_asset_url('letterhead', (int)$letter['letterhead_id'], 'background_path', (int)($letter['id'] ?? 0))) : '';
     $signature = !empty($letter['signature_path']) ? ($embedAssets ? letter_embedded_asset($letter['signature_path']) : letter_asset_url('signature', (int)$letter['signature_id'], 'signature_path', (int)($letter['id'] ?? 0))) : '';
     $stamp = !empty($letter['stamp_path']) ? ($embedAssets ? letter_embedded_asset($letter['stamp_path']) : letter_asset_url('signature', (int)$letter['signature_id'], 'stamp_path', (int)($letter['id'] ?? 0))) : '';
     $header = LetterModule::sanitizeHtml((string)($letter['header_html'] ?? ''));
@@ -76,7 +94,8 @@ function letter_document_fragment(array $letter, bool $embedAssets = false): str
     $body = LetterModule::renderBody($letter);
     $company = (string)($letter['company_name'] ?: setting('company_name', 'شرکت پخش سبحان'));
     ob_start(); ?>
-    <article class="official-letter paper-<?= e(strtolower($paper)) ?> orientation-<?= e($orientation) ?>" data-paper="<?= e($paper) ?>" data-orientation="<?= e($orientation) ?>"<?= $background ? ' style="background-image:url(\'' . e($background) . '\')"' : '' ?>>
+    <?php $headerPosition=max(0,min(40,(int)($letter['header_position_mm']??0)));$footerPosition=max(0,min(40,(int)($letter['footer_position_mm']??0))); ?>
+    <article class="official-letter paper-<?= e(strtolower($paper)) ?> orientation-<?= e($orientation) ?>" data-paper="<?= e($paper) ?>" data-orientation="<?= e($orientation) ?>" style="<?= $background ? 'background-image:url(\'' . e($background) . '\');' : '' ?>--letter-header-offset:<?= $headerPosition ?>mm;--letter-footer-offset:<?= $footerPosition ?>mm">
         <?php if (!empty($letter['watermark_text'])): ?><div class="letter-watermark"><?= e($letter['watermark_text']) ?></div><?php endif; ?>
         <header class="letter-document-header">
             <?php if ($header !== ''): ?><?= $header ?><?php else: ?>
@@ -106,8 +125,8 @@ function letter_document_page(array $letter, bool $autoPrint = false, bool $embe
     $paper = in_array($letter['paper_size'] ?? '', ['A4', 'A5'], true) ? $letter['paper_size'] : 'A4';
     $orientation = ($letter['orientation'] ?? '') === 'landscape' ? 'landscape' : 'portrait';
     $margins = [
-        max(5, min(40, (int)letter_setting('margin_top', '18'))), max(5, min(40, (int)letter_setting('margin_right', '18'))),
-        max(5, min(40, (int)letter_setting('margin_bottom', '18'))), max(5, min(40, (int)letter_setting('margin_left', '18'))),
+        max(5, min(40, (int)(($letter['margin_top_mm'] ?? null) ?: letter_setting('margin_top', '18')))), max(5, min(40, (int)(($letter['margin_right_mm'] ?? null) ?: letter_setting('margin_right', '18')))),
+        max(5, min(40, (int)(($letter['margin_bottom_mm'] ?? null) ?: letter_setting('margin_bottom', '18')))), max(5, min(40, (int)(($letter['margin_left_mm'] ?? null) ?: letter_setting('margin_left', '18')))),
     ];
     $font = preg_replace('/[^\p{L}\p{N}\s,_-]/u', '', letter_setting('default_font', 'Tahoma, sans-serif')) ?: 'Tahoma, sans-serif';
     $fontSize = max(10, min(24, (int)letter_setting('default_font_size', '14')));
@@ -123,7 +142,7 @@ function letter_upload_attachment(int $letterId, array $file): void
 {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) return;
     $allowed = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'webp', 'txt'];
-    $upload = letter_private_upload($file, 'attachments', $allowed, 10 * 1024 * 1024);
+    $upload = letter_private_upload($file, 'attachments', $allowed, ImportSettings::letterAttachmentBytes());
     if (!$upload['ok']) throw new InvalidArgumentException($upload['error']);
     Database::execute('INSERT INTO organizational_letter_attachments(letter_id,original_name,stored_name,file_path,mime_type,file_size,uploaded_by,created_at) VALUES(?,?,?,?,?,?,?,NOW())', [
         $letterId, $upload['original_name'], $upload['stored_name'], $upload['file_path'], $upload['mime_type'], $upload['file_size'], (int)Auth::user()['id'],

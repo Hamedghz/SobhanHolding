@@ -5,6 +5,8 @@ Set-Location $root
 
 Write-Host "Running Sobhan validation" -ForegroundColor Cyan
 
+& "$PSScriptRoot\policy-contract-test.ps1"
+
 & "$PSScriptRoot\lint.ps1"
 
 $php = Get-PhpExecutable

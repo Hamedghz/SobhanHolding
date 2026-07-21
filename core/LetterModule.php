@@ -29,9 +29,17 @@ class LetterModule
                 contact_info TEXT NULL,
                 logo_path VARCHAR(255) NULL,
                 background_path VARCHAR(255) NULL,
+                background_mime VARCHAR(120) NULL,
                 watermark_text VARCHAR(190) NULL,
                 header_html MEDIUMTEXT NULL,
                 footer_html MEDIUMTEXT NULL,
+                margin_top_mm TINYINT UNSIGNED NULL,
+                margin_right_mm TINYINT UNSIGNED NULL,
+                margin_bottom_mm TINYINT UNSIGNED NULL,
+                margin_left_mm TINYINT UNSIGNED NULL,
+                header_position_mm TINYINT UNSIGNED NULL,
+                footer_position_mm TINYINT UNSIGNED NULL,
+                is_default TINYINT(1) NOT NULL DEFAULT 0,
                 is_active TINYINT(1) NOT NULL DEFAULT 1,
                 created_by INT UNSIGNED NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -59,6 +67,7 @@ class LetterModule
                 title VARCHAR(190) NOT NULL,
                 default_subject VARCHAR(255) NULL,
                 default_body MEDIUMTEXT NULL,
+                default_delta_json LONGTEXT NULL,
                 letterhead_id INT UNSIGNED NULL,
                 signature_id INT UNSIGNED NULL,
                 paper_size ENUM('A4','A5') NOT NULL DEFAULT 'A4',
@@ -85,6 +94,7 @@ class LetterModule
                 letterhead_id INT UNSIGNED NULL,
                 signature_id INT UNSIGNED NULL,
                 body_html MEDIUMTEXT NOT NULL,
+                body_delta_json LONGTEXT NULL,
                 final_html LONGTEXT NULL,
                 paper_size ENUM('A4','A5') NOT NULL DEFAULT 'A4',
                 orientation ENUM('portrait','landscape') NOT NULL DEFAULT 'portrait',
@@ -138,6 +148,24 @@ class LetterModule
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
         ];
         foreach ($statements as $statement) $pdo->exec($statement);
+        foreach ([
+            'background_mime' => 'VARCHAR(120) NULL AFTER background_path',
+            'margin_top_mm' => 'TINYINT UNSIGNED NULL AFTER footer_html',
+            'margin_right_mm' => 'TINYINT UNSIGNED NULL AFTER margin_top_mm',
+            'margin_bottom_mm' => 'TINYINT UNSIGNED NULL AFTER margin_right_mm',
+            'margin_left_mm' => 'TINYINT UNSIGNED NULL AFTER margin_bottom_mm',
+            'header_position_mm' => 'TINYINT UNSIGNED NULL AFTER margin_left_mm',
+            'footer_position_mm' => 'TINYINT UNSIGNED NULL AFTER header_position_mm',
+            'is_default' => 'TINYINT(1) NOT NULL DEFAULT 0 AFTER footer_position_mm',
+        ] as $column => $definition) self::ensureColumn($pdo, 'letter_letterheads', $column, $definition);
+        self::ensureColumn($pdo, 'letter_templates', 'default_delta_json', 'LONGTEXT NULL AFTER default_body');
+        self::ensureColumn($pdo, 'organizational_letters', 'body_delta_json', 'LONGTEXT NULL AFTER body_html');
+        $pdo->exec("UPDATE letter_letterheads SET is_default=0 WHERE is_active=0 AND is_default=1");
+        $defaultIds = $pdo->query("SELECT id FROM letter_letterheads WHERE is_default=1 ORDER BY id")->fetchAll(PDO::FETCH_COLUMN);
+        if (count($defaultIds) > 1) {
+            $keep = (int)array_shift($defaultIds);
+            $pdo->exec("UPDATE letter_letterheads SET is_default=0 WHERE is_default=1 AND id<>".$keep);
+        }
 
         $modules = [
             ['organizational_letters', 'نامه‌های سازمانی'],
@@ -155,6 +183,7 @@ class LetterModule
             'letter_default_font' => 'Vazirmatn, Tahoma, sans-serif', 'letter_default_font_size' => '14',
             'letter_default_paper_size' => 'A4', 'letter_default_orientation' => 'portrait',
             'letter_margin_top' => '18', 'letter_margin_right' => '18', 'letter_margin_bottom' => '18', 'letter_margin_left' => '18',
+            'max_letterhead_upload_mb' => '50',
         ];
         $settingStmt = $pdo->prepare("INSERT INTO site_settings(setting_key,setting_value,setting_type,updated_at) VALUES(?,?,'text',NOW()) ON DUPLICATE KEY UPDATE setting_key=VALUES(setting_key)");
         foreach ($defaults as $key => $value) $settingStmt->execute([$key, $value]);
@@ -214,14 +243,26 @@ class LetterModule
         $html = preg_replace('#<(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link)[^>]*>.*?</\1>#is', '', $html) ?? '';
         $html = preg_replace('/\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/iu', '', $html) ?? '';
         $html = preg_replace('/\s(href|src)\s*=\s*(["\'])\s*(javascript:|vbscript:)[^"\']*\2/iu', '', $html) ?? '';
-        $allowed = '<p><br><div><span><strong><b><em><i><u><s><h1><h2><h3><h4><blockquote><ul><ol><li><table><thead><tbody><tfoot><tr><th><td><img><hr><sub><sup>';
+        $html = preg_replace_callback('/\shref\s*=\s*(["\'])(.*?)\1/iu', static function (array $match): string {
+            $href = trim(html_entity_decode((string)$match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            return preg_match('#^(https?://|mailto:|tel:|/|\#)#i', $href) ? ' href="' . htmlspecialchars($href, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"' : '';
+        }, $html) ?? '';
+        $html = preg_replace_callback('/\ssrc\s*=\s*(["\'])(.*?)\1/iu', static function (array $match): string {
+            $src = trim(html_entity_decode((string)$match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            return preg_match('#^(https?://|/|data:image/(png|jpeg|webp);base64,)#i', $src) ? ' src="' . htmlspecialchars($src, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"' : '';
+        }, $html) ?? '';
+        $html = preg_replace_callback('/\sstyle\s*=\s*(["\'])(.*?)\1/isu', static function (array $match): string {
+            $style = self::sanitizeStyle(html_entity_decode((string)$match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            return $style === '' ? '' : ' style="' . htmlspecialchars($style, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+        }, $html) ?? '';
+        $allowed = '<p><br><div><span><strong><b><em><i><u><s><h1><h2><h3><h4><blockquote><ul><ol><li><table><thead><tbody><tfoot><tr><th><td><img><a><hr><sub><sup>';
         $html = strip_tags($html, $allowed);
         if (class_exists('DOMDocument')) {
             $doc = new DOMDocument('1.0', 'UTF-8');
             libxml_use_internal_errors(true);
             $doc->loadHTML('<?xml encoding="utf-8" ?><div id="letter-root">' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
             libxml_clear_errors();
-            $allowedAttributes = ['style', 'class', 'dir', 'align', 'colspan', 'rowspan', 'width', 'height', 'src', 'alt'];
+            $allowedAttributes = ['style', 'class', 'dir', 'align', 'colspan', 'rowspan', 'width', 'height', 'src', 'alt', 'href', 'target', 'rel'];
             foreach ($doc->getElementsByTagName('*') as $node) {
                 if (!$node->hasAttributes()) continue;
                 foreach (iterator_to_array($node->attributes) as $attribute) {
@@ -232,9 +273,22 @@ class LetterModule
                     $src = trim($node->getAttribute('src'));
                     if (!preg_match('#^(https?://|/|data:image/(png|jpeg|webp);base64,)#i', $src)) $node->removeAttribute('src');
                 }
+                if ($node->hasAttribute('href')) {
+                    $href = trim($node->getAttribute('href'));
+                    if (!preg_match('#^(https?://|mailto:|tel:|/|\#)#i', $href)) $node->removeAttribute('href');
+                    else {
+                        $node->setAttribute('rel', 'noopener noreferrer');
+                        if ($node->getAttribute('target') !== '_blank') $node->removeAttribute('target');
+                    }
+                }
                 if ($node->hasAttribute('style')) {
-                    $style = preg_replace('/(?:expression|url\s*\(|position\s*:|behavior\s*:|@import)/iu', '', $node->getAttribute('style')) ?? '';
-                    $node->setAttribute('style', $style);
+                    $style = self::sanitizeStyle($node->getAttribute('style'));
+                    if ($style === '') $node->removeAttribute('style'); else $node->setAttribute('style', $style);
+                }
+                if ($node->hasAttribute('class')) {
+                    $classes = preg_split('/\s+/u', trim($node->getAttribute('class')), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                    $classes = array_values(array_filter($classes, static fn(string $class): bool => (bool)preg_match('/^ql-(align-(right|center|justify)|direction-rtl|indent-[1-8]|size-(small|large|huge)|font-[a-z0-9_-]+)$/i', $class)));
+                    if ($classes) $node->setAttribute('class', implode(' ', $classes)); else $node->removeAttribute('class');
                 }
             }
             $root = $doc->getElementById('letter-root');
@@ -244,6 +298,22 @@ class LetterModule
             }
         }
         return trim($html);
+    }
+
+    public static function sanitizeDelta(?string $json): ?string
+    {
+        $json = trim((string)$json);
+        if ($json === '') return null;
+        if (strlen($json) > 4000000) throw new InvalidArgumentException('حجم داده ساختاری ویرایشگر بیش از حد مجاز است.');
+        $decoded = json_decode($json, true, 64);
+        if (!is_array($decoded) || !isset($decoded['ops']) || !is_array($decoded['ops']) || count($decoded['ops']) > 20000) {
+            throw new InvalidArgumentException('داده ساختاری ویرایشگر معتبر نیست.');
+        }
+        foreach ($decoded['ops'] as $operation) {
+            if (!is_array($operation) || !array_key_exists('insert', $operation)) throw new InvalidArgumentException('داده ساختاری ویرایشگر معتبر نیست.');
+            if (!is_string($operation['insert']) && !is_array($operation['insert'])) throw new InvalidArgumentException('داده ساختاری ویرایشگر معتبر نیست.');
+        }
+        return json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     public static function variables(array $letter): array
@@ -301,6 +371,29 @@ class LetterModule
 
     public static function load(int $id): ?array
     {
-        return Database::fetch('SELECT l.*,t.title template_title,h.title letterhead_title,h.company_name,h.contact_info,h.logo_path,h.background_path,h.watermark_text,h.header_html,h.footer_html,s.signer_name,s.signer_title,s.signature_path,s.stamp_path,s.user_id signer_user_id,u.name creator_name,a.name approver_name FROM organizational_letters l LEFT JOIN letter_templates t ON t.id=l.template_id LEFT JOIN letter_letterheads h ON h.id=l.letterhead_id LEFT JOIN letter_signatures s ON s.id=l.signature_id LEFT JOIN users u ON u.id=l.created_by LEFT JOIN users a ON a.id=l.approved_by WHERE l.id=? LIMIT 1', [$id]);
+        return Database::fetch('SELECT l.*,t.title template_title,h.title letterhead_title,h.company_name,h.contact_info,h.logo_path,h.background_path,h.background_mime,h.watermark_text,h.header_html,h.footer_html,h.margin_top_mm,h.margin_right_mm,h.margin_bottom_mm,h.margin_left_mm,h.header_position_mm,h.footer_position_mm,h.is_default letterhead_is_default,s.signer_name,s.signer_title,s.signature_path,s.stamp_path,s.user_id signer_user_id,u.name creator_name,a.name approver_name FROM organizational_letters l LEFT JOIN letter_templates t ON t.id=l.template_id LEFT JOIN letter_letterheads h ON h.id=l.letterhead_id LEFT JOIN letter_signatures s ON s.id=l.signature_id LEFT JOIN users u ON u.id=l.created_by LEFT JOIN users a ON a.id=l.approved_by WHERE l.id=? LIMIT 1', [$id]);
+    }
+
+    private static function sanitizeStyle(string $style): string
+    {
+        $allowed = ['color', 'background-color', 'font-family', 'font-size', 'font-weight', 'font-style', 'text-decoration', 'text-align', 'direction', 'line-height', 'margin', 'margin-right', 'margin-left', 'padding', 'padding-right', 'padding-left', 'width', 'height', 'border', 'border-collapse'];
+        $clean = [];
+        foreach (explode(';', $style) as $declaration) {
+            if (!str_contains($declaration, ':')) continue;
+            [$property, $value] = array_map('trim', explode(':', $declaration, 2));
+            $property = strtolower($property);
+            if (!in_array($property, $allowed, true)) continue;
+            if ($value === '' || preg_match('/(?:expression|url\s*\(|javascript:|vbscript:|@import|[<>])/iu', $value)) continue;
+            if (strlen($value) > 160) continue;
+            $clean[] = $property . ':' . $value;
+        }
+        return implode(';', $clean);
+    }
+
+    private static function ensureColumn(PDO $pdo, string $table, string $column, string $definition): void
+    {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?');
+        $stmt->execute([$table, $column]);
+        if (!(int)$stmt->fetchColumn()) $pdo->exec("ALTER TABLE `{$table}` ADD `{$column}` {$definition}");
     }
 }

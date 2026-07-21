@@ -5,13 +5,18 @@ require_once __DIR__ . '/../core/Response.php';
 $sources = [
     'sales_aggregate' => ['ورود اطلاعات فروش تجمیعی', 'منبع تجمیعی / tbltajmi'],
     'inventory' => ['آپدیت موجودی انبار', 'منبع tblanbar'],
-    'sales_team' => ['ورود اطلاعات ویزیتورها', 'منبع ویزیتور / tblvizit'],
     'customer_coefficients' => ['ورود ضرایب صنف', 'منبع zarib / tblzarib'],
     'product_priorities' => ['ورود اولویت کالا', 'منبع olaviyat / tblolaviyat'],
     'sales_targets' => ['ورود تارگت فروش', 'منبع target / tbltargrt'],
 ];
 $source = (string)($_GET['source'] ?? '');
 $section = (string)($_GET['section'] ?? '');
+
+if ($source === 'sales_team') {
+    Auth::requirePermission('sales_data_import');
+    flash('ورود فایل جداگانه ویزیتورها حذف شده است؛ اطلاعات ویزیتور از کاربر مرکزی و ساختار فروش مدیریت می‌شود.', 'info');
+    redirect('/admin/users.php');
+}
 
 if (isset($sources[$source])) {
     Auth::requirePermission('sales_data_import');

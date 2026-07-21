@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/SalesReferenceRepository.php';
+require_once __DIR__ . '/SalesDataNormalizer.php';
 
 class SalesAggregateRepository
 {
@@ -43,10 +44,11 @@ class SalesAggregateRepository
 
     public static function mappings(): array
     {
-        return Database::fetchAll(
+        $mappings = Database::fetchAll(
             'SELECT source_header,normalized_key,required,data_type FROM sales_import_column_mappings
              WHERE source_module="sales_aggregate" AND active=1 ORDER BY id'
         );
+        return $mappings ?: SalesDataNormalizer::mappingDefinitions();
     }
 
     public static function updateBatchDetection(int $batchId, array $candidate, string $status, array $metadata): void
@@ -60,12 +62,15 @@ class SalesAggregateRepository
 
     public static function addStagingRow(int $batchId, int $rowNumber, array $raw, array $normalized, string $status, array $errors, string $sourceKey): void
     {
+        $rawJson = json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $normalizedJson = json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $rowHash = hash('sha256', 'sales_aggregate|' . $rowNumber . '|' . $rawJson);
         Database::execute(
             'INSERT INTO staging_sales_data
-             (import_batch_id,source_module,`row_number`,raw_json,normalized_json,validation_status,validation_errors_json,source_unique_key,created_at)
-             VALUES (?,"sales_aggregate",?,?,?,?,?,?,NOW())',
-            [$batchId,$rowNumber,json_encode($raw,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
-             json_encode($normalized,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),$status,
+             (import_batch_id,source_module,`row_number`,source_row_number,source_row_hash,raw_json,normalized_json,validation_status,validation_errors_json,source_unique_key,created_at)
+             VALUES (?,"sales_aggregate",?,?,?,?,?,?,?,?,NOW())',
+            [$batchId,$rowNumber,$rowNumber,$rowHash,$rawJson,
+             $normalizedJson,$status,
              $errors?json_encode($errors,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES):null,$sourceKey]
         );
         $stagingId = (int)Database::lastInsertId();
@@ -85,8 +90,8 @@ class SalesAggregateRepository
     public static function updateBatchCounts(int $batchId, array $summary, string $status = 'preview'): void
     {
         Database::execute(
-            'UPDATE sales_import_batches SET status=?,total_rows=?,valid_rows=?,invalid_rows=?,duplicate_rows=?,updated_at=NOW() WHERE id=?',
-            [$status,$summary['total_rows'],$summary['valid_rows'],$summary['invalid_rows'],$summary['duplicate_rows'],$batchId]
+            'UPDATE sales_import_batches SET status=?,pipeline_status=?,total_rows=?,valid_rows=?,invalid_rows=?,duplicate_rows=?,updated_at=NOW() WHERE id=?',
+            [$status,($summary['ready_rows']??0)>0?'ready_to_commit':'validation_failed',$summary['total_rows'],$summary['valid_rows'],$summary['invalid_rows'],$summary['duplicate_rows'],$batchId]
         );
         SalesReferenceRepository::mirrorBatchFromLegacy($batchId);
     }
@@ -97,6 +102,23 @@ class SalesAggregateRepository
             'SELECT * FROM staging_sales_data WHERE import_batch_id=? AND source_module="sales_aggregate" AND validation_status=? ORDER BY `row_number`,id',
             [$batchId,$status]
         );
+    }
+
+    public static function stagingRowsChunk(int $batchId, string $status, int $afterId, int $limit = 500): array
+    {
+        $limit = max(1, min(1000, $limit));
+        return Database::fetchAll(
+            'SELECT * FROM staging_sales_data WHERE import_batch_id=? AND source_module="sales_aggregate" AND validation_status=? AND id>? ORDER BY id LIMIT ' . $limit,
+            [$batchId,$status,$afterId]
+        );
+    }
+
+    public static function stagingCount(int $batchId, string $status): int
+    {
+        return (int)(Database::fetch(
+            'SELECT COUNT(*) c FROM staging_sales_data WHERE import_batch_id=? AND source_module="sales_aggregate" AND validation_status=?',
+            [$batchId,$status]
+        )['c'] ?? 0);
     }
 
     public static function sourceKeyExists(string $sourceKey): bool
@@ -123,7 +145,6 @@ class SalesAggregateRepository
              json_encode($raw,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)]
         );
         self::updateReferenceFields($sourceKey, $data);
-        self::syncReferenceAliases($batchId);
     }
 
     public static function updateFinal(int $id, int $batchId, string $sourceKey, array $data, array $raw): void
@@ -139,6 +160,10 @@ class SalesAggregateRepository
              json_encode($raw,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),$id]
         );
         self::updateReferenceFields($sourceKey, $data);
+    }
+
+    public static function finalizeReferenceAliases(int $batchId): void
+    {
         self::syncReferenceAliases($batchId);
     }
 
@@ -151,8 +176,8 @@ class SalesAggregateRepository
     public static function finishBatch(int $batchId, string $status, int $imported, int $updated, int $skipped, ?string $error = null): void
     {
         Database::execute(
-            'UPDATE sales_import_batches SET status=?,imported_rows=?,updated_rows=?,skipped_rows=?,error_message=?,finished_at=NOW(),updated_at=NOW() WHERE id=?',
-            [$status,$imported,$updated,$skipped,$error,$batchId]
+            'UPDATE sales_import_batches SET status=?,pipeline_status=?,imported_rows=?,updated_rows=?,skipped_rows=?,error_message=?,finished_at=NOW(),updated_at=NOW() WHERE id=?',
+            [$status,match($status){'committed','completed'=>'committed','failed'=>'rejected','cancelled'=>'rolled_back',default=>$status},$imported,$updated,$skipped,$error,$batchId]
         );
         SalesReferenceRepository::mirrorBatchFromLegacy($batchId);
     }
@@ -209,7 +234,8 @@ class SalesAggregateRepository
         foreach ($map as $column => $key) {
             if (array_key_exists($key, $data)) {
                 $sets[] = "`{$column}`=?";
-                $params[] = $data[$key];
+                $value = $data[$key];
+                $params[] = is_string($value) && trim($value) === '' ? null : $value;
             }
         }
         if (!$sets) return;

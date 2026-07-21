@@ -24,7 +24,12 @@ class OrgAccess
         $frontier = [$userId];
         for ($depth = 0; $depth < 4 && $frontier; $depth++) {
             $placeholders = implode(',', array_fill(0, count($frontier), '?'));
-            $rows = Database::fetchAll("SELECT id FROM users WHERE status='active' AND parent_user_id IN ({$placeholders})", $frontier);
+            $rows = Database::fetchAll(
+                "SELECT id FROM users
+                 WHERE status='active'
+                   AND (parent_user_id IN ({$placeholders}) OR supervisor_id IN ({$placeholders}))",
+                array_merge($frontier, $frontier)
+            );
             $next = [];
             foreach ($rows as $row) {
                 $id = (int)$row['id'];
@@ -34,6 +39,11 @@ class OrgAccess
         }
 
         foreach (Database::fetchAll('SELECT employee_id FROM manager_employees WHERE manager_id=?', [$userId]) as $row) $ids[(int)$row['employee_id']] = true;
+        if (Database::tableExists('sales_team_assignments')) {
+            foreach (Database::fetchAll('SELECT visitor_id FROM sales_team_assignments WHERE supervisor_id=? AND active=1', [$userId]) as $row) {
+                $ids[(int)$row['visitor_id']] = true;
+            }
+        }
 
         if (($user['access_scope'] ?? '') === 'unit' && (int)($user['org_unit_id'] ?? 0) > 0) {
             foreach (Database::fetchAll('SELECT id FROM users WHERE status="active" AND org_unit_id=?', [(int)$user['org_unit_id']]) as $row) $ids[(int)$row['id']] = true;

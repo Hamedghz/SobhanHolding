@@ -37,6 +37,19 @@ class SalesReferenceRepository
                 $data['metadata_json'] ?? null,
             ]
         );
+        Database::execute(
+            'UPDATE sales_reference_import_batches
+             SET pipeline_status=?,snapshot_date=?,period_id=?,retry_of_batch_id=?,source_confidence=?,updated_at=NOW()
+             WHERE id=?',
+            [
+                $data['pipeline_status'] ?? self::publicStatus((string)($data['status'] ?? 'uploaded')),
+                $data['snapshot_date'] ?? null,
+                $data['period_id'] ?? null,
+                $data['retry_of_batch_id'] ?? null,
+                $data['source_confidence'] ?? null,
+                $batchId,
+            ]
+        );
     }
 
     public static function mirrorBatchFromLegacy(int $batchId): void
@@ -53,6 +66,11 @@ class SalesReferenceRepository
             'detected_table' => $batch['detected_table'],
             'detected_range' => $batch['detected_range'] ?? null,
             'period_key' => $batch['period_key'] ?? null,
+            'pipeline_status' => $batch['pipeline_status'] ?? self::publicStatus((string)$batch['status']),
+            'snapshot_date' => $batch['snapshot_date'] ?? null,
+            'period_id' => $batch['period_id'] ?? null,
+            'retry_of_batch_id' => $batch['retry_of_batch_id'] ?? null,
+            'source_confidence' => $batch['source_confidence'] ?? null,
             'import_mode' => $batch['import_mode'],
             'status' => self::publicStatus((string)$batch['status']),
             'total_rows' => $batch['total_rows'],
@@ -72,19 +90,24 @@ class SalesReferenceRepository
 
     public static function mirrorStagingRow(int $legacyId, int $batchId, string $sourceModule, int $rowNumber, array $raw, array $normalized, string $status, array $errors, string $sourceKey): void
     {
+        $rawJson = json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $normalizedJson = json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $rowHash = hash('sha256', $sourceModule . '|' . $rowNumber . '|' . $rawJson);
         Database::execute(
             'INSERT INTO staging_sales_reference_rows
-             (id,import_batch_id,source_module,`row_number`,source_unique_key,raw_json,normalized_json,validation_status,validation_errors_json,created_at)
-             VALUES (?,?,?,?,?,?,?,?,?,NOW())
-             ON DUPLICATE KEY UPDATE source_unique_key=VALUES(source_unique_key),raw_json=VALUES(raw_json),normalized_json=VALUES(normalized_json),validation_status=VALUES(validation_status),validation_errors_json=VALUES(validation_errors_json)',
+             (id,import_batch_id,source_module,`row_number`,source_row_number,source_row_hash,source_unique_key,raw_json,normalized_json,validation_status,validation_errors_json,created_at)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW())
+             ON DUPLICATE KEY UPDATE source_row_number=VALUES(source_row_number),source_row_hash=VALUES(source_row_hash),source_unique_key=VALUES(source_unique_key),raw_json=VALUES(raw_json),normalized_json=VALUES(normalized_json),validation_status=VALUES(validation_status),validation_errors_json=VALUES(validation_errors_json)',
             [
                 $legacyId,
                 $batchId,
                 $sourceModule,
                 $rowNumber,
+                $rowNumber,
+                $rowHash,
                 $sourceKey,
-                json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                $rawJson,
+                $normalizedJson,
                 $status,
                 $errors ? json_encode($errors, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
             ]
@@ -128,8 +151,8 @@ class SalesReferenceRepository
         }
         Database::execute('UPDATE sales_import_batches SET is_active_reference=0,updated_at=NOW() WHERE source_module=?' . $periodSql, $params);
         Database::execute('UPDATE sales_reference_import_batches SET is_active_reference=0,updated_at=NOW() WHERE source_module=?' . $periodSql, $params);
-        Database::execute('UPDATE sales_import_batches SET is_active_reference=1,activated_at=NOW(),activated_by=?,status="committed",updated_at=NOW() WHERE id=?', [$actorId, $batchId]);
-        Database::execute('UPDATE sales_reference_import_batches SET is_active_reference=1,activated_at=NOW(),activated_by=?,status="committed",updated_at=NOW() WHERE id=?', [$actorId, $batchId]);
+        Database::execute('UPDATE sales_import_batches SET is_active_reference=1,activated_at=NOW(),activated_by=?,status="committed",pipeline_status="activated",updated_at=NOW() WHERE id=?', [$actorId, $batchId]);
+        Database::execute('UPDATE sales_reference_import_batches SET is_active_reference=1,activated_at=NOW(),activated_by=?,status="committed",pipeline_status="activated",updated_at=NOW() WHERE id=?', [$actorId, $batchId]);
     }
 
     public static function getActiveReferenceBatch(string $sourceModule, ?string $periodKey = null): ?array
@@ -167,7 +190,7 @@ class SalesReferenceRepository
     {
         $limit = max(1, min(200, $limit));
         return Database::fetchAll(
-            "SELECT id,source_module,source_type,original_file_name,period_key,status,is_active_reference,total_rows,valid_rows,invalid_rows,duplicate_rows,inserted_rows,updated_rows,skipped_rows,started_by,started_at,finished_at,created_at
+            "SELECT id,source_module,source_type,original_file_name,period_key,status,pipeline_status,is_active_reference,total_rows,valid_rows,invalid_rows,duplicate_rows,inserted_rows,updated_rows,skipped_rows,started_by,started_at,finished_at,created_at
              FROM sales_reference_import_batches ORDER BY id DESC LIMIT {$limit}"
         );
     }

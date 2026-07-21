@@ -16,6 +16,14 @@ if (!$canManage) {
     echo 'دسترسی غیرمجاز';
     exit;
 }
+$legacyMaintenance = isset($_GET['legacy']) && Auth::isSuperAdmin();
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['export']) && !$legacyMaintenance) {
+    redirect('/admin/dashboard-settings.php?scope=ceo');
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$legacyMaintenance) {
+    http_response_code(403);
+    exit('ورود و ویرایش دستی قدیمی غیرفعال است؛ از مسیر ورود اطلاعات مرکزی استفاده کنید.');
+}
 
 $settingFields = [
     'ceo_dashboard_page_title' => ['label' => 'عنوان اصلی صفحه', 'type' => 'text', 'default' => 'داشبورد مدیرعامل'],
@@ -386,21 +394,33 @@ function ceo_validate_import(array $workbook, array $settingFields): array
         $row = (int)$visitor['_row'];
         $blank = [];
         foreach ($visitorHeaders as $column) $blank[$column] = trim((string)($visitor[$column] ?? '')) === '';
-        if ($visitor['کد لاین'] === '') $errors[] = ['sheet' => 'Visitors', 'row' => $row, 'column' => 'کد لاین', 'error' => 'کد لاین الزامی است.'];
-        if ($visitor['نام ویزیتور'] === '') $errors[] = ['sheet' => 'Visitors', 'row' => $row, 'column' => 'نام ویزیتور', 'error' => 'نام ویزیتور الزامی است.'];
         if (!ceo_valid_date($visitor['تاریخ گزارش'])) $errors[] = ['sheet' => 'Visitors', 'row' => $row, 'column' => 'تاریخ گزارش', 'error' => 'تاریخ باید با قالب شمسی 1404/09/15 باشد.'];
         ceo_validate_numeric_columns($visitor, ['مبلغ فروش ویزیتور', 'قطعه', 'تارگت', 'تارگت مبلغی ویزیتور', 'ترتیب نمایش'], 'Visitors', $errors);
+        $resolvedVisitorId = ceo_resolve_user_id($visitor['اتصال ویزیتور به کاربر'], $errors, 'Visitors', $row, 'اتصال ویزیتور به کاربر');
+        $centralVisitor = $resolvedVisitorId ? Database::fetch(
+            "SELECT u.id,u.name,COALESCE(sl.code,u.sales_line) line_code
+             FROM users u
+             LEFT JOIN org_roles r ON r.id=u.org_role_id
+             LEFT JOIN sales_lines sl ON sl.id=u.sales_line_id
+             WHERE u.id=? AND u.status='active' AND (r.code='VISITOR' OR u.role_key='VISITOR')",
+            [$resolvedVisitorId]
+        ) : null;
+        if (!$resolvedVisitorId) {
+            $errors[] = ['sheet' => 'Visitors', 'row' => $row, 'column' => 'اتصال ویزیتور به کاربر', 'error' => 'اتصال به کاربر مرکزی ویزیتور الزامی است.'];
+        } elseif (!$centralVisitor || trim((string)$centralVisitor['line_code']) === '') {
+            $errors[] = ['sheet' => 'Visitors', 'row' => $row, 'column' => 'اتصال ویزیتور به کاربر', 'error' => 'کاربر انتخاب‌شده ویزیتور فعال با لاین مرکزی معتبر نیست.'];
+        }
         $visitor = [
             '_row' => $row,
             '_blank' => $blank,
             'report_date' => $blank['تاریخ گزارش'] ? null : JalaliDate::toGregorian($visitor['تاریخ گزارش']),
-            'line_code' => $visitor['کد لاین'],
-            'visitor_name' => $visitor['نام ویزیتور'],
+            'line_code' => (string)($centralVisitor['line_code'] ?? ''),
+            'visitor_name' => (string)($centralVisitor['name'] ?? ''),
             'sales_amount' => ceo_money_value($visitor['مبلغ فروش ویزیتور']),
             'qty' => ceo_money_value($visitor['قطعه']),
             'target_qty' => ceo_money_value($visitor['تارگت']),
             'target_amount' => ceo_money_value($visitor['تارگت مبلغی ویزیتور']),
-            'user_id' => ceo_resolve_user_id($visitor['اتصال ویزیتور به کاربر'], $errors, 'Visitors', $row, 'اتصال ویزیتور به کاربر'),
+            'user_id' => $resolvedVisitorId,
             'sort_order' => ceo_money_value($visitor['ترتیب نمایش']),
             'active' => ceo_active_value($visitor['فعال']),
         ];
@@ -449,18 +469,8 @@ function ceo_apply_import(array $preview): array
             else $result['inserted']++;
         }
         $mode = $preview['mode'];
-        if ($mode === 'truncate_and_insert') {
-            Database::execute('DELETE FROM ceo_dashboard_lines');
-            Database::execute('DELETE FROM ceo_dashboard_visitors');
-        } elseif ($mode === 'replace_same_report_date') {
-            $dates = [];
-            foreach (array_merge($preview['lines'], $preview['visitors']) as $row) {
-                $dates[$row['report_date'] ?? 'NULL'] = $row['report_date'] ?? null;
-            }
-            foreach ($dates as $date) {
-                Database::execute('DELETE FROM ceo_dashboard_lines WHERE report_date <=> ?', [$date]);
-                Database::execute('DELETE FROM ceo_dashboard_visitors WHERE report_date <=> ?', [$date]);
-            }
+        if (!in_array($mode, ['update_existing', 'append'], true)) {
+            throw new InvalidArgumentException('حالت ورود انتخاب‌شده ایمن یا پشتیبانی‌شده نیست.');
         }
         foreach ($preview['lines'] as $line) {
             $existing = $mode === 'update_existing'
@@ -492,7 +502,7 @@ function ceo_apply_import(array $preview): array
         }
         foreach ($preview['visitors'] as $visitor) {
             $existing = $mode === 'update_existing'
-                ? Database::fetch('SELECT * FROM ceo_dashboard_visitors WHERE report_date <=> ? AND line_code = ? AND visitor_name = ? LIMIT 1', [$visitor['report_date'], $visitor['line_code'], $visitor['visitor_name']])
+                ? Database::fetch('SELECT * FROM ceo_dashboard_visitors WHERE report_date <=> ? AND user_id = ? LIMIT 1', [$visitor['report_date'], $visitor['user_id']])
                 : null;
             if ($existing) {
                 $data = [
@@ -649,25 +659,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'delete_line') {
-        Database::execute('DELETE FROM ceo_dashboard_lines WHERE id = ?', [(int)($_POST['id'] ?? 0)]);
-        flash('اطلاعات لاین حذف شد.');
+        Database::execute('UPDATE ceo_dashboard_lines SET active=0,updated_at=NOW() WHERE id = ?', [(int)($_POST['id'] ?? 0)]);
+        flash('اطلاعات لاین غیرفعال شد.');
         redirect('/admin/ceo-dashboard-settings.php#lines');
     }
 
     if ($action === 'save_visitor') {
         $id = (int)($_POST['id'] ?? 0);
-        $lineCode = trim((string)($_POST['line_code'] ?? ''));
-        $visitorName = trim((string)($_POST['visitor_name'] ?? ''));
-        if ($lineCode === '' || $visitorName === '') {
-            flash('کد لاین و نام ویزیتور الزامی است.', 'danger');
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $visitorUser = $userId ? Database::fetch(
+            "SELECT u.id,u.name,COALESCE(sl.code,u.sales_line) line_code
+             FROM users u
+             LEFT JOIN org_roles r ON r.id=u.org_role_id
+             LEFT JOIN sales_lines sl ON sl.id=u.sales_line_id
+             WHERE u.id=? AND u.status='active' AND (r.code='VISITOR' OR u.role_key='VISITOR')",
+            [$userId]
+        ) : null;
+        if (!$visitorUser || trim((string)$visitorUser['line_code']) === '') {
+            flash('ویزیتور مرکزی معتبر با لاین فروش فعال انتخاب کنید.', 'danger');
             redirect('/admin/ceo-dashboard-settings.php#visitors');
         }
+        $lineCode = (string)$visitorUser['line_code'];
+        $visitorName = (string)$visitorUser['name'];
         $reportDate = JalaliDate::toGregorian($_POST['report_date'] ?? '');
         if ($reportDate === null) {
             flash('تاریخ گزارش باید شمسی و معتبر باشد.', 'danger');
             redirect('/admin/ceo-dashboard-settings.php#visitors');
         }
-        $userId = (int)($_POST['user_id'] ?? 0);
+        $sameSnapshot = Database::fetch(
+            'SELECT id FROM ceo_dashboard_visitors WHERE report_date <=> ? AND user_id=? AND id<>? LIMIT 1',
+            [$reportDate, $userId, $id]
+        );
+        if ($sameSnapshot) $id = (int)$sameSnapshot['id'];
         $data = [
             $reportDate,
             $lineCode,
@@ -676,7 +699,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             max(0, (int)($_POST['qty'] ?? 0)),
             ceo_money_value($_POST['target_amount'] ?? 0),
             ceo_money_value($_POST['sales_amount'] ?? 0),
-            $userId > 0 ? $userId : null,
+            $userId,
             max(0, (int)($_POST['sort_order'] ?? 0)),
             !empty($_POST['active']) ? 1 : 0,
         ];
@@ -685,13 +708,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             Database::execute('INSERT INTO ceo_dashboard_visitors (report_date,line_code,visitor_name,target_qty,qty,target_amount,sales_amount,user_id,sort_order,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,NOW(),NOW())', $data);
         }
-        flash('اطلاعات ویزیتور ذخیره شد.');
+        flash('رکورد عملکرد ویزیتور مرکزی ذخیره شد.');
         redirect('/admin/ceo-dashboard-settings.php#visitors');
     }
 
     if ($action === 'delete_visitor') {
-        Database::execute('DELETE FROM ceo_dashboard_visitors WHERE id = ?', [(int)($_POST['id'] ?? 0)]);
-        flash('اطلاعات ویزیتور حذف شد.');
+        Database::execute('UPDATE ceo_dashboard_visitors SET active=0,updated_at=NOW() WHERE id = ?', [(int)($_POST['id'] ?? 0)]);
+        flash('رکورد تاریخی ویزیتور غیرفعال شد.');
         redirect('/admin/ceo-dashboard-settings.php#visitors');
     }
 
@@ -712,7 +735,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $workbook = CeoDashboardExcel::read($_FILES['excel_file']['tmp_name']);
             $preview = ceo_validate_import($workbook, $settingFields);
-            $preview['mode'] = in_array($_POST['import_mode'] ?? '', ['update_existing', 'replace_same_report_date', 'append', 'truncate_and_insert'], true) ? $_POST['import_mode'] : 'update_existing';
+            $preview['mode'] = in_array($_POST['import_mode'] ?? '', ['update_existing', 'append'], true) ? $_POST['import_mode'] : 'update_existing';
             $preview['uploaded_file_name'] = basename((string)($_FILES['excel_file']['name'] ?? ''));
             Auth::start();
             $_SESSION['ceo_dashboard_import_preview'] = $preview;
@@ -746,7 +769,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$lineEdit = null;$visitorEdit = null;$lines = [];$visitors = [];$lineOptions = [];$userOptions = [];
+$lineEdit = null;$visitorEdit = null;$lines = [];$visitors = [];$lineOptions = [];$userOptions = [];$visitorUserOptions = [];
 try {
     $lineEdit = isset($_GET['line_edit']) ? Database::fetch('SELECT * FROM ceo_dashboard_lines WHERE id = ?', [(int)$_GET['line_edit']]) : null;
     $visitorEdit = isset($_GET['visitor_edit']) ? Database::fetch('SELECT * FROM ceo_dashboard_visitors WHERE id = ?', [(int)$_GET['visitor_edit']]) : null;
@@ -754,6 +777,14 @@ try {
     $visitors = Database::fetchAll('SELECT v.*, u.name user_name, u.username user_username, u.email user_email FROM ceo_dashboard_visitors v LEFT JOIN users u ON u.id = v.user_id ORDER BY COALESCE(v.report_date, "0000-00-00") DESC, v.sort_order ASC, v.id DESC');
     $lineOptions = array_column(Database::fetchAll('SELECT DISTINCT line_code FROM ceo_dashboard_lines WHERE line_code <> "" ORDER BY line_code ASC'), 'line_code');
     $userOptions = Database::fetchAll('SELECT id,name,username FROM users ORDER BY name ASC, username ASC, id ASC');
+    $visitorUserOptions = Database::fetchAll(
+        "SELECT u.id,u.name,u.username,COALESCE(sl.code,u.sales_line) line_code
+         FROM users u
+         LEFT JOIN org_roles r ON r.id=u.org_role_id
+         LEFT JOIN sales_lines sl ON sl.id=u.sales_line_id
+         WHERE u.status='active' AND (r.code='VISITOR' OR u.role_key='VISITOR')
+         ORDER BY sl.sort_order,u.display_order,u.name"
+    );
 } catch (Throwable $e) {
     error_log('CEO dashboard settings data: ' . $e->getMessage());
     flash('دریافت اطلاعات لاین‌ها و ویزیتورها با خطا مواجه شد. لطفاً دوباره تلاش کنید.', 'danger');
@@ -771,6 +802,13 @@ unset($_SESSION['ceo_dashboard_summary_warnings']);
 
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
+<div class="alert alert-warning">
+    این صفحه فقط برای نگهداری اضطراری داده‌های قدیمی باقی مانده است. مسیر اصلی ثبت داده،
+    <a href="/admin/sales-aggregate-import.php">ورود اطلاعات فروش</a>
+    و مسیر تنظیم چیدمان،
+    <a href="/admin/dashboard-settings.php?scope=ceo">تنظیم نمایش داشبورد</a>
+    است.
+</div>
 <div class="ceo-settings-tabs">
     <a href="#general">تنظیمات عمومی</a>
     <a href="#lines">اطلاعات لاین‌ها</a>
@@ -831,7 +869,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
             <?php foreach ($lines as $item): $lineTargetQty = (int)$item['target_qty']; $lineQty = (int)$item['qty']; $percent = $lineTargetQty > 0 ? ($lineQty / $lineTargetQty) * 100 : 0; ?>
                 <tr>
                     <td><?= e(format_jalali_date($item['report_date'])) ?></td><td><?= e($item['line_code']) ?></td><td><?= e($item['line_title']) ?></td><td><?= e(format_money($item['sales_amount'])) ?></td><td><?= e(format_number($item['qty'])) ?></td><td><?= e(format_number($item['target_qty'])) ?></td><td><?= e(format_money($item['target_amount'])) ?></td><td><?= e($item['supervisor_name'] ?: '-') ?></td><td><?= e($item['sales_manager_name'] ?: '-') ?></td><td><?= e(ceo_user_label($item['supervisor_user_id'] ?? null, $item['supervisor_user_name'] ?? '', $item['supervisor_username'] ?? '', $item['supervisor_email'] ?? '') ?: '-') ?></td><td><?= e(ceo_user_label($item['sales_manager_user_id'] ?? null, $item['sales_manager_user_name'] ?? '', $item['sales_manager_username'] ?? '', $item['sales_manager_email'] ?? '') ?: '-') ?></td><td><?= e(format_percent($percent, 2)) ?></td><td><?= e($item['sort_order']) ?></td><td><?= (int)$item['active'] === 1 ? 'فعال' : 'غیرفعال' ?></td>
-                    <td class="actions"><a class="btn btn-small" href="?line_edit=<?= e($item['id']) ?>#lines">ویرایش</a><form class="inline-form" method="post" onsubmit="return confirm('حذف شود؟')"><input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>"><input type="hidden" name="action" value="delete_line"><input type="hidden" name="id" value="<?= e($item['id']) ?>"><button class="btn btn-small btn-danger">حذف</button></form></td>
+                    <td class="actions"><a class="btn btn-small" href="?line_edit=<?= e($item['id']) ?>#lines">ویرایش</a><form class="inline-form" method="post" onsubmit="return confirm('این رکورد غیرفعال شود؟')"><input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>"><input type="hidden" name="action" value="delete_line"><input type="hidden" name="id" value="<?= e($item['id']) ?>"><button class="btn btn-small btn-danger">غیرفعال‌سازی</button></form></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -840,25 +878,23 @@ require __DIR__ . '/../views/partials/admin-header.php';
 </section>
 
 <section class="card ceo-settings-card" id="visitors">
-    <h2>اطلاعات ویزیتورها</h2>
+    <h2>رکوردهای تاریخی عملکرد ویزیتورها</h2>
+    <p class="muted">هویت ویزیتور در این بخش ساخته نمی‌شود؛ فقط یک snapshot عملکرد به کاربر مرکزی موجود متصل می‌شود.</p>
     <form method="post" class="admin-form">
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
         <input type="hidden" name="action" value="save_visitor">
         <input type="hidden" name="id" value="<?= e($visitorEdit['id'] ?? '') ?>">
         <div class="grid grid-3">
             <label class="form-field"><span>تاریخ گزارش</span><input class="jalali-date-input" name="report_date" inputmode="numeric" placeholder="1404/09/15" value="<?= e(jalali_input_value($visitorEdit['report_date'] ?? date('Y-m-d'))) ?>" required></label>
-            <label class="form-field"><span>کد لاین</span><input name="line_code" list="ceoLineCodes" maxlength="10" value="<?= e($visitorEdit['line_code'] ?? '') ?>" required></label>
-            <datalist id="ceoLineCodes"><?php foreach ($lineOptions as $lineCode): ?><option value="<?= e($lineCode) ?>"></option><?php endforeach; ?></datalist>
-            <label class="form-field"><span>نام ویزیتور</span><input name="visitor_name" maxlength="150" value="<?= e($visitorEdit['visitor_name'] ?? '') ?>" required></label>
+            <label class="form-field"><span>ویزیتور مرکزی</span><select name="user_id" required><option value="">انتخاب ویزیتور</option><?php foreach ($visitorUserOptions as $user): ?><option value="<?= e($user['id']) ?>" <?= (int)($visitorEdit['user_id'] ?? 0) === (int)$user['id'] ? 'selected' : '' ?>><?= e($user['name'] . ' (' . $user['username'] . ') - لاین ' . ($user['line_code'] ?: 'نامشخص')) ?></option><?php endforeach; ?></select><small class="muted">نام و کد لاین از کاربر و ساختار مرکزی خوانده می‌شود.</small></label>
             <label class="form-field"><span>تارگت</span><input type="number" min="0" step="1" name="target_qty" value="<?= e($visitorEdit['target_qty'] ?? '0') ?>" required></label>
             <label class="form-field"><span>قطعه</span><input type="number" min="0" step="1" name="qty" value="<?= e($visitorEdit['qty'] ?? '0') ?>" required></label>
             <label class="form-field"><span>تارگت مبلغی ویزیتور</span><input type="number" min="0" step="1" name="target_amount" value="<?= e($visitorEdit['target_amount'] ?? '0') ?>"></label>
             <label class="form-field"><span>مبلغ فروش ویزیتور</span><input type="number" min="0" step="1" name="sales_amount" value="<?= e($visitorEdit['sales_amount'] ?? '0') ?>"></label>
-            <label class="form-field"><span>اتصال ویزیتور به کاربر</span><select name="user_id"><option value="0">بدون اتصال</option><?php foreach ($userOptions as $user): ?><option value="<?= e($user['id']) ?>" <?= (int)($visitorEdit['user_id'] ?? 0) === (int)$user['id'] ? 'selected' : '' ?>><?= e($user['name'] . ' (' . $user['username'] . ')') ?></option><?php endforeach; ?></select></label>
             <label class="form-field"><span>ترتیب نمایش</span><input type="number" min="0" step="1" name="sort_order" value="<?= e($visitorEdit['sort_order'] ?? '0') ?>"></label>
             <label class="checkbox-item"><input type="checkbox" name="active" value="1" <?= (int)($visitorEdit['active'] ?? 1) === 1 ? 'checked' : '' ?>> فعال</label>
         </div>
-        <div class="form-actions"><button class="btn btn-primary">ذخیره ویزیتور</button><a class="btn" href="/admin/ceo-dashboard-settings.php#visitors">جدید</a></div>
+        <div class="form-actions"><button class="btn btn-primary">ذخیره رکورد عملکرد</button><a class="btn" href="/admin/ceo-dashboard-settings.php#visitors">رکورد جدید</a></div>
     </form>
     <div class="table-wrap ceo-table-wrap">
         <table>
@@ -867,7 +903,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
             <?php foreach ($visitors as $item): $visitorTargetQty = (int)$item['target_qty']; $visitorQty = (int)$item['qty']; $percent = $visitorTargetQty > 0 ? ($visitorQty / $visitorTargetQty) * 100 : 0; ?>
                 <tr>
                     <td><?= e(format_jalali_date($item['report_date'])) ?></td><td><?= e($item['line_code']) ?></td><td><?= e($item['visitor_name']) ?></td><td><?= e(format_money($item['sales_amount'])) ?></td><td><?= e(format_number($item['qty'])) ?></td><td><?= e(format_number($item['target_qty'])) ?></td><td><?= e(format_money($item['target_amount'])) ?></td><td><?= e(ceo_user_label($item['user_id'] ?? null, $item['user_name'] ?? '', $item['user_username'] ?? '', $item['user_email'] ?? '') ?: '-') ?></td><td><?= e(format_percent($percent, 2)) ?></td><td><?= e($item['sort_order']) ?></td><td><?= (int)$item['active'] === 1 ? 'فعال' : 'غیرفعال' ?></td>
-                    <td class="actions"><a class="btn btn-small" href="?visitor_edit=<?= e($item['id']) ?>#visitors">ویرایش</a><form class="inline-form" method="post" onsubmit="return confirm('حذف شود؟')"><input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>"><input type="hidden" name="action" value="delete_visitor"><input type="hidden" name="id" value="<?= e($item['id']) ?>"><button class="btn btn-small btn-danger">حذف</button></form></td>
+                    <td class="actions"><a class="btn btn-small" href="?visitor_edit=<?= e($item['id']) ?>#visitors">ویرایش</a><form class="inline-form" method="post" onsubmit="return confirm('این رکورد تاریخی غیرفعال شود؟')"><input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>"><input type="hidden" name="action" value="delete_visitor"><input type="hidden" name="id" value="<?= e($item['id']) ?>"><button class="btn btn-small btn-danger">غیرفعال‌سازی</button></form></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -921,10 +957,10 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <input type="hidden" name="csrf_token" value="<?= e(Auth::csrfToken()) ?>">
         <input type="hidden" name="action" value="preview_import">
         <div class="grid grid-2">
-            <label class="form-field"><span>حالت ورود اطلاعات</span><select name="import_mode"><option value="update_existing">بروزرسانی رکوردهای موجود و حفظ مقدار ستون‌های خالی</option><option value="replace_same_report_date">جایگزینی اطلاعات همان تاریخ گزارش</option><option value="append">افزودن به اطلاعات موجود</option><option value="truncate_and_insert">حذف همه و ثبت مجدد</option></select></label>
+            <label class="form-field"><span>حالت ورود اطلاعات</span><select name="import_mode"><option value="update_existing">بروزرسانی رکوردهای موجود و حفظ مقدار ستون‌های خالی</option><option value="append">افزودن به اطلاعات موجود</option></select></label>
             <label class="form-field"><span>فایل اکسل</span><input type="file" name="excel_file" accept=".xlsx" required></label>
         </div>
-        <button class="btn btn-primary">بررسی و پیش‌نمایش</button>
+        <div class="form-actions actions"><a class="btn" href="?export=template">دانلود فایل نمونه ورودی</a><button class="btn btn-primary">بررسی و پیش‌نمایش</button></div>
     </form>
     <?php if ($importResult): ?>
         <div class="stats">

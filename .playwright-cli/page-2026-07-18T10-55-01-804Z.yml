@@ -1,0 +1,137 @@
+- generic [ref=f5e2]:
+  - complementary [ref=f5e3]:
+    - link "شرکت پخش سبحان پنل مدیریت" [ref=f5e4] [cursor=pointer]:
+      - /url: /admin/
+      - generic [ref=f5e5]: شرکت پخش سبحان
+      - generic [ref=f5e6]: پنل مدیریت
+    - navigation "منوی مدیریت" [ref=f5e7]:
+      - group [ref=f5e8]:
+        - generic "داشبوردها" [ref=f5e9] [cursor=pointer]
+      - group [ref=f5e10]:
+        - generic "OKR و اهداف سازمانی" [ref=f5e11] [cursor=pointer]
+        - generic [ref=f5e12]:
+          - link "داشبورد OKR" [ref=f5e13] [cursor=pointer]:
+            - /url: /admin/okr.php
+          - link "دوره‌های OKR" [ref=f5e15] [cursor=pointer]:
+            - /url: /admin/okr-cycles.php
+      - group [ref=f5e17]:
+        - generic "برنامه کاری من" [ref=f5e18] [cursor=pointer]
+      - group [ref=f5e19]:
+        - generic "گزارش کار روزانه" [ref=f5e20] [cursor=pointer]
+      - group [ref=f5e21]:
+        - generic "مرکز اقدامات" [ref=f5e22] [cursor=pointer]
+      - group [ref=f5e23]:
+        - generic "فروش و تحلیل عملکرد" [ref=f5e24] [cursor=pointer]
+      - group [ref=f5e25]:
+        - generic "مدیریت داده فروش" [ref=f5e26] [cursor=pointer]
+      - group [ref=f5e27]:
+        - generic "پنل سرپرست فروش" [ref=f5e28] [cursor=pointer]
+      - group [ref=f5e29]:
+        - generic "گزارشات مدیران" [ref=f5e30] [cursor=pointer]
+      - group [ref=f5e31]:
+        - generic "قوانین مصوب و صورتجلسات" [ref=f5e32] [cursor=pointer]
+      - group [ref=f5e33]:
+        - generic "منابع انسانی" [ref=f5e34] [cursor=pointer]
+      - group [ref=f5e35]:
+        - generic "KPI و ارزیابی عملکرد" [ref=f5e36] [cursor=pointer]
+      - group [ref=f5e37]:
+        - generic "آزمون‌ها و ارزیابی سازمانی" [ref=f5e38] [cursor=pointer]
+      - group [ref=f5e39]:
+        - generic "مالی، انبار و وصول" [ref=f5e40] [cursor=pointer]
+      - group [ref=f5e41]:
+        - generic "سایت و محتوا" [ref=f5e42] [cursor=pointer]
+      - group [ref=f5e43]:
+        - generic "مکاتبات اداری" [ref=f5e44] [cursor=pointer]
+      - group [ref=f5e45]:
+        - generic "ایمیل سازمانی" [ref=f5e46] [cursor=pointer]
+      - group [ref=f5e47]:
+        - generic "هوش مصنوعی و گزارش‌گیری" [ref=f5e48] [cursor=pointer]
+      - group [ref=f5e49]:
+        - generic "تنظیمات" [ref=f5e50] [cursor=pointer]
+      - group [ref=f5e51]:
+        - generic "ابزارهای سیستم" [ref=f5e52] [cursor=pointer]
+  - main [ref=f5e53]:
+    - generic [ref=f5e54]:
+      - generic [ref=f5e55]:
+        - strong [ref=f5e56]: دوره‌های OKR
+        - generic [ref=f5e57]: شرکت پخش سبحان
+      - generic [ref=f5e58]:
+        - link "هوش مصنوعی سبحان در دسترس نیست" [ref=f5e59] [cursor=pointer]:
+          - /url: /admin/sobhan-api-settings.php
+          - generic [ref=f5e61]: AI قطع
+        - button "اعلان‌ها" [ref=f5e63] [cursor=pointer]:
+          - generic [ref=f5e65]: "0"
+        - generic [ref=f5e66]:
+          - generic [ref=f5e67]: مدیر نصب آزمایشی
+          - link "ظاهر" [ref=f5e68] [cursor=pointer]:
+            - /url: /admin/theme-settings.php
+          - link "خروج" [ref=f5e69] [cursor=pointer]:
+            - /url: /logout.php
+    - generic [ref=f5e70]:
+      - generic [ref=f5e71]:
+        - generic [ref=f5e72]:
+          - heading "دوره‌های OKR" [level=1] [ref=f5e73]
+          - paragraph [ref=f5e74]: تعریف بازه ثبت، تأیید و Check-in اهداف سازمانی
+        - link "بازگشت به داشبورد OKR" [ref=f5e75] [cursor=pointer]:
+          - /url: /admin/okr.php
+      - generic [ref=f5e76]:
+        - heading "دوره جدید" [level=2] [ref=f5e77]
+        - generic [ref=f5e78]:
+          - generic [ref=f5e79]:
+            - generic [ref=f5e80]:
+              - generic [ref=f5e81]: عنوان دوره
+              - textbox "عنوان دوره" [active] [ref=f5e82]:
+                - /placeholder: فصل دوم ۱۴۰۵
+                - text: دوره مرورگر نصب تازه
+            - generic [ref=f5e83]:
+              - generic [ref=f5e84]: نوع دوره
+              - combobox "نوع دوره" [ref=f5e85]:
+                - option "ماهانه"
+                - option "فصلی" [selected]
+                - option "شش‌ماهه"
+                - option "سالانه"
+                - option "پروژه‌ای"
+            - generic [ref=f5e86]:
+              - generic [ref=f5e87]: وضعیت
+              - combobox "وضعیت" [ref=f5e88]:
+                - option "پیش‌نویس"
+                - option "باز"
+                - option "فعال" [selected]
+                - option "بسته"
+            - generic [ref=f5e89]:
+              - generic [ref=f5e90]: شروع دوره
+              - textbox "شروع دوره" [ref=f5e91]
+            - generic [ref=f5e92]:
+              - generic [ref=f5e93]: پایان دوره
+              - textbox "پایان دوره" [ref=f5e94]
+            - generic [ref=f5e95]:
+              - generic [ref=f5e96]: تعداد Check-in برنامه‌ریزی‌شده
+              - spinbutton "تعداد Check-in برنامه‌ریزی‌شده" [ref=f5e97]: "0"
+            - generic [ref=f5e98]:
+              - generic [ref=f5e99]: مهلت ثبت هدف
+              - textbox "مهلت ثبت هدف" [ref=f5e100]
+            - generic [ref=f5e101]:
+              - generic [ref=f5e102]: مهلت تأیید
+              - textbox "مهلت تأیید" [ref=f5e103]
+            - generic [ref=f5e104]:
+              - generic [ref=f5e105]: تناوب Check-in
+              - combobox "تناوب Check-in" [ref=f5e106]:
+                - option "هفتگی" [selected]
+                - option "ماهانه"
+                - option "بدون برنامه"
+          - button "ذخیره دوره" [ref=f5e108] [cursor=pointer]
+      - generic [ref=f5e109]:
+        - heading "دوره‌های ثبت‌شده" [level=2] [ref=f5e110]
+        - table [ref=f5e112]:
+          - rowgroup [ref=f5e113]:
+            - row [ref=f5e114]:
+              - columnheader "دوره" [ref=f5e115]
+              - columnheader "بازه" [ref=f5e116]
+              - columnheader "ثبت/تأیید" [ref=f5e117]
+              - columnheader "Check-in" [ref=f5e118]
+              - columnheader "اهداف" [ref=f5e119]
+              - columnheader "وضعیت" [ref=f5e120]
+              - columnheader [ref=f5e121]
+          - rowgroup [ref=f5e122]:
+            - row [ref=f5e123]:
+              - cell "دوره‌ای ثبت نشده است." [ref=f5e124]

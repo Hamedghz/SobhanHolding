@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(190) NOT NULL UNIQUE,
   username VARCHAR(100) NOT NULL UNIQUE,
   employee_no VARCHAR(50) NULL,
+  kara_system_code VARCHAR(100) NULL,
   mobile VARCHAR(30) NULL,
   force_password_change TINYINT(1) NOT NULL DEFAULT 0,
   password_hash VARCHAR(255) NOT NULL,
@@ -14,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   department VARCHAR(150) NULL,
   role_key VARCHAR(100) NULL,
   sales_line VARCHAR(50) NULL,
+  sales_line_id INT UNSIGNED NULL,
   supervisor_id INT UNSIGNED NULL,
   organization_manager_id INT UNSIGNED NULL,
   org_unit_id INT UNSIGNED NULL,
@@ -26,7 +28,93 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at DATETIME NULL,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_users_employee_no(employee_no)
+  UNIQUE KEY uq_users_employee_no(employee_no),
+  UNIQUE KEY uq_users_kara_system_code(kara_system_code),
+  INDEX idx_users_sales_line_id(sales_line_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_lines (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(40) NOT NULL,
+  title VARCHAR(190) NOT NULL,
+  manager_user_id INT UNSIGNED NULL,
+  supervisor_user_id INT UNSIGNED NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  description TEXT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_sales_lines_code(code),
+  INDEX idx_sales_lines_manager(manager_user_id),
+  INDEX idx_sales_lines_supervisor(supervisor_user_id),
+  INDEX idx_sales_lines_active(active),
+  CONSTRAINT fk_sales_lines_manager FOREIGN KEY(manager_user_id) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_sales_lines_supervisor FOREIGN KEY(supervisor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_line_brands (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  line_id INT UNSIGNED NOT NULL,
+  brand_code VARCHAR(80) NULL,
+  brand_name VARCHAR(190) NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_sales_line_brand_name(line_id,brand_name),
+  INDEX idx_sales_line_brands_line(line_id),
+  INDEX idx_sales_line_brands_active(active),
+  CONSTRAINT fk_sales_line_brands_line FOREIGN KEY(line_id) REFERENCES sales_lines(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_geographies (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  parent_id INT UNSIGNED NULL,
+  type ENUM('city','region') NOT NULL DEFAULT 'city',
+  code VARCHAR(80) NOT NULL,
+  title VARCHAR(190) NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_sales_geographies_code(code),
+  INDEX idx_sales_geographies_parent(parent_id),
+  INDEX idx_sales_geographies_type(type),
+  INDEX idx_sales_geographies_active(active),
+  CONSTRAINT fk_sales_geographies_parent FOREIGN KEY(parent_id) REFERENCES sales_geographies(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_visitor_territories (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  visitor_user_id INT UNSIGNED NOT NULL,
+  line_id INT UNSIGNED NOT NULL,
+  geography_id INT UNSIGNED NOT NULL,
+  is_primary TINYINT(1) NOT NULL DEFAULT 0,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  notes TEXT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_sales_visitor_geography(visitor_user_id,geography_id),
+  INDEX idx_sales_visitor_territories_visitor(visitor_user_id),
+  INDEX idx_sales_visitor_territories_line(line_id),
+  INDEX idx_sales_visitor_territories_geo(geography_id),
+  INDEX idx_sales_visitor_territories_active(active),
+  CONSTRAINT fk_sales_visitor_territories_visitor FOREIGN KEY(visitor_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_sales_visitor_territories_line FOREIGN KEY(line_id) REFERENCES sales_lines(id) ON DELETE CASCADE,
+  CONSTRAINT fk_sales_visitor_territories_geo FOREIGN KEY(geography_id) REFERENCES sales_geographies(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_structure_audit_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  action VARCHAR(80) NOT NULL,
+  entity_type VARCHAR(80) NOT NULL,
+  entity_id INT UNSIGNED NULL,
+  performed_by INT UNSIGNED NULL,
+  payload_json LONGTEXT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_sales_structure_logs_entity(entity_type,entity_id),
+  INDEX idx_sales_structure_logs_actor(performed_by),
+  INDEX idx_sales_structure_logs_created(created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sms_settings (
@@ -48,12 +136,12 @@ CREATE TABLE IF NOT EXISTS sms_templates (
 
 CREATE TABLE IF NOT EXISTS sms_messages (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, provider_name VARCHAR(100) NOT NULL DEFAULT 'bazyabpayam', sender VARCHAR(50) NOT NULL,
-  message_body TEXT NOT NULL, message_hash VARCHAR(64) NULL, recipients_count INT UNSIGNED NOT NULL DEFAULT 0,
+  message_body TEXT NOT NULL, message_hash VARCHAR(64) NULL, request_key CHAR(64) NULL, segment_count INT UNSIGNED NOT NULL DEFAULT 1, recipients_count INT UNSIGNED NOT NULL DEFAULT 0,
   valid_recipients_count INT UNSIGNED NOT NULL DEFAULT 0, invalid_recipients_count INT UNSIGNED NOT NULL DEFAULT 0, bulk_code VARCHAR(100) NULL,
   status VARCHAR(50) NOT NULL DEFAULT 'queued', source_module VARCHAR(100) NULL, source_id BIGINT UNSIGNED NULL,
   created_by INT UNSIGNED NULL, sent_at DATETIME NULL, last_checked_at DATETIME NULL, error_code VARCHAR(50) NULL,
   error_message TEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_sms_messages_status(status), INDEX idx_sms_messages_bulk(bulk_code), INDEX idx_sms_messages_source(source_module,source_id),
+  UNIQUE KEY uq_sms_request_key(request_key), INDEX idx_sms_messages_status(status), INDEX idx_sms_messages_bulk(bulk_code), INDEX idx_sms_messages_source(source_module,source_id),
   CONSTRAINT fk_sms_messages_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -546,12 +634,58 @@ CREATE TABLE IF NOT EXISTS ceo_dashboard_visitors (
 CREATE TABLE IF NOT EXISTS ceo_dashboard_periods (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(150) NOT NULL,
-  from_date DATE NULL,
-  to_date DATE NULL,
+  `from_date` DATE NULL,
+  `to_date` DATE NULL,
   active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_ceo_periods_active (active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS system_periods (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  period_key VARCHAR(100) NOT NULL,
+  title VARCHAR(190) NOT NULL,
+  period_type ENUM('daily','weekly','monthly','quarterly','half_yearly','yearly','custom') NOT NULL,
+  start_date DATE NULL,
+  end_date DATE NULL,
+  jalali_year SMALLINT UNSIGNED NULL,
+  jalali_month TINYINT UNSIGNED NULL,
+  scope_key VARCHAR(100) NOT NULL DEFAULT 'global',
+  is_current TINYINT(1) NOT NULL DEFAULT 0,
+  is_system TINYINT(1) NOT NULL DEFAULT 1,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_system_period_key (period_key),
+  INDEX idx_system_period_type (period_type,is_active,start_date,end_date),
+  INDEX idx_system_period_scope (scope_key,is_active,sort_order),
+  INDEX idx_system_period_current (is_current,is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS dashboard_widget_preferences (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    scope_type VARCHAR(40) NOT NULL,
+    scope_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    user_id INT UNSIGNED NOT NULL DEFAULT 0,
+    widget_key VARCHAR(100) NOT NULL,
+    title_override VARCHAR(190) NULL,
+    visible TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    size_key VARCHAR(20) NOT NULL DEFAULT 'wide',
+    default_period_key VARCHAR(40) NOT NULL DEFAULT 'monthly',
+    default_filters_json LONGTEXT NULL,
+    refresh_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+    drilldown_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    data_source_key VARCHAR(150) NOT NULL,
+    settings_json LONGTEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_dashboard_widget_preference (scope_type,scope_id,user_id,widget_key),
+    INDEX idx_dashboard_widget_scope (scope_type,scope_id,user_id,visible,sort_order),
+    INDEX idx_dashboard_widget_source (data_source_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS ceo_dashboard_manual_metrics (
@@ -622,12 +756,20 @@ CREATE TABLE IF NOT EXISTS carousel_items (
   title VARCHAR(190) NOT NULL,
   description TEXT NULL,
   image_path VARCHAR(255) NULL,
+  mobile_image_path VARCHAR(255) NULL,
+  alt_text VARCHAR(255) NULL,
   button_text VARCHAR(100) NULL,
   button_link VARCHAR(255) NULL,
+  link_target VARCHAR(10) NOT NULL DEFAULT '_self',
+  placement VARCHAR(50) NOT NULL DEFAULT 'homepage',
+  item_type VARCHAR(30) NOT NULL DEFAULT 'slider',
+  starts_at DATETIME NULL,
+  ends_at DATETIME NULL,
   sort_order INT NOT NULL DEFAULT 0,
   status ENUM('active','disabled') NOT NULL DEFAULT 'active',
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_carousel_publication(status,placement,item_type,starts_at,ends_at,sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS site_settings (
@@ -776,6 +918,44 @@ CREATE TABLE IF NOT EXISTS personal_planner_settings (
   CONSTRAINT fk_planner_settings_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS work_planner_tasks (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, template_id INT UNSIGNED NULL, user_id INT UNSIGNED NOT NULL,
+  employee_id INT UNSIGNED NULL, assigned_by INT UNSIGNED NULL, assigned_to_role_id INT UNSIGNED NULL, assigned_to_unit_id INT UNSIGNED NULL,
+  title VARCHAR(190) NOT NULL, description TEXT NULL, task_type VARCHAR(40) NOT NULL DEFAULT 'custom',
+  priority VARCHAR(20) NOT NULL DEFAULT 'normal', status VARCHAR(20) NOT NULL DEFAULT 'todo',
+  start_date DATE NULL, due_date DATE NULL, started_at DATETIME NULL, paused_at DATETIME NULL, completed_at DATETIME NULL,
+  progress_percent TINYINT UNSIGNED NOT NULL DEFAULT 0, related_module VARCHAR(100) NULL, related_record_id BIGINT UNSIGNED NULL,
+  parent_task_id BIGINT UNSIGNED NULL, recurrence_key VARCHAR(100) NULL, client_request_key VARCHAR(64) NULL,
+  is_locked TINYINT(1) NOT NULL DEFAULT 0, is_personal TINYINT(1) NOT NULL DEFAULT 0, is_visible_on_dashboard TINYINT(1) NOT NULL DEFAULT 1,
+  manual_sort_order INT NOT NULL DEFAULT 0, recurrence_type VARCHAR(20) NOT NULL DEFAULT 'none', recurrence_interval INT UNSIGNED NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_work_planner_generated(template_id,user_id,start_date), UNIQUE KEY uq_work_planner_recurrence(recurrence_key),
+  UNIQUE KEY uq_work_planner_client_request(user_id,client_request_key), INDEX idx_work_planner_user_status(user_id,status,due_date),
+  INDEX idx_work_planner_scope(assigned_to_unit_id,assigned_to_role_id), INDEX idx_work_planner_related(related_module,related_record_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS work_planner_user_preferences (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id INT UNSIGNED NOT NULL UNIQUE,
+  default_view VARCHAR(20) NOT NULL DEFAULT 'list', dashboard_widget_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  show_in_progress_first TINYINT(1) NOT NULL DEFAULT 1, show_overdue_tasks TINYINT(1) NOT NULL DEFAULT 1,
+  show_today_tasks TINYINT(1) NOT NULL DEFAULT 1, show_completed_tasks TINYINT(1) NOT NULL DEFAULT 0,
+  preferred_grouping VARCHAR(20) NOT NULL DEFAULT 'status', preferred_sorting VARCHAR(20) NOT NULL DEFAULT 'priority',
+  work_style VARCHAR(40) NULL, compact_mode TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS work_planner_task_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, task_id BIGINT UNSIGNED NOT NULL, user_id INT UNSIGNED NULL,
+  action VARCHAR(40) NOT NULL, old_value_json LONGTEXT NULL, new_value_json LONGTEXT NULL, note TEXT NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_work_planner_logs_task(task_id,created_at), INDEX idx_work_planner_logs_user(user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS work_planner_comments (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, task_id BIGINT UNSIGNED NOT NULL, user_id INT UNSIGNED NOT NULL,
+  comment_text TEXT NOT NULL, created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX idx_work_planner_comments_task(task_id,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS sobhan_notifications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,
@@ -849,8 +1029,10 @@ CREATE TABLE IF NOT EXISTS sobhan_user_notification_settings (
 
 CREATE TABLE IF NOT EXISTS letter_letterheads (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, company_name VARCHAR(190) NULL,
-  contact_info TEXT NULL, logo_path VARCHAR(255) NULL, background_path VARCHAR(255) NULL, watermark_text VARCHAR(190) NULL,
-  header_html MEDIUMTEXT NULL, footer_html MEDIUMTEXT NULL, is_active TINYINT(1) NOT NULL DEFAULT 1,
+  contact_info TEXT NULL, logo_path VARCHAR(255) NULL, background_path VARCHAR(255) NULL, background_mime VARCHAR(120) NULL, watermark_text VARCHAR(190) NULL,
+  header_html MEDIUMTEXT NULL, footer_html MEDIUMTEXT NULL,
+  margin_top_mm TINYINT UNSIGNED NULL, margin_right_mm TINYINT UNSIGNED NULL, margin_bottom_mm TINYINT UNSIGNED NULL, margin_left_mm TINYINT UNSIGNED NULL,
+  header_position_mm TINYINT UNSIGNED NULL, footer_position_mm TINYINT UNSIGNED NULL, is_default TINYINT(1) NOT NULL DEFAULT 0, is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_letterheads_active(is_active), CONSTRAINT fk_letterheads_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -864,7 +1046,7 @@ CREATE TABLE IF NOT EXISTS letter_signatures (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS letter_templates (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, default_subject VARCHAR(255) NULL, default_body MEDIUMTEXT NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, title VARCHAR(190) NOT NULL, default_subject VARCHAR(255) NULL, default_body MEDIUMTEXT NULL, default_delta_json LONGTEXT NULL,
   letterhead_id INT UNSIGNED NULL, signature_id INT UNSIGNED NULL, paper_size ENUM('A4','A5') NOT NULL DEFAULT 'A4',
   orientation ENUM('portrait','landscape') NOT NULL DEFAULT 'portrait', is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -876,7 +1058,7 @@ CREATE TABLE IF NOT EXISTS letter_templates (
 CREATE TABLE IF NOT EXISTS organizational_letters (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, letter_number VARCHAR(100) NULL, letter_date DATE NOT NULL, subject VARCHAR(255) NOT NULL,
   recipient_name VARCHAR(190) NOT NULL, recipient_title VARCHAR(190) NULL, recipient_organization VARCHAR(190) NULL, sender_unit VARCHAR(190) NULL,
-  template_id INT UNSIGNED NULL, letterhead_id INT UNSIGNED NULL, signature_id INT UNSIGNED NULL, body_html MEDIUMTEXT NOT NULL, final_html LONGTEXT NULL,
+  template_id INT UNSIGNED NULL, letterhead_id INT UNSIGNED NULL, signature_id INT UNSIGNED NULL, body_html MEDIUMTEXT NOT NULL, body_delta_json LONGTEXT NULL, final_html LONGTEXT NULL,
   paper_size ENUM('A4','A5') NOT NULL DEFAULT 'A4', orientation ENUM('portrait','landscape') NOT NULL DEFAULT 'portrait',
   importance ENUM('normal','important','urgent') NOT NULL DEFAULT 'normal', confidentiality ENUM('normal','confidential','secret') NOT NULL DEFAULT 'normal',
   status ENUM('draft','pending_signature','signed','issued','archived','cancelled') NOT NULL DEFAULT 'draft', created_by INT UNSIGNED NOT NULL,
@@ -919,11 +1101,13 @@ CREATE TABLE IF NOT EXISTS email_accounts (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, provider_id INT UNSIGNED NOT NULL, account_title VARCHAR(190) NOT NULL,
   email_address VARCHAR(255) NOT NULL, display_name VARCHAR(190) NULL, username VARCHAR(255) NOT NULL,
   encrypted_password LONGTEXT NULL, encrypted_access_token LONGTEXT NULL, encrypted_refresh_token LONGTEXT NULL,
+  access_token_expires_at DATETIME NULL,
   auth_type ENUM('password','app_password','oauth2') NOT NULL DEFAULT 'password',
   account_scope ENUM('personal','department','role','shared','system') NOT NULL DEFAULT 'personal', owner_user_id INT UNSIGNED NULL,
   department_id INT UNSIGNED NULL, role_id INT UNSIGNED NULL, is_shared TINYINT(1) NOT NULL DEFAULT 0,
   sync_enabled TINYINT(1) NOT NULL DEFAULT 1, send_enabled TINYINT(1) NOT NULL DEFAULT 1, last_sync_at DATETIME NULL,
-  sync_status ENUM('never','syncing','ok','error') NOT NULL DEFAULT 'never', last_error TEXT NULL, active TINYINT(1) NOT NULL DEFAULT 1,
+  sync_status ENUM('never','syncing','ok','partial','needs_reauth','error') NOT NULL DEFAULT 'never', sync_lock_token CHAR(64) NULL,
+  sync_lock_expires_at DATETIME NULL, last_error TEXT NULL, active TINYINT(1) NOT NULL DEFAULT 1,
   created_by INT UNSIGNED NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_email_accounts_scope(account_scope), INDEX idx_email_accounts_sync(active,sync_enabled),
   CONSTRAINT fk_email_accounts_provider FOREIGN KEY(provider_id) REFERENCES email_providers(id) ON DELETE RESTRICT,
@@ -1090,10 +1274,10 @@ CREATE TABLE IF NOT EXISTS payroll_periods (
 CREATE TABLE IF NOT EXISTS payroll_fields (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, field_key VARCHAR(100) NOT NULL UNIQUE, label VARCHAR(190) NOT NULL,
   field_type ENUM('earning','deduction','info','calculated','employer_cost') NOT NULL, data_type ENUM('text','number','money','date','percent') NOT NULL DEFAULT 'money',
-  calculation_type ENUM('manual','formula','system') NOT NULL DEFAULT 'manual', formula VARCHAR(1000) NULL, default_value VARCHAR(500) NULL,
+  calculation_type ENUM('manual','formula','system') NOT NULL DEFAULT 'manual', formula VARCHAR(1000) NULL, formula_definition_id BIGINT UNSIGNED NULL, default_value VARCHAR(500) NULL,
   visible_to_employee TINYINT(1) NOT NULL DEFAULT 1, visible_in_pdf TINYINT(1) NOT NULL DEFAULT 1, sort_order INT NOT NULL DEFAULT 0,
   active TINYINT(1) NOT NULL DEFAULT 1, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_payroll_fields_active(active,sort_order)
+  INDEX idx_payroll_fields_active(active,sort_order), INDEX idx_payroll_fields_formula_definition(formula_definition_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS payroll_import_batches (
@@ -1140,7 +1324,7 @@ CREATE TABLE IF NOT EXISTS payroll_exports (
 
 CREATE TABLE IF NOT EXISTS management_report_templates (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, report_type VARCHAR(40) NOT NULL, title VARCHAR(190) NOT NULL, description TEXT NULL,
-  active TINYINT(1) NOT NULL DEFAULT 1, created_by INT UNSIGNED NULL, updated_by INT UNSIGNED NULL,
+  version_no INT UNSIGNED NOT NULL DEFAULT 1, active TINYINT(1) NOT NULL DEFAULT 1, created_by INT UNSIGNED NULL, updated_by INT UNSIGNED NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_management_report_template_type(report_type), INDEX idx_management_report_templates_active(active),
   CONSTRAINT fk_management_report_templates_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL,
@@ -1157,7 +1341,7 @@ CREATE TABLE IF NOT EXISTS management_report_sections (
 
 CREATE TABLE IF NOT EXISTS management_report_fields (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, section_id INT UNSIGNED NOT NULL, field_key VARCHAR(100) NOT NULL, label VARCHAR(190) NOT NULL,
-  field_type ENUM('text','textarea','number','currency','percent','date','select','checkbox','table','repeater','file','readonly_metric') NOT NULL DEFAULT 'text',
+  field_type VARCHAR(40) NOT NULL DEFAULT 'text',
   placeholder VARCHAR(255) NULL, help_text TEXT NULL, options_json LONGTEXT NULL, validation_json LONGTEXT NULL, default_value LONGTEXT NULL,
   linked_source_key VARCHAR(190) NULL, is_required TINYINT(1) NOT NULL DEFAULT 0, sort_order INT NOT NULL DEFAULT 0, active TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1182,15 +1366,17 @@ CREATE TABLE IF NOT EXISTS management_report_periods (
 -- Sales data foundation (Stage 01: schema only; no parser, sync or dashboard migration)
 CREATE TABLE IF NOT EXISTS sales_import_batches (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, source_type VARCHAR(30) NOT NULL, source_module VARCHAR(50) NOT NULL,
-  file_name VARCHAR(255) NULL, file_hash VARCHAR(128) NULL, detected_sheet VARCHAR(255) NULL, detected_table VARCHAR(255) NULL,
-  import_mode VARCHAR(30) NOT NULL DEFAULT 'skip_duplicates', status VARCHAR(30) NOT NULL DEFAULT 'uploaded',
+  file_name VARCHAR(255) NULL, stored_file_path VARCHAR(500) NULL, file_hash VARCHAR(128) NULL, detected_sheet VARCHAR(255) NULL, detected_table VARCHAR(255) NULL, detected_range VARCHAR(100) NULL,
+  period_key VARCHAR(50) NULL, snapshot_date DATE NULL, period_id BIGINT UNSIGNED NULL, retry_of_batch_id BIGINT UNSIGNED NULL, source_confidence DECIMAL(6,2) NULL,
+  import_mode VARCHAR(30) NOT NULL DEFAULT 'skip_duplicates', status VARCHAR(30) NOT NULL DEFAULT 'uploaded', pipeline_status VARCHAR(40) NOT NULL DEFAULT 'uploaded',
+  is_active_reference TINYINT NOT NULL DEFAULT 0, activated_at DATETIME NULL, activated_by BIGINT UNSIGNED NULL,
   total_rows INT NOT NULL DEFAULT 0, valid_rows INT NOT NULL DEFAULT 0, invalid_rows INT NOT NULL DEFAULT 0,
   duplicate_rows INT NOT NULL DEFAULT 0, imported_rows INT NOT NULL DEFAULT 0, updated_rows INT NOT NULL DEFAULT 0, skipped_rows INT NOT NULL DEFAULT 0,
   started_by BIGINT UNSIGNED NULL, started_at DATETIME NULL, finished_at DATETIME NULL, error_message TEXT NULL, metadata_json LONGTEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
   INDEX idx_sales_import_batches_status(status), INDEX idx_sales_import_batches_source_type(source_type),
   INDEX idx_sales_import_batches_source_module(source_module), INDEX idx_sales_import_batches_file_hash(file_hash),
-  INDEX idx_sales_import_batches_started_by(started_by), INDEX idx_sales_import_batches_created_at(created_at)
+  INDEX idx_sales_import_batches_started_by(started_by), INDEX idx_sales_import_batches_created_at(created_at), INDEX idx_sales_import_pipeline(pipeline_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sales_import_errors (
@@ -1211,34 +1397,84 @@ CREATE TABLE IF NOT EXISTS sales_import_column_mappings (
 
 CREATE TABLE IF NOT EXISTS staging_sales_data (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NOT NULL, source_module VARCHAR(50) NOT NULL,
-  `row_number` INT NOT NULL, raw_json LONGTEXT NOT NULL, normalized_json LONGTEXT NULL,
+  `row_number` INT NOT NULL, source_row_number INT NULL, source_sheet VARCHAR(255) NULL, source_table VARCHAR(255) NULL, source_row_hash CHAR(64) NULL, raw_json LONGTEXT NOT NULL, normalized_json LONGTEXT NULL,
   validation_status VARCHAR(30) NOT NULL DEFAULT 'pending', validation_errors_json LONGTEXT NULL, source_unique_key VARCHAR(191) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_staging_sales_batch(import_batch_id), INDEX idx_staging_sales_source(source_module),
-  INDEX idx_staging_sales_validation(validation_status), INDEX idx_staging_sales_unique_key(source_unique_key),
+  INDEX idx_staging_sales_validation(validation_status), INDEX idx_staging_sales_unique_key(source_unique_key), INDEX idx_staging_source_row_hash(source_row_hash),
   CONSTRAINT fk_staging_sales_batch FOREIGN KEY(import_batch_id) REFERENCES sales_import_batches(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_reference_import_batches (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, source_module VARCHAR(50) NOT NULL, source_type VARCHAR(50) NOT NULL DEFAULT 'excel_upload',
+  original_file_name VARCHAR(255) NULL, stored_file_path VARCHAR(500) NULL, file_hash VARCHAR(128) NULL,
+  detected_sheet VARCHAR(255) NULL, detected_table VARCHAR(255) NULL, detected_range VARCHAR(100) NULL,
+  period_key VARCHAR(50) NULL, snapshot_date DATE NULL, period_id BIGINT UNSIGNED NULL, retry_of_batch_id BIGINT UNSIGNED NULL, source_confidence DECIMAL(6,2) NULL,
+  import_mode VARCHAR(50) NOT NULL DEFAULT 'replace_reference', status VARCHAR(50) NOT NULL DEFAULT 'uploaded', pipeline_status VARCHAR(40) NOT NULL DEFAULT 'uploaded',
+  is_active_reference TINYINT NOT NULL DEFAULT 0, activated_at DATETIME NULL, activated_by BIGINT UNSIGNED NULL,
+  total_rows INT NOT NULL DEFAULT 0, valid_rows INT NOT NULL DEFAULT 0, invalid_rows INT NOT NULL DEFAULT 0, duplicate_rows INT NOT NULL DEFAULT 0,
+  inserted_rows INT NOT NULL DEFAULT 0, updated_rows INT NOT NULL DEFAULT 0, skipped_rows INT NOT NULL DEFAULT 0,
+  started_by BIGINT UNSIGNED NULL, started_at DATETIME NULL, finished_at DATETIME NULL, error_message TEXT NULL, metadata_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_ref_batches_source_module(source_module), INDEX idx_ref_batches_source_type(source_type), INDEX idx_ref_batches_status(status),
+  INDEX idx_ref_batches_pipeline(pipeline_status), INDEX idx_ref_batches_period(period_key), INDEX idx_ref_batches_active(is_active_reference),
+  INDEX idx_ref_batches_hash(file_hash), INDEX idx_ref_batches_created(created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS staging_sales_reference_rows (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NOT NULL, source_module VARCHAR(50) NOT NULL,
+  `row_number` INT NOT NULL, source_row_number INT NULL, source_sheet VARCHAR(255) NULL, source_table VARCHAR(255) NULL, source_row_hash CHAR(64) NULL,
+  source_unique_key VARCHAR(191) NULL, raw_json LONGTEXT NOT NULL, normalized_json LONGTEXT NULL,
+  validation_status VARCHAR(50) NOT NULL DEFAULT 'pending', validation_errors_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_ref_staging_batch(import_batch_id), INDEX idx_ref_staging_source(source_module), INDEX idx_ref_staging_key(source_unique_key),
+  INDEX idx_ref_staging_status(validation_status), INDEX idx_ref_staging_row_hash(source_row_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS sales_reference_import_errors (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NOT NULL, source_module VARCHAR(50) NOT NULL,
+  `row_number` INT NULL, error_code VARCHAR(100) NULL, error_message TEXT NOT NULL, raw_json LONGTEXT NULL, normalized_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_ref_errors_batch(import_batch_id), INDEX idx_ref_errors_source(source_module), INDEX idx_ref_errors_code(error_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sales_aggregate_rows (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
   unique_code VARCHAR(191) NULL, invoice_type VARCHAR(100) NULL, invoice_number VARCHAR(100) NULL, sub_invoice_number VARCHAR(100) NULL,
-  invoice_date_raw VARCHAR(100) NULL, invoice_date DATE NULL, customer_code VARCHAR(100) NULL, customer_name VARCHAR(255) NULL,
-  product_code VARCHAR(100) NULL, product_name VARCHAR(255) NULL, visitor_code VARCHAR(100) NULL, line_code VARCHAR(100) NULL,
-  quantity DECIMAL(18,4) NULL, gross_amount DECIMAL(20,2) NULL, discount_amount DECIMAL(20,2) NULL, net_amount DECIMAL(20,2) NULL,
-  return_quantity DECIMAL(18,4) NULL, return_amount DECIMAL(20,2) NULL, raw_json LONGTEXT NULL,
+  invoice_date_raw VARCHAR(100) NULL, invoice_date DATE NULL, period_key VARCHAR(50) NULL,
+  customer_code VARCHAR(100) NULL, customer_name VARCHAR(255) NULL, customer_guild_code VARCHAR(100) NULL, customer_guild_name VARCHAR(255) NULL,
+  product_code VARCHAR(100) NULL, product_name VARCHAR(255) NULL, brand_code VARCHAR(100) NULL, brand_name VARCHAR(255) NULL,
+  visitor_code VARCHAR(100) NULL, visitor_name VARCHAR(255) NULL,
+  supervisor_code VARCHAR(100) NULL, supervisor_name VARCHAR(255) NULL,
+  sales_manager_code VARCHAR(100) NULL, sales_manager_name VARCHAR(255) NULL,
+  line_code VARCHAR(100) NULL, line_name VARCHAR(100) NULL,
+  quantity DECIMAL(18,4) NULL, total_qty DECIMAL(18,4) NULL, gross_amount DECIMAL(20,2) NULL, discount_amount DECIMAL(20,2) NULL, net_amount DECIMAL(20,2) NULL,
+  discount_total DECIMAL(18,4) NULL, return_quantity DECIMAL(18,4) NULL, return_amount DECIMAL(20,2) NULL, raw_json LONGTEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
   INDEX idx_sales_aggregate_batch(import_batch_id), UNIQUE KEY uq_sales_aggregate_source_key(source_unique_key), INDEX idx_sales_aggregate_date(invoice_date),
   INDEX idx_sales_aggregate_customer(customer_code), INDEX idx_sales_aggregate_product(product_code), INDEX idx_sales_aggregate_visitor(visitor_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS purchase_aggregate_rows (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NOT NULL, source_unique_key VARCHAR(191) NOT NULL,
+  invoice_type VARCHAR(100) NULL, invoice_number VARCHAR(100) NULL, invoice_date_raw VARCHAR(100) NULL, invoice_date DATE NULL,
+  supplier_code VARCHAR(100) NULL, supplier_name VARCHAR(255) NULL, manufacturer_code VARCHAR(100) NULL, manufacturer_name VARCHAR(255) NULL,
+  line_code VARCHAR(100) NULL, line_name VARCHAR(255) NULL, product_code VARCHAR(100) NULL, product_name VARCHAR(255) NULL,
+  quantity DECIMAL(18,4) NULL, gross_amount DECIMAL(20,2) NULL, discount_amount DECIMAL(20,2) NULL, net_amount DECIMAL(20,2) NULL,
+  brand_code VARCHAR(100) NULL, brand_name VARCHAR(255) NULL, raw_json LONGTEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  INDEX idx_purchase_batch(import_batch_id), INDEX idx_purchase_key(source_unique_key), INDEX idx_purchase_date(invoice_date),
+  INDEX idx_purchase_supplier(supplier_code), INDEX idx_purchase_product(product_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS inventory_aggregate_rows (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_type VARCHAR(30) NULL, source_unique_key VARCHAR(191) NULL,
+  period_key VARCHAR(50) NULL, snapshot_date DATE NULL, period_id BIGINT UNSIGNED NULL,
   product_code VARCHAR(100) NULL,product_name VARCHAR(255) NULL,index_code VARCHAR(100) NULL,index_name VARCHAR(255) NULL,consumer_price DECIMAL(20,4) NULL,expire_date DATE NULL,expire_date_raw VARCHAR(100) NULL,manufacturer_code VARCHAR(100) NULL,manufacturer_name VARCHAR(255) NULL,
   sales_carton_qty DECIMAL(20,4) NULL,sales_part_qty DECIMAL(20,4) NULL,sales_total_qty DECIMAL(20,4) NULL,sales_total_amount DECIMAL(20,4) NULL,sales_discount_amount DECIMAL(20,4) NULL,sales_tax_amount DECIMAL(20,4) NULL,sales_duty_amount DECIMAL(20,4) NULL,sales_payable_amount DECIMAL(20,4) NULL,sales_return_carton_qty DECIMAL(20,4) NULL,sales_return_part_qty DECIMAL(20,4) NULL,sales_return_total_qty DECIMAL(20,4) NULL,
   purchase_carton_qty DECIMAL(20,4) NULL,purchase_part_qty DECIMAL(20,4) NULL,purchase_total_qty DECIMAL(20,4) NULL,opening_carton_qty DECIMAL(20,4) NULL,opening_part_qty DECIMAL(20,4) NULL,opening_total_qty DECIMAL(20,4) NULL,inbound_carton_qty DECIMAL(20,4) NULL,inbound_part_qty DECIMAL(20,4) NULL,inbound_total_qty DECIMAL(20,4) NULL,outbound_carton_qty DECIMAL(20,4) NULL,outbound_part_qty DECIMAL(20,4) NULL,outbound_total_qty DECIMAL(20,4) NULL,current_period_carton_qty DECIMAL(20,4) NULL,current_period_part_qty DECIMAL(20,4) NULL,current_period_total_qty DECIMAL(20,4) NULL,carton_size DECIMAL(20,4) NULL,
   last_cost_price DECIMAL(20,4) NULL,last_purchase_price DECIMAL(20,4) NULL,stock_value_by_last_cost DECIMAL(20,4) NULL,stock_value_by_sale_price_1 DECIMAL(20,4) NULL,retail_price DECIMAL(20,4) NULL,wholesale_price DECIMAL(20,4) NULL,sale_price_3 DECIMAL(20,4) NULL,sale_price_4 DECIMAL(20,4) NULL,sale_price_5 DECIMAL(20,4) NULL,sale_price_6 DECIMAL(20,4) NULL,sale_price_7 DECIMAL(20,4) NULL,sale_price_8 DECIMAL(20,4) NULL,sale_price_9 DECIMAL(20,4) NULL,sale_price_10 DECIMAL(20,4) NULL,sale_price_11 DECIMAL(20,4) NULL,sale_price_12 DECIMAL(20,4) NULL,
   retail_commission DECIMAL(20,4) NULL,wholesale_commission DECIMAL(20,4) NULL,commission_3 DECIMAL(20,4) NULL,commission_4 DECIMAL(20,4) NULL,commission_5 DECIMAL(20,4) NULL,commission_6 DECIMAL(20,4) NULL,commission_7 DECIMAL(20,4) NULL,commission_8 DECIMAL(20,4) NULL,commission_9 DECIMAL(20,4) NULL,commission_10 DECIMAL(20,4) NULL,commission_11 DECIMAL(20,4) NULL,commission_12 DECIMAL(20,4) NULL,
-  current_weight DECIMAL(20,4) NULL,current_volume DECIMAL(20,4) NULL,product_tree_group_code VARCHAR(100) NULL,product_tree_group_name VARCHAR(255) NULL,barcode VARCHAR(191) NULL,control_code VARCHAR(191) NULL,group_code VARCHAR(100) NULL,group_name VARCHAR(255) NULL,retail_collection_days DECIMAL(20,4) NULL,current_base_stock DECIMAL(20,4) NULL,current_part_stock DECIMAL(20,4) NULL,current_total_stock DECIMAL(20,4) NULL,brand_name VARCHAR(255) NULL,last_purchase_date DATE NULL,last_purchase_date_raw VARCHAR(100) NULL,raw_json LONGTEXT NULL,
+  current_weight DECIMAL(20,4) NULL,current_volume DECIMAL(20,4) NULL,product_tree_group_code VARCHAR(100) NULL,product_tree_group_name VARCHAR(255) NULL,barcode VARCHAR(191) NULL,control_code VARCHAR(191) NULL,group_code VARCHAR(100) NULL,group_name VARCHAR(255) NULL,retail_collection_days DECIMAL(20,4) NULL,current_base_stock DECIMAL(20,4) NULL,current_part_stock DECIMAL(20,4) NULL,current_total_stock DECIMAL(20,4) NULL,period_total_stock DECIMAL(20,4) NULL,brand_name VARCHAR(255) NULL,last_purchase_date DATE NULL,last_purchase_date_raw VARCHAR(100) NULL,raw_json LONGTEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
   INDEX idx_inventory_aggregate_batch(import_batch_id), UNIQUE KEY uq_inventory_aggregate_source_key(source_unique_key), INDEX idx_inventory_aggregate_product(product_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1255,31 +1491,140 @@ CREATE TABLE IF NOT EXISTS sales_team_members (
 
 CREATE TABLE IF NOT EXISTS sales_customer_class_coefficients (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
-  customer_class_code VARCHAR(100) NULL, customer_class_title VARCHAR(255) NULL, coefficient DECIMAL(12,6) NULL,
-  effective_from DATE NULL, effective_to DATE NULL, active TINYINT(1) NOT NULL DEFAULT 1, raw_json LONGTEXT NULL,
+  period_id BIGINT UNSIGNED NULL, guild_identity_key VARCHAR(191) NULL, customer_class_code VARCHAR(100) NULL,
+  customer_class_title VARCHAR(255) NULL, normalized_guild_name VARCHAR(191) NULL, coefficient DECIMAL(12,6) NULL,
+  effective_from DATE NULL, effective_to DATE NULL, version_no INT UNSIGNED NOT NULL DEFAULT 1,
+  source_type VARCHAR(30) NOT NULL DEFAULT 'import', active TINYINT(1) NOT NULL DEFAULT 1, created_by INT UNSIGNED NULL, raw_json LONGTEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
   INDEX idx_sales_coeff_batch(import_batch_id), INDEX idx_sales_coeff_unique_key(source_unique_key), INDEX idx_sales_coeff_class(customer_class_code),
-  INDEX idx_sales_coeff_effective(effective_from,effective_to)
+  INDEX idx_sales_coeff_effective(effective_from,effective_to), INDEX idx_sales_coeff_period(period_id),
+  INDEX idx_sales_coeff_identity(guild_identity_key), INDEX idx_sales_coeff_active_version(active,version_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS product_priorities (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
+  period_id BIGINT UNSIGNED NULL,
   product_code VARCHAR(100) NULL, product_name VARCHAR(255) NULL, brand_code VARCHAR(100) NULL, brand_name VARCHAR(255) NULL,
   priority_code VARCHAR(100) NULL, priority_rank INT NULL, inventory_quantity DECIMAL(18,4) NULL, inventory_value DECIMAL(20,2) NULL,
-  active TINYINT(1) NOT NULL DEFAULT 1, raw_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'active', active TINYINT(1) NOT NULL DEFAULT 1, created_by INT UNSIGNED NULL,
+  raw_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
   INDEX idx_product_priorities_batch(import_batch_id), INDEX idx_product_priorities_unique_key(source_unique_key),
-  INDEX idx_product_priorities_product(product_code), INDEX idx_product_priorities_brand(brand_code), INDEX idx_product_priorities_priority(priority_code)
+  INDEX idx_product_priorities_product(product_code), INDEX idx_product_priorities_brand(brand_code), INDEX idx_product_priorities_priority(priority_code),
+  INDEX idx_product_priorities_period(period_id), INDEX idx_product_priorities_status(status,active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sales_targets (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
+  period_id BIGINT UNSIGNED NULL, visitor_user_id INT UNSIGNED NULL, line_id INT UNSIGNED NULL,
   target_year SMALLINT NULL, target_month TINYINT NULL, line_code VARCHAR(100) NULL, product_code VARCHAR(100) NULL,
+  product_name VARCHAR(255) NULL, brand_code VARCHAR(100) NULL, brand_name VARCHAR(255) NULL,
   priority_code VARCHAR(100) NULL, visitor_code VARCHAR(100) NULL, supervisor_code VARCHAR(100) NULL,
-  target_quantity DECIMAL(18,4) NULL, target_amount DECIMAL(20,2) NULL, raw_json LONGTEXT NULL,
+  target_quantity DECIMAL(18,4) NULL, target_amount DECIMAL(20,2) NULL, allocation_percent DECIMAL(8,4) NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1, source_type VARCHAR(30) NOT NULL DEFAULT 'import', created_by INT UNSIGNED NULL, raw_json LONGTEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
   INDEX idx_sales_targets_batch(import_batch_id), INDEX idx_sales_targets_unique_key(source_unique_key), INDEX idx_sales_targets_period(target_year,target_month),
-  INDEX idx_sales_targets_line(line_code), INDEX idx_sales_targets_product(product_code), INDEX idx_sales_targets_visitor(visitor_code)
+  INDEX idx_sales_targets_line(line_code), INDEX idx_sales_targets_product(product_code), INDEX idx_sales_targets_visitor(visitor_code),
+  INDEX idx_sales_targets_period_id(period_id), INDEX idx_sales_targets_visitor_user(visitor_user_id), INDEX idx_sales_targets_line_id(line_id),
+  INDEX idx_sales_targets_grain(period_id,visitor_user_id,line_id,product_code), INDEX idx_sales_targets_active(active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE OR REPLACE VIEW vw_active_sales_aggregate_rows AS
+SELECT r.* FROM sales_aggregate_rows r
+JOIN sales_import_batches b ON b.id=r.import_batch_id AND b.source_module='sales_aggregate' AND b.is_active_reference=1 AND b.status='committed';
+
+CREATE OR REPLACE VIEW vw_active_inventory_aggregate_rows AS
+SELECT r.* FROM inventory_aggregate_rows r
+JOIN sales_import_batches b ON b.id=r.import_batch_id AND b.source_module='inventory_aggregate' AND b.is_active_reference=1 AND b.status='committed';
+
+CREATE OR REPLACE VIEW vw_active_purchase_aggregate_rows AS
+SELECT r.* FROM purchase_aggregate_rows r
+JOIN sales_import_batches b ON b.id=r.import_batch_id AND b.source_module='purchase_aggregate' AND b.is_active_reference=1 AND b.status='committed';
+
+CREATE OR REPLACE VIEW vw_active_sales_targets AS
+SELECT t.* FROM sales_targets t
+LEFT JOIN sales_import_batches b ON b.id=t.import_batch_id
+WHERE t.active=1
+  AND (t.import_batch_id IS NULL OR (b.source_module='sales_targets' AND b.is_active_reference=1 AND b.status='committed'))
+  AND (t.import_batch_id IS NULL OR NOT EXISTS (
+      SELECT 1 FROM sales_targets manual
+      WHERE manual.import_batch_id IS NULL AND manual.active=1
+        AND manual.period_id=t.period_id AND manual.visitor_user_id=t.visitor_user_id
+        AND manual.line_id=t.line_id AND manual.product_code=t.product_code
+  ));
+
+CREATE OR REPLACE VIEW vw_active_product_priorities AS
+SELECT p.* FROM product_priorities p
+LEFT JOIN sales_import_batches b ON b.id=p.import_batch_id
+WHERE p.active=1 AND p.status='active'
+  AND (p.import_batch_id IS NULL OR (b.source_module='product_priorities' AND b.is_active_reference=1 AND b.status='committed'));
+
+CREATE OR REPLACE VIEW vw_active_customer_class_coefficients AS
+SELECT c.* FROM sales_customer_class_coefficients c
+LEFT JOIN sales_import_batches b ON b.id=c.import_batch_id
+WHERE c.active=1
+  AND (c.import_batch_id IS NULL OR (b.source_module='customer_coefficients' AND b.is_active_reference=1 AND b.status='committed'))
+  AND (c.import_batch_id IS NULL OR NOT EXISTS (
+      SELECT 1 FROM sales_customer_class_coefficients manual
+      WHERE manual.import_batch_id IS NULL AND manual.active=1
+        AND manual.period_id <=> c.period_id AND manual.guild_identity_key=c.guild_identity_key
+  ));
+
+CREATE OR REPLACE VIEW vw_sales_target_achievement AS
+SELECT
+  t.id target_id,t.period_id,p.period_key,p.title period_title,p.start_date,p.end_date,
+  t.visitor_user_id,u.name visitor_name,u.employee_no visitor_code,
+  t.line_id,l.code line_code,l.title line_title,
+  t.product_code,t.product_name,t.brand_code,t.brand_name,
+  t.target_quantity,t.target_amount,t.allocation_percent,
+  COALESCE((
+    SELECT SUM(COALESCE(s.total_qty,s.quantity,0)-COALESCE(s.return_quantity,0))
+    FROM vw_active_sales_aggregate_rows s
+    WHERE s.invoice_date BETWEEN p.start_date AND p.end_date
+      AND s.product_code=t.product_code AND s.line_code=l.code
+      AND (s.visitor_code=u.employee_no OR s.visitor_code=u.kara_system_code)
+  ),0) achievement_quantity,
+  COALESCE((
+    SELECT SUM(COALESCE(s.net_amount,0)-COALESCE(s.return_amount,0))
+    FROM vw_active_sales_aggregate_rows s
+    WHERE s.invoice_date BETWEEN p.start_date AND p.end_date
+      AND s.product_code=t.product_code AND s.line_code=l.code
+      AND (s.visitor_code=u.employee_no OR s.visitor_code=u.kara_system_code)
+  ),0) achievement_amount
+FROM vw_active_sales_targets t
+JOIN system_periods p ON p.id=t.period_id
+JOIN users u ON u.id=t.visitor_user_id
+JOIN sales_lines l ON l.id=t.line_id;
+
+CREATE OR REPLACE VIEW vw_sales_target_visitor_totals AS
+SELECT period_id,period_key,period_title,visitor_user_id,visitor_name,line_id,line_code,line_title,
+  SUM(target_quantity) target_quantity,SUM(target_amount) target_amount,
+  SUM(achievement_quantity) achievement_quantity,SUM(achievement_amount) achievement_amount
+FROM vw_sales_target_achievement
+GROUP BY period_id,period_key,period_title,visitor_user_id,visitor_name,line_id,line_code,line_title;
+
+CREATE OR REPLACE VIEW vw_sales_target_line_products AS
+SELECT period_id,period_key,period_title,line_id,line_code,line_title,product_code,
+  MAX(product_name) product_name,MAX(brand_code) brand_code,MAX(brand_name) brand_name,
+  SUM(target_quantity) target_quantity,SUM(target_amount) target_amount,
+  SUM(achievement_quantity) achievement_quantity,SUM(achievement_amount) achievement_amount
+FROM vw_sales_target_achievement
+GROUP BY period_id,period_key,period_title,line_id,line_code,line_title,product_code;
+
+CREATE OR REPLACE VIEW vw_sales_target_line_totals AS
+SELECT period_id,period_key,period_title,line_id,line_code,line_title,
+  SUM(target_quantity) target_quantity,SUM(target_amount) target_amount,
+  SUM(achievement_quantity) achievement_quantity,SUM(achievement_amount) achievement_amount
+FROM vw_sales_target_achievement
+GROUP BY period_id,period_key,period_title,line_id,line_code,line_title;
+
+CREATE OR REPLACE VIEW vw_sales_target_brand_totals AS
+SELECT period_id,period_key,period_title,
+  COALESCE(NULLIF(brand_code,''),CONCAT('name:',COALESCE(NULLIF(brand_name,''),'بدون برند'))) brand_key,
+  COALESCE(NULLIF(brand_name,''),'بدون برند') brand_name,
+  SUM(target_quantity) target_quantity,SUM(target_amount) target_amount,
+  SUM(achievement_quantity) achievement_quantity,SUM(achievement_amount) achievement_amount
+FROM vw_sales_target_achievement
+GROUP BY period_id,period_key,period_title,brand_key,brand_name;
 
 CREATE TABLE IF NOT EXISTS commission_formula_settings (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, formula_key VARCHAR(100) NOT NULL, title VARCHAR(255) NULL, formula_expression TEXT NULL,
@@ -1288,6 +1633,109 @@ CREATE TABLE IF NOT EXISTS commission_formula_settings (
   published_at DATETIME NULL, raw_json LONGTEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
   UNIQUE KEY uq_commission_formula_version(formula_key,version_no), INDEX idx_commission_formula_status(status),
   INDEX idx_commission_formula_effective(effective_from,effective_to)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS formula_definitions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  formula_key VARCHAR(100) NOT NULL,
+  title VARCHAR(190) NOT NULL,
+  category_key VARCHAR(60) NOT NULL,
+  description TEXT NULL,
+  owner_scope VARCHAR(60) NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_formula_definition_key(formula_key),
+  INDEX idx_formula_definition_category(category_key,active),
+  CONSTRAINT fk_formula_definition_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS formula_versions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  definition_id BIGINT UNSIGNED NOT NULL,
+  version_no INT UNSIGNED NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'draft',
+  effective_from DATE NULL,
+  effective_to DATE NULL,
+  data_source_key VARCHAR(100) NOT NULL,
+  metric_key VARCHAR(100) NOT NULL,
+  comparison_metric_key VARCHAR(100) NULL,
+  aggregation_key VARCHAR(30) NOT NULL,
+  operator_key VARCHAR(30) NOT NULL,
+  condition_value_json LONGTEXT NULL,
+  result_type VARCHAR(40) NOT NULL,
+  result_value DECIMAL(20,6) NOT NULL DEFAULT 0,
+  priority INT NOT NULL DEFAULT 100,
+  user_note TEXT NULL,
+  rule_json LONGTEXT NOT NULL,
+  created_by INT UNSIGNED NULL,
+  published_by INT UNSIGNED NULL,
+  published_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_formula_definition_version(definition_id,version_no),
+  INDEX idx_formula_version_status(status,effective_from,effective_to),
+  INDEX idx_formula_version_source(data_source_key,metric_key,priority),
+  CONSTRAINT fk_formula_version_definition FOREIGN KEY(definition_id) REFERENCES formula_definitions(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_formula_version_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT fk_formula_version_publisher FOREIGN KEY(published_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS formula_filters (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  formula_version_id BIGINT UNSIGNED NOT NULL,
+  field_key VARCHAR(100) NOT NULL,
+  operator_key VARCHAR(30) NOT NULL,
+  value_json LONGTEXT NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_formula_filter_version(formula_version_id,sort_order),
+  CONSTRAINT fk_formula_filter_version FOREIGN KEY(formula_version_id) REFERENCES formula_versions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS formula_dependencies (
+  formula_version_id BIGINT UNSIGNED NOT NULL,
+  depends_on_definition_id BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(formula_version_id,depends_on_definition_id),
+  INDEX idx_formula_dependency_target(depends_on_definition_id),
+  CONSTRAINT fk_formula_dependency_version FOREIGN KEY(formula_version_id) REFERENCES formula_versions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_formula_dependency_definition FOREIGN KEY(depends_on_definition_id) REFERENCES formula_definitions(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS formula_audit_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  definition_id BIGINT UNSIGNED NULL,
+  formula_version_id BIGINT UNSIGNED NULL,
+  actor_user_id INT UNSIGNED NULL,
+  action VARCHAR(60) NOT NULL,
+  old_value_json LONGTEXT NULL,
+  new_value_json LONGTEXT NULL,
+  note VARCHAR(500) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_formula_audit_definition(definition_id,created_at),
+  INDEX idx_formula_audit_version(formula_version_id,created_at),
+  INDEX idx_formula_audit_actor(actor_user_id,created_at),
+  CONSTRAINT fk_formula_audit_definition FOREIGN KEY(definition_id) REFERENCES formula_definitions(id) ON DELETE SET NULL,
+  CONSTRAINT fk_formula_audit_version FOREIGN KEY(formula_version_id) REFERENCES formula_versions(id) ON DELETE SET NULL,
+  CONSTRAINT fk_formula_audit_actor FOREIGN KEY(actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS formula_test_runs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  formula_version_id BIGINT UNSIGNED NOT NULL,
+  actor_user_id INT UNSIGNED NULL,
+  context_json LONGTEXT NULL,
+  input_values_json LONGTEXT NULL,
+  trace_json LONGTEXT NOT NULL,
+  matched TINYINT(1) NOT NULL DEFAULT 0,
+  final_result DECIMAL(20,6) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_formula_test_version(formula_version_id,created_at),
+  INDEX idx_formula_test_actor(actor_user_id,created_at),
+  CONSTRAINT fk_formula_test_version FOREIGN KEY(formula_version_id) REFERENCES formula_versions(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_formula_test_actor FOREIGN KEY(actor_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS commission_calculation_runs (
@@ -1312,7 +1760,8 @@ CREATE TABLE IF NOT EXISTS commission_calculation_results (
 CREATE TABLE IF NOT EXISTS management_report_submissions (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, template_id INT UNSIGNED NOT NULL, report_type VARCHAR(40) NOT NULL,
   period_key VARCHAR(80) NOT NULL, period_title VARCHAR(190) NOT NULL, period_start DATE NULL, period_end DATE NULL,
-  submitter_id INT UNSIGNED NOT NULL, unit_id INT UNSIGNED NULL, status ENUM('draft','submitted','returned','approved','archived') NOT NULL DEFAULT 'draft',
+  submitter_id INT UNSIGNED NOT NULL, unit_id INT UNSIGNED NULL, template_version_no INT UNSIGNED NOT NULL DEFAULT 1,
+  schema_snapshot_json LONGTEXT NULL, status ENUM('draft','submitted','returned','approved','archived') NOT NULL DEFAULT 'draft',
   submitted_at DATETIME NULL, returned_at DATETIME NULL, approved_at DATETIME NULL, approved_by INT UNSIGNED NULL, archived_at DATETIME NULL,
   return_note TEXT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_management_report_period_user(template_id,period_key,submitter_id), INDEX idx_management_report_submissions_type(report_type),
@@ -1349,6 +1798,18 @@ CREATE TABLE IF NOT EXISTS management_report_reviews (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX idx_management_report_reviews_submission(submission_id,created_at),
   CONSTRAINT fk_management_report_reviews_submission FOREIGN KEY(submission_id) REFERENCES management_report_submissions(id) ON DELETE CASCADE,
   CONSTRAINT fk_management_report_reviews_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS management_report_links (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, submission_id BIGINT UNSIGNED NOT NULL, field_id INT UNSIGNED NULL,
+  link_type VARCHAR(40) NOT NULL, linked_type VARCHAR(80) NOT NULL, linked_id BIGINT UNSIGNED NOT NULL,
+  link_url VARCHAR(500) NULL, label VARCHAR(255) NULL, created_by INT UNSIGNED NULL, active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
+  UNIQUE KEY uq_management_report_field_link(submission_id,field_id,link_type),
+  INDEX idx_management_report_links_target(linked_type,linked_id),
+  CONSTRAINT fk_management_report_links_submission FOREIGN KEY(submission_id) REFERENCES management_report_submissions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_management_report_links_field FOREIGN KEY(field_id) REFERENCES management_report_fields(id) ON DELETE SET NULL,
+  CONSTRAINT fk_management_report_links_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS uploaded_files_backup (
@@ -1508,6 +1969,7 @@ CREATE TABLE IF NOT EXISTS hr_month_holidays (
 
 CREATE TABLE IF NOT EXISTS hr_attendance_entries (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  import_batch_id BIGINT UNSIGNED NULL,
   employee_id INT UNSIGNED NOT NULL,
   work_group_id INT UNSIGNED NOT NULL,
   attendance_date DATE NOT NULL,
@@ -1523,9 +1985,12 @@ CREATE TABLE IF NOT EXISTS hr_attendance_entries (
   normal_overtime_minutes INT UNSIGNED NOT NULL DEFAULT 0,
   holiday_overtime_minutes INT UNSIGNED NOT NULL DEFAULT 0,
   work_minutes INT UNSIGNED NOT NULL DEFAULT 0,
-  day_status ENUM('present','absent','leave','mission','holiday','half_day') NOT NULL DEFAULT 'present',
+  day_status VARCHAR(30) NOT NULL DEFAULT 'present',
+  leave_type VARCHAR(100) NULL,
+  mission_details TEXT NULL,
   overtime_status ENUM('none','pending','approved','rejected') NOT NULL DEFAULT 'none',
   notes TEXT NULL,
+  import_time_notes TEXT NULL,
   attachment_path VARCHAR(500) NULL,
   created_by INT UNSIGNED NULL,
   approved_by INT UNSIGNED NULL,
@@ -1534,6 +1999,7 @@ CREATE TABLE IF NOT EXISTS hr_attendance_entries (
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_hr_attendance_employee_date(employee_id,attendance_date),
   INDEX idx_hr_attendance_date(attendance_date),
+  INDEX idx_hr_attendance_import_batch(import_batch_id),
   INDEX idx_hr_attendance_group(work_group_id,attendance_date),
   INDEX idx_hr_attendance_status(day_status,overtime_status),
   CONSTRAINT fk_hr_attendance_employee FOREIGN KEY(employee_id) REFERENCES users(id),
@@ -1541,6 +2007,21 @@ CREATE TABLE IF NOT EXISTS hr_attendance_entries (
   CONSTRAINT fk_hr_attendance_holiday FOREIGN KEY(holiday_id) REFERENCES hr_month_holidays(id) ON DELETE SET NULL,
   CONSTRAINT fk_hr_attendance_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_hr_attendance_approver FOREIGN KEY(approved_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hr_attendance_identity_mappings (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  source_field VARCHAR(40) NOT NULL,
+  external_code VARCHAR(100) NOT NULL,
+  user_id INT UNSIGNED NOT NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_hr_attendance_identity(source_field,external_code),
+  INDEX idx_hr_attendance_identity_user(user_id,active),
+  CONSTRAINT fk_hr_attendance_identity_user FOREIGN KEY(user_id) REFERENCES users(id),
+  CONSTRAINT fk_hr_attendance_identity_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS hr_attendance_logs (
@@ -1566,7 +2047,7 @@ SELECT employee_id,YEAR(attendance_date) AS `year`,MONTH(attendance_date) AS `mo
   SUM(day_status='absent') AS absent_days,
   SUM(day_status='leave') AS leave_days,
   SUM(day_status='mission') AS mission_days,
-  SUM(day_status IN ('present','half_day')) AS present_days,
+  SUM(day_status IN ('present','half_day','holiday_work')) AS present_days,
   ROUND(GREATEST(0,10-(((SUM(late_minutes)+SUM(early_leave_minutes))/30)*0.5)-(SUM(day_status='absent')*2)),2) AS attendance_score_suggestion
 FROM hr_attendance_entries
 GROUP BY employee_id,YEAR(attendance_date),MONTH(attendance_date);
@@ -1590,5 +2071,239 @@ CREATE TABLE IF NOT EXISTS sales_offer_budget_requests (
   updated_at DATETIME NULL, UNIQUE KEY uq_offer_budget_code(request_code), INDEX idx_offer_budget_status(status), INDEX idx_offer_budget_manager(sales_manager_id),
   INDEX idx_offer_budget_product(product_code), INDEX idx_offer_budget_period(period_key), INDEX idx_offer_budget_dates(date_from,date_to)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS sales_offer_budget_logs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,request_id BIGINT UNSIGNED NOT NULL,action VARCHAR(50) NOT NULL,performed_by BIGINT UNSIGNED NULL,old_value_json JSON NULL,new_value_json JSON NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,INDEX idx_offer_budget_log_request(request_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE IF NOT EXISTS sales_offer_formula_settings (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,formula_key VARCHAR(100) NOT NULL UNIQUE,title VARCHAR(255) NOT NULL,formula_version VARCHAR(50) NOT NULL,settings_json JSON NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- OKR MVP: additive organization objectives, measurable results, check-ins and planner links.
+CREATE TABLE IF NOT EXISTS okr_cycles (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(190) NOT NULL,cycle_type VARCHAR(30) NOT NULL DEFAULT 'quarterly',start_date DATE NOT NULL,end_date DATE NOT NULL,status VARCHAR(20) NOT NULL DEFAULT 'draft',registration_deadline DATE NULL,approval_deadline DATE NULL,checkin_frequency VARCHAR(20) NOT NULL DEFAULT 'weekly',checkin_count INT UNSIGNED NOT NULL DEFAULT 0,created_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_okr_cycle_title_period(title,start_date,end_date),INDEX idx_okr_cycles_status_dates(status,start_date,end_date),CONSTRAINT fk_okr_cycles_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_objectives (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,cycle_id INT UNSIGNED NOT NULL,parent_objective_id BIGINT UNSIGNED NULL,owner_user_id INT UNSIGNED NOT NULL,org_unit_id INT UNSIGNED NULL,sales_line VARCHAR(50) NULL,objective_level VARCHAR(30) NOT NULL DEFAULT 'employee',title VARCHAR(255) NOT NULL,description TEXT NULL,okr_type VARCHAR(20) NOT NULL DEFAULT 'committed',priority VARCHAR(20) NOT NULL DEFAULT 'normal',weight DECIMAL(7,2) NOT NULL DEFAULT 100.00,status VARCHAR(30) NOT NULL DEFAULT 'draft',progress_score DECIMAL(7,2) NOT NULL DEFAULT 0.00,health_status VARCHAR(20) NOT NULL DEFAULT 'on_track',start_date DATE NOT NULL,due_date DATE NOT NULL,created_by INT UNSIGNED NOT NULL,approved_by INT UNSIGNED NULL,approved_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_okr_objective_cycle_status(cycle_id,status,due_date),INDEX idx_okr_objective_owner(owner_user_id,status,due_date),INDEX idx_okr_objective_scope(org_unit_id,sales_line,status),INDEX idx_okr_objective_parent(parent_objective_id),CONSTRAINT fk_okr_objective_cycle FOREIGN KEY(cycle_id) REFERENCES okr_cycles(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_objective_parent FOREIGN KEY(parent_objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_objective_owner FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_objective_unit FOREIGN KEY(org_unit_id) REFERENCES org_units(id) ON DELETE SET NULL,CONSTRAINT fk_okr_objective_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_objective_approver FOREIGN KEY(approved_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_key_results (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,objective_id BIGINT UNSIGNED NOT NULL,title VARCHAR(255) NOT NULL,metric_type VARCHAR(30) NOT NULL DEFAULT 'number',baseline_value DECIMAL(20,4) NOT NULL DEFAULT 0,target_value DECIMAL(20,4) NOT NULL DEFAULT 0,current_value DECIMAL(20,4) NOT NULL DEFAULT 0,unit VARCHAR(40) NOT NULL DEFAULT 'count',direction VARCHAR(20) NOT NULL DEFAULT 'increase',weight DECIMAL(7,2) NOT NULL DEFAULT 0,data_source_type VARCHAR(30) NOT NULL DEFAULT 'manual',data_source_config_json LONGTEXT NULL,calculation_formula TEXT NULL,owner_user_id INT UNSIGNED NOT NULL,status VARCHAR(20) NOT NULL DEFAULT 'active',health_status VARCHAR(20) NOT NULL DEFAULT 'on_track',progress_percent DECIMAL(7,2) NOT NULL DEFAULT 0.00,due_date DATE NOT NULL,last_checkin_at DATETIME NULL,last_calculated_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_okr_kr_objective(objective_id,status,due_date),INDEX idx_okr_kr_owner(owner_user_id,status,due_date),CONSTRAINT fk_okr_kr_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_kr_owner FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_alignments (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,child_objective_id BIGINT UNSIGNED NOT NULL,parent_objective_id BIGINT UNSIGNED NOT NULL,alignment_type VARCHAR(30) NOT NULL DEFAULT 'contributes',contribution_weight DECIMAL(7,2) NOT NULL DEFAULT 100.00,note VARCHAR(500) NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_by INT UNSIGNED NOT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_okr_alignment_pair(child_objective_id,parent_objective_id),INDEX idx_okr_alignment_parent(parent_objective_id,active),INDEX idx_okr_alignment_child(child_objective_id,active),CONSTRAINT fk_okr_alignment_child FOREIGN KEY(child_objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_alignment_parent FOREIGN KEY(parent_objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_alignment_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_approvals (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,objective_id BIGINT UNSIGNED NOT NULL,requested_by INT UNSIGNED NOT NULL,approver_user_id INT UNSIGNED NULL,decision VARCHAR(20) NOT NULL DEFAULT 'pending',note TEXT NULL,decided_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_okr_approval_objective(objective_id,decision,created_at),INDEX idx_okr_approval_approver(approver_user_id,decision),CONSTRAINT fk_okr_approval_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_approval_requester FOREIGN KEY(requested_by) REFERENCES users(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_approval_approver FOREIGN KEY(approver_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_checkins (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,objective_id BIGINT UNSIGNED NOT NULL,key_result_id BIGINT UNSIGNED NOT NULL,current_value DECIMAL(20,4) NOT NULL,progress_percent DECIMAL(7,2) NOT NULL,confidence_level VARCHAR(20) NOT NULL DEFAULT 'medium',health_status VARCHAR(20) NOT NULL DEFAULT 'on_track',blocker_text TEXT NULL,next_action TEXT NULL,note TEXT NULL,created_by INT UNSIGNED NOT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_okr_checkin_kr(key_result_id,created_at),INDEX idx_okr_checkin_objective(objective_id,created_at),INDEX idx_okr_checkin_creator(created_by,created_at),CONSTRAINT fk_okr_checkin_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_checkin_kr FOREIGN KEY(key_result_id) REFERENCES okr_key_results(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_checkin_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_initiatives (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,objective_id BIGINT UNSIGNED NOT NULL,key_result_id BIGINT UNSIGNED NULL,owner_user_id INT UNSIGNED NOT NULL,title VARCHAR(255) NOT NULL,description TEXT NULL,priority VARCHAR(20) NOT NULL DEFAULT 'normal',status VARCHAR(20) NOT NULL DEFAULT 'open',start_date DATE NOT NULL,due_date DATE NOT NULL,planner_task_id BIGINT UNSIGNED NULL,created_by INT UNSIGNED NOT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_okr_initiative_objective(objective_id,status,due_date),INDEX idx_okr_initiative_owner(owner_user_id,status,due_date),INDEX idx_okr_initiative_task(planner_task_id),CONSTRAINT fk_okr_initiative_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_initiative_kr FOREIGN KEY(key_result_id) REFERENCES okr_key_results(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_initiative_owner FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_initiative_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_task_links (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,objective_id BIGINT UNSIGNED NOT NULL,key_result_id BIGINT UNSIGNED NULL,initiative_id BIGINT UNSIGNED NULL,planner_task_id BIGINT UNSIGNED NOT NULL,created_by INT UNSIGNED NOT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_okr_task_link(planner_task_id),INDEX idx_okr_task_objective(objective_id,created_at),CONSTRAINT fk_okr_task_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_task_kr FOREIGN KEY(key_result_id) REFERENCES okr_key_results(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_task_initiative FOREIGN KEY(initiative_id) REFERENCES okr_initiatives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_task_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_evidence (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,objective_id BIGINT UNSIGNED NOT NULL,key_result_id BIGINT UNSIGNED NULL,checkin_id BIGINT UNSIGNED NULL,original_name VARCHAR(255) NOT NULL,stored_name VARCHAR(255) NOT NULL,mime_type VARCHAR(120) NOT NULL,file_size BIGINT UNSIGNED NOT NULL DEFAULT 0,uploaded_by INT UNSIGNED NOT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_okr_evidence_objective(objective_id,created_at),INDEX idx_okr_evidence_checkin(checkin_id),CONSTRAINT fk_okr_evidence_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_evidence_kr FOREIGN KEY(key_result_id) REFERENCES okr_key_results(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_evidence_checkin FOREIGN KEY(checkin_id) REFERENCES okr_checkins(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_evidence_uploader FOREIGN KEY(uploaded_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_score_history (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,objective_id BIGINT UNSIGNED NOT NULL,score_percent DECIMAL(7,2) NOT NULL,health_status VARCHAR(20) NOT NULL,source VARCHAR(30) NOT NULL DEFAULT 'checkin',recorded_by INT UNSIGNED NULL,recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_okr_score_objective(objective_id,recorded_at),CONSTRAINT fk_okr_score_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_score_recorder FOREIGN KEY(recorded_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_audit_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,objective_id BIGINT UNSIGNED NULL,key_result_id BIGINT UNSIGNED NULL,actor_user_id INT UNSIGNED NULL,action VARCHAR(60) NOT NULL,old_value_json LONGTEXT NULL,new_value_json LONGTEXT NULL,note VARCHAR(500) NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_okr_audit_objective(objective_id,created_at),INDEX idx_okr_audit_kr(key_result_id,created_at),INDEX idx_okr_audit_actor(actor_user_id,created_at),CONSTRAINT fk_okr_audit_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_audit_kr FOREIGN KEY(key_result_id) REFERENCES okr_key_results(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_audit_actor FOREIGN KEY(actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_reminder_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,objective_id BIGINT UNSIGNED NOT NULL,key_result_id BIGINT UNSIGNED NULL,recipient_user_id INT UNSIGNED NOT NULL,reminder_type VARCHAR(40) NOT NULL,reminder_key VARCHAR(80) NOT NULL,notification_id BIGINT UNSIGNED NULL,sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_okr_reminder_once(objective_id,recipient_user_id,reminder_type,reminder_key),INDEX idx_okr_reminder_recipient(recipient_user_id,sent_at),INDEX idx_okr_reminder_objective(objective_id,sent_at),CONSTRAINT fk_okr_reminder_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_reminder_kr FOREIGN KEY(key_result_id) REFERENCES okr_key_results(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_reminder_recipient FOREIGN KEY(recipient_user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_decision_links (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,decision_id BIGINT UNSIGNED NOT NULL,objective_id BIGINT UNSIGNED NOT NULL,key_result_id BIGINT UNSIGNED NULL,initiative_id BIGINT UNSIGNED NULL,planner_task_id BIGINT UNSIGNED NULL,link_note VARCHAR(500) NULL,created_by INT UNSIGNED NOT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_okr_decision_link(decision_id,objective_id,key_result_id),INDEX idx_okr_decision_objective(objective_id,created_at),INDEX idx_okr_decision_kr(key_result_id),CONSTRAINT fk_okr_decision_link_decision FOREIGN KEY(decision_id) REFERENCES management_decisions(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_decision_link_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_decision_link_kr FOREIGN KEY(key_result_id) REFERENCES okr_key_results(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_decision_link_initiative FOREIGN KEY(initiative_id) REFERENCES okr_initiatives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_decision_link_task FOREIGN KEY(planner_task_id) REFERENCES work_planner_tasks(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_decision_link_creator FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS okr_ai_analyses (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,objective_id BIGINT UNSIGNED NOT NULL,requested_by INT UNSIGNED NOT NULL,analysis_type VARCHAR(50) NOT NULL,context_summary_json LONGTEXT NULL,result_json LONGTEXT NULL,response_text LONGTEXT NULL,source VARCHAR(30) NOT NULL DEFAULT 'deterministic',status VARCHAR(20) NOT NULL DEFAULT 'success',error_message VARCHAR(500) NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_okr_ai_objective(objective_id,created_at),INDEX idx_okr_ai_requester(requested_by,created_at),CONSTRAINT fk_okr_ai_objective FOREIGN KEY(objective_id) REFERENCES okr_objectives(id) ON DELETE RESTRICT,CONSTRAINT fk_okr_ai_requester FOREIGN KEY(requested_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Universal Action Hub: one organization-wide action path with dynamic Persian fields and legacy adapters.
+CREATE TABLE IF NOT EXISTS action_types (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,code VARCHAR(100) NOT NULL,title VARCHAR(190) NOT NULL,description TEXT NULL,color VARCHAR(20) NOT NULL DEFAULT '#2563eb',icon VARCHAR(80) NULL,active TINYINT(1) NOT NULL DEFAULT 1,requires_approval TINYINT(1) NOT NULL DEFAULT 0,required_fields_csv VARCHAR(500) NULL,sort_order INT NOT NULL DEFAULT 0,created_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+  UNIQUE KEY uq_action_types_code(code),INDEX idx_action_types_active(active,sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS action_templates (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,action_type_id INT UNSIGNED NOT NULL,template_code VARCHAR(100) NOT NULL,title VARCHAR(190) NOT NULL,description TEXT NULL,instructions TEXT NULL,active TINYINT(1) NOT NULL DEFAULT 1,legacy_source_type VARCHAR(60) NULL,legacy_source_id BIGINT UNSIGNED NULL,created_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+  UNIQUE KEY uq_action_templates_code(template_code),UNIQUE KEY uq_action_templates_legacy(legacy_source_type,legacy_source_id),INDEX idx_action_templates_type(action_type_id,active),CONSTRAINT fk_action_templates_type FOREIGN KEY(action_type_id) REFERENCES action_types(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS action_template_fields (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,template_id BIGINT UNSIGNED NOT NULL,field_key VARCHAR(100) NOT NULL,field_label VARCHAR(190) NOT NULL,field_type VARCHAR(50) NOT NULL,help_text TEXT NULL,placeholder VARCHAR(255) NULL,options_json LONGTEXT NULL,data_source VARCHAR(100) NULL,formula_expression TEXT NULL,default_value TEXT NULL,required TINYINT(1) NOT NULL DEFAULT 0,readonly TINYINT(1) NOT NULL DEFAULT 0,active TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+  UNIQUE KEY uq_action_template_field(template_id,field_key),INDEX idx_action_template_fields(template_id,active,sort_order),CONSTRAINT fk_action_template_fields_template FOREIGN KEY(template_id) REFERENCES action_templates(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS actions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,title VARCHAR(190) NOT NULL,description TEXT NULL,action_type_id INT UNSIGNED NOT NULL,template_id BIGINT UNSIGNED NULL,assigned_to INT UNSIGNED NOT NULL,assigned_by INT UNSIGNED NOT NULL,priority VARCHAR(20) NOT NULL DEFAULT 'normal',status VARCHAR(40) NOT NULL DEFAULT 'new',start_date DATE NULL,due_date DATE NULL,source_type VARCHAR(80) NOT NULL DEFAULT 'manual',source_id BIGINT UNSIGNED NULL,planner_task_id BIGINT UNSIGNED NULL,approval_required TINYINT(1) NOT NULL DEFAULT 0,approved_by INT UNSIGNED NULL,approved_at DATETIME NULL,legacy_source_type VARCHAR(60) NULL,legacy_source_id BIGINT UNSIGNED NULL,completed_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+  UNIQUE KEY uq_actions_legacy(legacy_source_type,legacy_source_id),INDEX idx_actions_assigned(assigned_to,status,due_date),INDEX idx_actions_assigner(assigned_by,status,created_at),INDEX idx_actions_type(action_type_id,status),INDEX idx_actions_source(source_type,source_id),INDEX idx_actions_due(status,due_date),CONSTRAINT fk_actions_type FOREIGN KEY(action_type_id) REFERENCES action_types(id) ON DELETE RESTRICT,CONSTRAINT fk_actions_template FOREIGN KEY(template_id) REFERENCES action_templates(id) ON DELETE SET NULL,CONSTRAINT fk_actions_assigned_to FOREIGN KEY(assigned_to) REFERENCES users(id) ON DELETE RESTRICT,CONSTRAINT fk_actions_assigned_by FOREIGN KEY(assigned_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS action_field_values (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,action_id BIGINT UNSIGNED NOT NULL,field_id BIGINT UNSIGNED NULL,field_key VARCHAR(100) NOT NULL,field_label VARCHAR(190) NULL,field_type VARCHAR(50) NOT NULL,value_text LONGTEXT NULL,value_number DECIMAL(20,4) NULL,value_date DATE NULL,value_datetime DATETIME NULL,value_json LONGTEXT NULL,file_path VARCHAR(500) NULL,file_name VARCHAR(255) NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+  UNIQUE KEY uq_action_field_value(action_id,field_key),INDEX idx_action_field_values_action(action_id),CONSTRAINT fk_action_field_values_action FOREIGN KEY(action_id) REFERENCES actions(id) ON DELETE CASCADE,CONSTRAINT fk_action_field_values_field FOREIGN KEY(field_id) REFERENCES action_template_fields(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS action_links (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,action_id BIGINT UNSIGNED NOT NULL,link_type VARCHAR(60) NOT NULL,linked_type VARCHAR(80) NULL,linked_id BIGINT UNSIGNED NULL,link_url VARCHAR(500) NULL,label VARCHAR(190) NULL,created_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_action_link(action_id,link_type,linked_type,linked_id),INDEX idx_action_links_target(linked_type,linked_id),CONSTRAINT fk_action_links_action FOREIGN KEY(action_id) REFERENCES actions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS action_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,action_id BIGINT UNSIGNED NOT NULL,action_key VARCHAR(60) NOT NULL,old_status VARCHAR(40) NULL,new_status VARCHAR(40) NULL,note TEXT NULL,old_value_json LONGTEXT NULL,new_value_json LONGTEXT NULL,performed_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_action_logs_action(action_id,created_at),INDEX idx_action_logs_actor(performed_by,created_at),CONSTRAINT fk_action_logs_action FOREIGN KEY(action_id) REFERENCES actions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Generic Daily Work Report: scoped templates, controlled data sources and report-to-action links.
+CREATE TABLE IF NOT EXISTS daily_report_templates (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,template_code VARCHAR(100) NOT NULL,title VARCHAR(190) NOT NULL,description TEXT NULL,version_no INT UNSIGNED NOT NULL DEFAULT 1,active TINYINT(1) NOT NULL DEFAULT 1,created_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+  UNIQUE KEY uq_daily_report_template_code(template_code),INDEX idx_daily_report_templates_active(active,title)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS daily_report_template_fields (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,template_id BIGINT UNSIGNED NOT NULL,field_key VARCHAR(100) NOT NULL,field_label VARCHAR(190) NOT NULL,input_type VARCHAR(40) NOT NULL DEFAULT 'long_text',source_type VARCHAR(40) NOT NULL DEFAULT 'manual',source_key VARCHAR(100) NULL,aggregation_key VARCHAR(30) NULL,formula_expression TEXT NULL,help_text TEXT NULL,placeholder VARCHAR(255) NULL,options_json LONGTEXT NULL,required TINYINT(1) NOT NULL DEFAULT 0,readonly TINYINT(1) NOT NULL DEFAULT 0,active TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+  UNIQUE KEY uq_daily_report_template_field(template_id,field_key),INDEX idx_daily_report_fields(template_id,active,sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS daily_report_template_assignments (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,template_id BIGINT UNSIGNED NOT NULL,scope_type VARCHAR(40) NOT NULL,scope_id BIGINT UNSIGNED NOT NULL DEFAULT 0,scope_key VARCHAR(150) NOT NULL DEFAULT '',active TINYINT(1) NOT NULL DEFAULT 1,created_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+  UNIQUE KEY uq_daily_report_assignment(template_id,scope_type,scope_id,scope_key),INDEX idx_daily_report_assignment_scope(scope_type,scope_id,scope_key,active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS daily_reports (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,template_id BIGINT UNSIGNED NOT NULL,template_version_no INT UNSIGNED NOT NULL DEFAULT 1,user_id INT UNSIGNED NOT NULL,report_date DATE NOT NULL,status VARCHAR(30) NOT NULL DEFAULT 'draft',submitted_at DATETIME NULL,created_by INT UNSIGNED NOT NULL,legacy_source_type VARCHAR(60) NULL,legacy_source_id BIGINT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+  UNIQUE KEY uq_daily_report_user_date_template(user_id,report_date,template_id),UNIQUE KEY uq_daily_report_legacy(legacy_source_type,legacy_source_id),INDEX idx_daily_reports_user(user_id,report_date,status),INDEX idx_daily_reports_date(report_date,status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS daily_report_values (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,report_id BIGINT UNSIGNED NOT NULL,field_id BIGINT UNSIGNED NULL,field_key VARCHAR(100) NOT NULL,field_label VARCHAR(190) NOT NULL,source_type VARCHAR(40) NOT NULL DEFAULT 'manual',value_text LONGTEXT NULL,value_number DECIMAL(20,4) NULL,value_date DATE NULL,display_text LONGTEXT NULL,readonly TINYINT(1) NOT NULL DEFAULT 0,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NULL,
+  UNIQUE KEY uq_daily_report_value(report_id,field_key),INDEX idx_daily_report_values(report_id,source_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS daily_report_links (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,report_id BIGINT UNSIGNED NOT NULL,field_id BIGINT UNSIGNED NULL,link_type VARCHAR(40) NOT NULL,linked_type VARCHAR(80) NOT NULL,linked_id BIGINT UNSIGNED NOT NULL,link_url VARCHAR(500) NULL,label VARCHAR(190) NULL,snapshot_text TEXT NULL,created_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_daily_report_link(report_id,link_type,linked_type,linked_id),INDEX idx_daily_report_links_target(linked_type,linked_id),INDEX idx_daily_report_links_report(report_id,field_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS daily_report_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,report_id BIGINT UNSIGNED NOT NULL,action_key VARCHAR(60) NOT NULL,note TEXT NULL,performed_by INT UNSIGNED NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_daily_report_logs(report_id,created_at),INDEX idx_daily_report_logs_actor(performed_by,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Canonical reporting contract. Imported sources are limited to active committed batches by the underlying active views.
+CREATE OR REPLACE VIEW vw_sales_active AS
+SELECT s.*,visitor.id visitor_user_id,supervisor.id supervisor_user_id,manager.id manager_user_id
+FROM vw_active_sales_aggregate_rows s
+LEFT JOIN users visitor ON visitor.status='active' AND (visitor.employee_no=s.visitor_code OR visitor.kara_system_code=s.visitor_code)
+LEFT JOIN users supervisor ON supervisor.status='active' AND (supervisor.employee_no=s.supervisor_code OR supervisor.kara_system_code=s.supervisor_code)
+LEFT JOIN users manager ON manager.status='active' AND (manager.employee_no=s.sales_manager_code OR manager.kara_system_code=s.sales_manager_code);
+
+CREATE OR REPLACE VIEW vw_sales_by_period AS
+SELECT COALESCE(NULLIF(period_key,''),DATE_FORMAT(invoice_date,'%Y-%m')) period_key,MIN(invoice_date) period_start,MAX(invoice_date) period_end,
+visitor_user_id,supervisor_user_id,manager_user_id,visitor_code,visitor_name,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name,
+COUNT(DISTINCT CONCAT_WS(':',import_batch_id,invoice_number)) invoice_count,SUM(COALESCE(total_qty,quantity,0)) gross_quantity,SUM(COALESCE(return_quantity,0)) return_quantity,
+SUM(COALESCE(total_qty,quantity,0)-COALESCE(return_quantity,0)) net_quantity,SUM(COALESCE(gross_amount,0)) gross_amount,
+SUM(COALESCE(discount_total,discount_amount,0)) discount_amount,SUM(COALESCE(return_amount,0)) return_amount,SUM(COALESCE(net_amount,0)-COALESCE(return_amount,0)) net_sales_amount
+FROM vw_sales_active GROUP BY period_key,visitor_user_id,supervisor_user_id,manager_user_id,visitor_code,visitor_name,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name;
+
+CREATE OR REPLACE VIEW vw_sales_by_visitor AS
+SELECT visitor_user_id,supervisor_user_id,manager_user_id,visitor_code,visitor_name,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name,
+COUNT(DISTINCT CONCAT_WS(':',import_batch_id,invoice_number)) invoice_count,SUM(COALESCE(total_qty,quantity,0)) gross_quantity,SUM(COALESCE(return_quantity,0)) return_quantity,
+SUM(COALESCE(total_qty,quantity,0)-COALESCE(return_quantity,0)) net_quantity,SUM(COALESCE(gross_amount,0)) gross_amount,
+SUM(COALESCE(discount_total,discount_amount,0)) discount_amount,SUM(COALESCE(return_amount,0)) return_amount,SUM(COALESCE(net_amount,0)-COALESCE(return_amount,0)) net_sales_amount
+FROM vw_sales_active GROUP BY visitor_user_id,supervisor_user_id,manager_user_id,visitor_code,visitor_name,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name;
+
+CREATE OR REPLACE VIEW vw_sales_by_supervisor AS
+SELECT supervisor_user_id,manager_user_id,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name,
+COUNT(DISTINCT CONCAT_WS(':',import_batch_id,invoice_number)) invoice_count,SUM(COALESCE(total_qty,quantity,0)-COALESCE(return_quantity,0)) net_quantity,
+SUM(COALESCE(gross_amount,0)) gross_amount,SUM(COALESCE(discount_total,discount_amount,0)) discount_amount,
+SUM(COALESCE(return_amount,0)) return_amount,SUM(COALESCE(net_amount,0)-COALESCE(return_amount,0)) net_sales_amount
+FROM vw_sales_active GROUP BY supervisor_user_id,manager_user_id,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name;
+
+CREATE OR REPLACE VIEW vw_sales_by_manager AS
+SELECT manager_user_id,sales_manager_code,sales_manager_name,line_code,line_name,
+COUNT(DISTINCT CONCAT_WS(':',import_batch_id,invoice_number)) invoice_count,SUM(COALESCE(total_qty,quantity,0)-COALESCE(return_quantity,0)) net_quantity,
+SUM(COALESCE(gross_amount,0)) gross_amount,SUM(COALESCE(discount_total,discount_amount,0)) discount_amount,
+SUM(COALESCE(return_amount,0)) return_amount,SUM(COALESCE(net_amount,0)-COALESCE(return_amount,0)) net_sales_amount
+FROM vw_sales_active GROUP BY manager_user_id,sales_manager_code,sales_manager_name,line_code,line_name;
+
+CREATE OR REPLACE VIEW vw_sales_by_line AS
+SELECT line_code,line_name,COUNT(DISTINCT CONCAT_WS(':',import_batch_id,invoice_number)) invoice_count,
+SUM(COALESCE(total_qty,quantity,0)-COALESCE(return_quantity,0)) net_quantity,SUM(COALESCE(gross_amount,0)) gross_amount,
+SUM(COALESCE(discount_total,discount_amount,0)) discount_amount,SUM(COALESCE(return_amount,0)) return_amount,
+SUM(COALESCE(net_amount,0)-COALESCE(return_amount,0)) net_sales_amount FROM vw_sales_active GROUP BY line_code,line_name;
+
+CREATE OR REPLACE VIEW vw_sales_by_customer AS
+SELECT visitor_user_id,supervisor_user_id,manager_user_id,visitor_code,visitor_name,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name,
+customer_code,customer_name,MAX(customer_guild_code) customer_guild_code,MAX(customer_guild_name) customer_guild_name,
+COUNT(DISTINCT CONCAT_WS(':',import_batch_id,invoice_number)) invoice_count,SUM(COALESCE(total_qty,quantity,0)-COALESCE(return_quantity,0)) net_quantity,
+SUM(COALESCE(net_amount,0)-COALESCE(return_amount,0)) net_sales_amount FROM vw_sales_active
+GROUP BY visitor_user_id,supervisor_user_id,manager_user_id,visitor_code,visitor_name,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name,customer_code,customer_name;
+
+CREATE OR REPLACE VIEW vw_sales_by_product AS
+SELECT visitor_user_id,supervisor_user_id,manager_user_id,visitor_code,visitor_name,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name,
+product_code,product_name,brand_code,brand_name,COUNT(DISTINCT CONCAT_WS(':',import_batch_id,invoice_number)) invoice_count,
+SUM(COALESCE(total_qty,quantity,0)-COALESCE(return_quantity,0)) net_quantity,SUM(COALESCE(net_amount,0)-COALESCE(return_amount,0)) net_sales_amount
+FROM vw_sales_active GROUP BY visitor_user_id,supervisor_user_id,manager_user_id,visitor_code,visitor_name,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name,product_code,product_name,brand_code,brand_name;
+
+CREATE OR REPLACE VIEW vw_sales_by_brand AS
+SELECT visitor_user_id,supervisor_user_id,manager_user_id,visitor_code,visitor_name,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name,
+brand_code,brand_name,COUNT(DISTINCT product_code) product_count,COUNT(DISTINCT CONCAT_WS(':',import_batch_id,invoice_number)) invoice_count,
+SUM(COALESCE(total_qty,quantity,0)-COALESCE(return_quantity,0)) net_quantity,SUM(COALESCE(net_amount,0)-COALESCE(return_amount,0)) net_sales_amount
+FROM vw_sales_active GROUP BY visitor_user_id,supervisor_user_id,manager_user_id,visitor_code,visitor_name,supervisor_code,supervisor_name,sales_manager_code,sales_manager_name,line_code,line_name,brand_code,brand_name;
+
+CREATE OR REPLACE VIEW vw_purchase_active AS SELECT * FROM vw_active_purchase_aggregate_rows;
+CREATE OR REPLACE VIEW vw_purchase_by_supplier AS
+SELECT supplier_code,supplier_name,line_code,line_name,COUNT(DISTINCT CONCAT_WS(':',import_batch_id,invoice_number)) invoice_count,
+COUNT(DISTINCT product_code) product_count,SUM(quantity) quantity,SUM(gross_amount) gross_amount,SUM(discount_amount) discount_amount,SUM(net_amount) net_amount
+FROM vw_active_purchase_aggregate_rows GROUP BY supplier_code,supplier_name,line_code,line_name;
+CREATE OR REPLACE VIEW vw_inventory_current AS SELECT * FROM vw_active_inventory_aggregate_rows;
+CREATE OR REPLACE VIEW vw_inventory_by_product AS
+SELECT product_code,product_name,brand_name,group_code,group_name,MAX(snapshot_date) snapshot_date,
+SUM(COALESCE(current_total_stock,period_total_stock)) stock_quantity,SUM(stock_value_by_last_cost) stock_value_by_last_cost,
+SUM(stock_value_by_sale_price_1) stock_value_by_sale_price FROM vw_active_inventory_aggregate_rows
+GROUP BY product_code,product_name,brand_name,group_code,group_name;
+CREATE OR REPLACE VIEW vw_target_achievement AS SELECT * FROM vw_sales_target_achievement;
+CREATE OR REPLACE VIEW vw_target_by_visitor AS SELECT * FROM vw_sales_target_visitor_totals;
+CREATE OR REPLACE VIEW vw_target_by_line AS SELECT * FROM vw_sales_target_line_totals;
+CREATE OR REPLACE VIEW vw_commission_inputs AS
+SELECT a.*,p.priority_code,p.priority_rank,CASE WHEN COALESCE(a.target_amount,0)>0 THEN ROUND((a.achievement_amount/a.target_amount)*100,4) ELSE 0 END achievement_percent
+FROM vw_sales_target_achievement a LEFT JOIN vw_active_product_priorities p ON p.period_id=a.period_id AND p.product_code=a.product_code;
+CREATE OR REPLACE VIEW vw_attendance_period_summary AS
+SELECT e.employee_id,YEAR(e.attendance_date) year,MONTH(e.attendance_date) month,MIN(e.attendance_date) period_start,MAX(e.attendance_date) period_end,
+SUM(e.work_minutes) work_minutes,SUM(e.late_minutes) late_minutes,SUM(e.early_leave_minutes) early_leave_minutes,
+SUM(CASE WHEN e.overtime_status='approved' THEN e.normal_overtime_minutes ELSE 0 END) normal_overtime_minutes,
+SUM(CASE WHEN e.overtime_status='approved' THEN e.holiday_overtime_minutes ELSE 0 END) holiday_overtime_minutes,
+SUM(e.day_status='absent') absent_days,SUM(e.day_status='leave') leave_days,SUM(e.day_status='mission') mission_days,
+SUM(e.day_status IN ('present','half_day','holiday_work')) present_days FROM hr_attendance_entries e
+LEFT JOIN sales_import_batches b ON b.id=e.import_batch_id
+WHERE e.import_batch_id IS NULL OR (b.source_module='attendance' AND b.is_active_reference=1 AND b.status='committed')
+GROUP BY e.employee_id,YEAR(e.attendance_date),MONTH(e.attendance_date);
+CREATE OR REPLACE VIEW vw_action_workload AS
+SELECT assigned_to user_id,status,priority,COUNT(*) action_count,SUM(due_date<CURDATE() AND status NOT IN ('done','cancelled')) overdue_count,
+MIN(due_date) nearest_due_date,MAX(updated_at) last_activity_at FROM actions GROUP BY assigned_to,status,priority;
+CREATE OR REPLACE VIEW vw_daily_report_completion AS
+SELECT user_id,report_date,status,COUNT(*) report_count,SUM(status IN ('submitted','approved')) completed_count,MAX(submitted_at) last_submitted_at
+FROM daily_reports GROUP BY user_id,report_date,status;

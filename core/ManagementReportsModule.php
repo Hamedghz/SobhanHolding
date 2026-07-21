@@ -14,6 +14,7 @@ class ManagementReportsModule
                 report_type VARCHAR(40) NOT NULL,
                 title VARCHAR(190) NOT NULL,
                 description TEXT NULL,
+                version_no INT UNSIGNED NOT NULL DEFAULT 1,
                 active TINYINT(1) NOT NULL DEFAULT 1,
                 created_by INT UNSIGNED NULL,
                 updated_by INT UNSIGNED NULL,
@@ -43,7 +44,7 @@ class ManagementReportsModule
                 section_id INT UNSIGNED NOT NULL,
                 field_key VARCHAR(100) NOT NULL,
                 label VARCHAR(190) NOT NULL,
-                field_type ENUM('text','textarea','number','currency','percent','date','select','checkbox','table','repeater','file','readonly_metric') NOT NULL DEFAULT 'text',
+                field_type VARCHAR(40) NOT NULL DEFAULT 'text',
                 placeholder VARCHAR(255) NULL,
                 help_text TEXT NULL,
                 options_json LONGTEXT NULL,
@@ -70,6 +71,8 @@ class ManagementReportsModule
                 period_end DATE NULL,
                 submitter_id INT UNSIGNED NOT NULL,
                 unit_id INT UNSIGNED NULL,
+                template_version_no INT UNSIGNED NOT NULL DEFAULT 1,
+                schema_snapshot_json LONGTEXT NULL,
                 status ENUM('draft','submitted','returned','approved','archived') NOT NULL DEFAULT 'draft',
                 submitted_at DATETIME NULL,
                 returned_at DATETIME NULL,
@@ -132,11 +135,48 @@ class ManagementReportsModule
                 CONSTRAINT fk_management_report_reviews_submission FOREIGN KEY(submission_id) REFERENCES management_report_submissions(id) ON DELETE CASCADE,
                 CONSTRAINT fk_management_report_reviews_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
             ){$engine}",
+            "CREATE TABLE IF NOT EXISTS management_report_links (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                submission_id BIGINT UNSIGNED NOT NULL,
+                field_id INT UNSIGNED NULL,
+                link_type VARCHAR(40) NOT NULL,
+                linked_type VARCHAR(80) NOT NULL,
+                linked_id BIGINT UNSIGNED NOT NULL,
+                link_url VARCHAR(500) NULL,
+                label VARCHAR(255) NULL,
+                created_by INT UNSIGNED NULL,
+                active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NULL,
+                UNIQUE KEY uq_management_report_field_link(submission_id,field_id,link_type),
+                INDEX idx_management_report_links_target(linked_type,linked_id),
+                CONSTRAINT fk_management_report_links_submission FOREIGN KEY(submission_id) REFERENCES management_report_submissions(id) ON DELETE CASCADE,
+                CONSTRAINT fk_management_report_links_field FOREIGN KEY(field_id) REFERENCES management_report_fields(id) ON DELETE SET NULL,
+                CONSTRAINT fk_management_report_links_user FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+            ){$engine}",
         ];
         foreach ($schema as $sql) $pdo->exec($sql);
 
-        if (Database::tableExists('management_report_fields') && !Database::columnExists('management_report_fields', 'linked_source_key')) {
+        if (self::tableExists($pdo, 'management_report_fields') && !self::columnExists($pdo, 'management_report_fields', 'linked_source_key')) {
             $pdo->exec('ALTER TABLE management_report_fields ADD linked_source_key VARCHAR(190) NULL AFTER default_value');
+        }
+        if (self::tableExists($pdo, 'management_report_templates') && !self::columnExists($pdo, 'management_report_templates', 'version_no')) {
+            $pdo->exec('ALTER TABLE management_report_templates ADD version_no INT UNSIGNED NOT NULL DEFAULT 1 AFTER description');
+        }
+        if (self::tableExists($pdo, 'management_report_submissions') && !self::columnExists($pdo, 'management_report_submissions', 'template_version_no')) {
+            $pdo->exec('ALTER TABLE management_report_submissions ADD template_version_no INT UNSIGNED NOT NULL DEFAULT 1 AFTER unit_id');
+        }
+        if (self::tableExists($pdo, 'management_report_submissions') && !self::columnExists($pdo, 'management_report_submissions', 'schema_snapshot_json')) {
+            $pdo->exec('ALTER TABLE management_report_submissions ADD schema_snapshot_json LONGTEXT NULL AFTER template_version_no');
+        }
+        if (self::tableExists($pdo, 'management_report_links') && !self::columnExists($pdo, 'management_report_links', 'active')) {
+            $pdo->exec('ALTER TABLE management_report_links ADD active TINYINT(1) NOT NULL DEFAULT 1 AFTER created_by');
+        }
+        if (self::tableExists($pdo, 'management_report_fields')) {
+            $column = $pdo->query("SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='management_report_fields' AND COLUMN_NAME='field_type'")->fetchColumn();
+            if (strtolower((string)$column) !== 'varchar') {
+                $pdo->exec("ALTER TABLE management_report_fields MODIFY field_type VARCHAR(40) NOT NULL DEFAULT 'text'");
+            }
         }
 
         $modules = [
@@ -151,7 +191,9 @@ class ManagementReportsModule
         $moduleStmt = $pdo->prepare("INSERT INTO modules(module_key,module_title,sort_order,status,created_at) VALUES(?,?,68,'active',NOW()) ON DUPLICATE KEY UPDATE module_title=VALUES(module_title)");
         foreach ($modules as $module) $moduleStmt->execute($module);
 
+        self::backfillSubmissionSnapshots($pdo);
         self::seedTemplates($pdo);
+        self::upgradeActionFields($pdo);
     }
 
     private static function seedTemplates(PDO $pdo): void
@@ -190,24 +232,80 @@ class ManagementReportsModule
             $sectionStmt->execute([$templateId,$section[0],$section[1],($index+1)*10]);
             $find = $pdo->prepare('SELECT id FROM management_report_sections WHERE template_id=? AND section_key=?');$find->execute([$templateId,$section[0]]);$sectionId=(int)$find->fetchColumn();
             if (!$sectionId) continue;
-            $fieldStmt->execute([$sectionId,$section[0].'_summary','شرح و تحلیل','textarea','تحلیل این بخش را بنویسید.','این فیلد در تنظیمات قالب قابل تغییر است.',null,null,1,10]);
-            $fieldStmt->execute([$sectionId,$section[0].'_actions','اقدامات و پیشنهادها','repeater',null,'برای هر اقدام یک ردیف اضافه کنید.',json_encode(['columns'=>[['key'=>'action','label'=>'اقدام'],['key'=>'owner','label'=>'مسئول'],['key'=>'due','label'=>'مهلت']]],JSON_UNESCAPED_UNICODE),null,0,20]);
+            $fieldStmt->execute([$sectionId,$section[0].'_summary','شرح و تحلیل','editable','تحلیل این بخش را بنویسید.','این فیلد در تنظیمات قالب قابل تغییر است.',null,null,1,10]);
+            $fieldStmt->execute([$sectionId,$section[0].'_actions','اقدامات','action_selector',null,'اقدام مرتبط را از مرکز اقدام انتخاب کنید.',null,'action_hub',0,20]);
+            $fieldStmt->execute([$sectionId,$section[0].'_suggestions','پیشنهادات','editable','پیشنهاد اجرایی را بنویسید.','پس از ذخیره پیش‌نویس می‌توانید پیشنهاد را به اقدام تبدیل کنید.',null,null,0,30]);
         }
         if ($sales) {
             $first=(int)$pdo->query("SELECT id FROM management_report_sections WHERE template_id={$templateId} ORDER BY sort_order,id LIMIT 1")->fetchColumn();
             if($first){
                 $fieldStmt->execute([$first,'sales_gross_amount','فروش ناخالص','readonly_metric',null,'آماده اتصال به منبع داده فروش.',null,'sales_gross_amount',0,1]);
                 $fieldStmt->execute([$first,'sales_net_amount','فروش خالص','readonly_metric',null,'آماده اتصال به منبع داده فروش.',null,'sales_net_amount',0,2]);
-                $fieldStmt->execute([$first,'target_achievement_percent','درصد تحقق تارگت','percent','برای مثال ۸۵',null,null,'target_achievement_percent',0,3]);
+                $fieldStmt->execute([$first,'target_achievement_percent','درصد تحقق تارگت','percentage','برای مثال ۸۵',null,null,'target_achievement_percent',0,3]);
             }
         } else {
             $first=(int)$pdo->query("SELECT id FROM management_report_sections WHERE template_id={$templateId} ORDER BY sort_order,id LIMIT 1")->fetchColumn();
             $metrics=[
-                'finance'=>[['finance_receivables_amount','مبلغ مطالبات','currency']],
-                'warehouse'=>[['inventory_accuracy','دقت موجودی','percent'],['warehouse_damage_rate','نرخ آسیب انبار','percent']],
+                'finance'=>[['finance_receivables_amount','مبلغ مطالبات','amount']],
+                'warehouse'=>[['inventory_accuracy','دقت موجودی','percentage'],['warehouse_damage_rate','نرخ آسیب انبار','percentage']],
                 'technology'=>[['it_backup_status','وضعیت پشتیبان‌گیری فناوری','text']],
             ];
             foreach($metrics[$type]??[] as $index=>$metric)if($first)$fieldStmt->execute([$first,$metric[0],$metric[1],'readonly_metric',null,'آماده اتصال به منبع داده سیستمی.',null,$metric[0],0,$index+1]);
         }
+    }
+
+    private static function backfillSubmissionSnapshots(PDO $pdo): void
+    {
+        if (!self::tableExists($pdo, 'management_report_submissions')) return;
+        $rows = $pdo->query('SELECT id,template_id FROM management_report_submissions WHERE schema_snapshot_json IS NULL OR schema_snapshot_json=""')->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) return;
+        $templateStmt = $pdo->prepare('SELECT * FROM management_report_templates WHERE id=?');
+        $sectionStmt = $pdo->prepare('SELECT * FROM management_report_sections WHERE template_id=? ORDER BY sort_order,id');
+        $fieldStmt = $pdo->prepare('SELECT * FROM management_report_fields WHERE section_id=? ORDER BY sort_order,id');
+        $update = $pdo->prepare('UPDATE management_report_submissions SET template_version_no=?,schema_snapshot_json=? WHERE id=?');
+        foreach ($rows as $row) {
+            $templateStmt->execute([(int)$row['template_id']]);
+            $template = $templateStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$template) continue;
+            $sectionStmt->execute([(int)$template['id']]);
+            $sections = $sectionStmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($sections as &$section) {
+                $fieldStmt->execute([(int)$section['id']]);
+                $section['fields'] = $fieldStmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+            unset($section);
+            $template['sections'] = $sections;
+            $snapshot = json_encode($template, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+            if ($snapshot !== false) $update->execute([(int)($template['version_no'] ?? 1),$snapshot,(int)$row['id']]);
+        }
+    }
+
+    private static function upgradeActionFields(PDO $pdo): void
+    {
+        $rows = $pdo->query("SELECT DISTINCT s.template_id
+            FROM management_report_fields f
+            JOIN management_report_sections s ON s.id=f.section_id
+            WHERE RIGHT(f.field_key,8)='_actions' AND f.field_type IN ('table','repeater')")->fetchAll(PDO::FETCH_COLUMN);
+        if (!$rows) return;
+        $pdo->exec("UPDATE management_report_fields f
+            JOIN management_report_sections s ON s.id=f.section_id
+            SET f.field_type='action_selector',f.options_json=NULL,f.linked_source_key='action_hub',f.help_text='اقدام مرتبط را از مرکز اقدام انتخاب کنید.',f.updated_at=NOW()
+            WHERE RIGHT(f.field_key,8)='_actions' AND f.field_type IN ('table','repeater')");
+        $update = $pdo->prepare('UPDATE management_report_templates SET version_no=version_no+1,updated_at=NOW() WHERE id=?');
+        foreach (array_unique(array_map('intval',$rows)) as $templateId) $update->execute([$templateId]);
+    }
+
+    private static function tableExists(PDO $pdo, string $table): bool
+    {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
+        $stmt->execute([$table]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private static function columnExists(PDO $pdo, string $table, string $column): bool
+    {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?');
+        $stmt->execute([$table,$column]);
+        return (int)$stmt->fetchColumn() > 0;
     }
 }

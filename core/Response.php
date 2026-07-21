@@ -14,6 +14,7 @@ function flash(?string $message = null, string $type = 'success'): ?array
 {
     if (session_status() !== PHP_SESSION_ACTIVE) session_start();
     if ($message !== null) {
+        $type = ['error' => 'danger', 'danger' => 'danger', 'warning' => 'warning', 'info' => 'info', 'success' => 'success'][$type] ?? 'info';
         $_SESSION['flash'] = ['message' => $message, 'type' => $type];
         return null;
     }
@@ -319,18 +320,116 @@ function format_percent($value, int $decimals = 0): string
 
 function format_jalali_date(?string $value): string
 {
-    require_once __DIR__ . '/JalaliDate.php';
-    return JalaliDate::toJalali($value);
+    require_once __DIR__ . '/../lib/AppDate.php';
+    return AppDate::formatDate($value);
 }
 
 function format_jalali_datetime(?string $value): string
 {
-    require_once __DIR__ . '/JalaliDate.php';
-    return JalaliDate::toJalaliDateTime($value);
+    require_once __DIR__ . '/../lib/AppDate.php';
+    return AppDate::formatDateTime($value);
 }
 
 function jalali_input_value(?string $value): string
 {
-    require_once __DIR__ . '/JalaliDate.php';
-    return JalaliDate::inputValue($value);
+    require_once __DIR__ . '/../lib/AppDate.php';
+    return AppDate::formatDate($value);
+}
+
+function app_date_to_iso(?string $value): ?string
+{
+    require_once __DIR__ . '/../lib/AppDate.php';
+    return AppDate::toGregorian($value);
+}
+
+function app_datetime_to_iso(?string $value): ?string
+{
+    require_once __DIR__ . '/../lib/AppDate.php';
+    return AppDate::toGregorianDateTime($value);
+}
+
+function app_date_input(string $name, ?string $value = null, array $options = []): string
+{
+    require_once __DIR__ . '/../lib/AppDate.php';
+    $datetime = !empty($options['datetime']);
+    $displayValue = $datetime ? AppDate::formatDateTime($value, !empty($options['seconds'])) : AppDate::formatDate($value);
+    $attributes = [
+        'type' => 'text',
+        'name' => $name,
+        'value' => $displayValue,
+        'data-jalali-date' => '',
+        'class' => trim('jalali-date-input ' . (string)($options['class'] ?? '')),
+        'placeholder' => (string)($options['placeholder'] ?? ($datetime ? '1405/04/25 13:30' : '1405/04/25')),
+    ];
+    foreach (['id', 'min', 'max', 'iso_target', 'disabled_dates'] as $key) {
+        if (!isset($options[$key]) || $options[$key] === '') continue;
+        $attribute = match ($key) {
+            'min' => 'data-jalali-min',
+            'max' => 'data-jalali-max',
+            'iso_target' => 'data-iso-target',
+            'disabled_dates' => 'data-jalali-disabled-dates',
+            default => $key,
+        };
+        $attributes[$attribute] = in_array($key, ['min', 'max'], true)
+            ? AppDate::formatDate((string)$options[$key])
+            : (is_array($options[$key]) ? json_encode($options[$key], JSON_UNESCAPED_UNICODE) : (string)$options[$key]);
+    }
+    if ($datetime) $attributes['data-jalali-datetime'] = '';
+    if (!empty($options['month'])) $attributes['data-jalali-month'] = '';
+    if (!empty($options['range'])) $attributes['data-jalali-mode'] = 'range';
+    if (!empty($options['required'])) $attributes['required'] = '';
+    if (!empty($options['disabled'])) $attributes['disabled'] = '';
+    if (!empty($options['readonly'])) $attributes['readonly'] = '';
+    if (!empty($options['autocomplete'])) $attributes['autocomplete'] = (string)$options['autocomplete'];
+
+    $html = '<input';
+    foreach ($attributes as $attribute => $attributeValue) {
+        $html .= ' ' . $attribute;
+        if ($attributeValue !== '') $html .= '="' . e((string)$attributeValue) . '"';
+    }
+    return $html . '>';
+}
+
+function app_period_select(
+    string $name,
+    ?string $selected = null,
+    array $types = [],
+    array $options = []
+): string {
+    require_once __DIR__ . '/../lib/AppDate.php';
+    try {
+        $periods = AppDate::periods($types, (string)($options['scope'] ?? 'global'));
+    } catch (Throwable $error) {
+        error_log('period selector: ' . $error->getMessage());
+        $periods = [];
+    }
+    $attributes = [
+        'name' => $name,
+        'data-period-selector' => '',
+    ];
+    if (!empty($options['id'])) $attributes['id'] = (string)$options['id'];
+    if (!empty($options['class'])) $attributes['class'] = (string)$options['class'];
+    if (!empty($options['custom_target'])) $attributes['data-custom-period-target'] = (string)$options['custom_target'];
+    if (!empty($options['required'])) $attributes['required'] = '';
+
+    $html = '<select';
+    foreach ($attributes as $attribute => $attributeValue) {
+        $html .= ' ' . $attribute;
+        if ($attributeValue !== '') $html .= '="' . e((string)$attributeValue) . '"';
+    }
+    $html .= '>';
+    if (!empty($options['placeholder'])) $html .= '<option value="">' . e((string)$options['placeholder']) . '</option>';
+    $grouped = [];
+    foreach ($periods as $period) $grouped[$period['period_type']][] = $period;
+    foreach (AppDate::PERIOD_TYPES as $type => $label) {
+        if (empty($grouped[$type])) continue;
+        $html .= '<optgroup label="' . e($label) . '">';
+        foreach ($grouped[$type] as $period) {
+            $isSelected = (string)$selected === (string)$period['period_key'];
+            $html .= '<option value="' . e((string)$period['period_key']) . '"' . ($isSelected ? ' selected' : '') . '>';
+            $html .= e((string)$period['title']) . '</option>';
+        }
+        $html .= '</optgroup>';
+    }
+    return $html . '</select>';
 }

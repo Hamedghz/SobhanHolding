@@ -5,6 +5,8 @@ require_once __DIR__ . '/../core/Response.php';
 require_once __DIR__ . '/../core/JalaliDate.php';
 require_once __DIR__ . '/../core/SobhanApiClient.php';
 require_once __DIR__ . '/../core/CeoDashboardManualMetrics.php';
+require_once __DIR__ . '/../core/SalesReferenceRepository.php';
+require_once __DIR__ . '/../lib/DashboardPreferences.php';
 
 Auth::requireLogin();
 if (!Auth::can('view_ceo_dashboard') && !Auth::can('ceo_dashboard')) {
@@ -26,11 +28,15 @@ $labels = [
     'line_achievement_chart' => setting('ceo_dashboard_line_achievement_chart_title', 'درصد تحقق لاین'),
     'visitor_achievement_chart' => setting('ceo_dashboard_visitor_achievement_chart_title', 'درصد تحقق ویزیتور'),
 ];
-$showCharts = setting('ceo_dashboard_show_charts', '1') === '1';
-$showLineTable = setting('ceo_dashboard_show_line_table', '1') === '1';
-$showVisitorTable = setting('ceo_dashboard_show_visitor_table', '1') === '1';
+$dashboardPreferences = DashboardPreferences::forScope('ceo', 0, (int)(Auth::user()['id'] ?? 0));
+$showCharts = DashboardPreferences::isVisible($dashboardPreferences, 'sales_trend')
+    || DashboardPreferences::isVisible($dashboardPreferences, 'line_performance')
+    || DashboardPreferences::isVisible($dashboardPreferences, 'visitor_performance')
+    || DashboardPreferences::isVisible($dashboardPreferences, 'brand_performance');
+$showLineTable = DashboardPreferences::isVisible($dashboardPreferences, 'line_performance');
+$showVisitorTable = DashboardPreferences::isVisible($dashboardPreferences, 'visitor_performance');
 $pageTitle = $labels['page_title'];
-$aiDashboardEnabled=setting('sobhan_api_enabled','0')==='1'&&setting('sobhan_ai_autofill_enabled','0')==='1';$dashboardCache=Database::fetch('SELECT source,updated_at FROM dashboard_data_cache WHERE dashboard_key="ceo_dashboard" AND scope_key="all" LIMIT 1');$dashboardSource=$aiDashboardEnabled?($dashboardCache['source']??'Windows Server API - در انتظار بروزرسانی'):'دستی / دیتابیس';
+$aiDashboardEnabled=setting('sobhan_api_enabled','0')==='1'&&setting('sobhan_ai_autofill_enabled','0')==='1';$dashboardCache=Database::fetch('SELECT source,updated_at FROM dashboard_data_cache WHERE dashboard_key="ceo_dashboard" AND scope_key="all" LIMIT 1');$activeSalesBatch=SalesReferenceRepository::getActiveReferenceBatch('sales_aggregate');$hasActiveSalesView=Database::tableExists('vw_active_sales_aggregate_rows');$dashboardSource=$activeSalesBatch&&$hasActiveSalesView?'Batch فعال فروش / View گزارش':($aiDashboardEnabled?($dashboardCache['source']??'Windows Server API - در انتظار بروزرسانی'):'داده قدیمی سازگار / بدون Batch فعال');
 $showAiChat=setting('ceo_dashboard_show_ai_chat','1')==='1';
 
 $latestDateRow = Database::fetch(
@@ -42,6 +48,10 @@ $latestDateRow = Database::fetch(
         SELECT period_key report_date FROM ceo_dashboard_manual_metrics WHERE period_key <> ""
     ) dates'
 );
+$activeLatestDate = $hasActiveSalesView ? (Database::fetch('SELECT MAX(invoice_date) latest_date FROM vw_active_sales_aggregate_rows')['latest_date'] ?? null) : null;
+if ($activeLatestDate && (!$latestDateRow || !$latestDateRow['latest_date'] || $activeLatestDate > $latestDateRow['latest_date'])) {
+    $latestDateRow = ['latest_date' => $activeLatestDate];
+}
 $requestedReportDate = trim($_GET['report_date'] ?? '');
 $hasExplicitReportDate = $requestedReportDate !== '';
 $filters = [
@@ -68,7 +78,21 @@ $dateOptions = array_column(Database::fetchAll(
      ) dates
      ORDER BY report_date DESC'
 ), 'report_date');
+if ($hasActiveSalesView) {
+    $dateOptions = array_values(array_unique(array_merge(
+        $dateOptions,
+        array_column(Database::fetchAll('SELECT DISTINCT invoice_date report_date FROM vw_active_sales_aggregate_rows WHERE invoice_date IS NOT NULL ORDER BY invoice_date DESC'), 'report_date')
+    )));
+    rsort($dateOptions);
+}
 $lineOptions = array_column(Database::fetchAll('SELECT DISTINCT line_code FROM (SELECT line_code FROM ceo_dashboard_lines WHERE line_code <> "" UNION ALL SELECT line_code FROM ceo_dashboard_visitors WHERE line_code <> "") line_sources ORDER BY line_code ASC'), 'line_code');
+if ($hasActiveSalesView) {
+    $lineOptions = array_values(array_unique(array_merge(
+        $lineOptions,
+        array_column(Database::fetchAll('SELECT DISTINCT line_code FROM vw_active_sales_aggregate_rows WHERE line_code IS NOT NULL AND line_code<>"" ORDER BY line_code'), 'line_code')
+    )));
+    sort($lineOptions);
+}
 $pharmacyOptions = Database::fetchAll('SELECT id,title FROM pharmacies WHERE active = 1 ORDER BY sort_order ASC, id ASC');
 
 $where = ['active = 1'];
@@ -133,6 +157,50 @@ $visitorRows = Database::fetchAll(
     $params
 );
 
+$activeSalesTotals = null;
+if ($activeSalesBatch && $hasActiveSalesView) {
+    $activeWhere = ['invoice_date=?'];
+    $activeParams = [$filters['report_date'] ?: $activeLatestDate];
+    if ($filters['line_code'] !== '') {
+        $activeWhere[] = 'line_code=?';
+        $activeParams[] = $filters['line_code'];
+    }
+    if ($activeParams[0]) {
+        $activeWhereSql = implode(' AND ', $activeWhere);
+        $lineRows = Database::fetchAll(
+            "SELECT MIN(id) line_id,line_code,COALESCE(NULLIF(MAX(line_name),''),line_code) line_title,
+                    COALESCE(SUM(net_amount),0) sales_amount,COALESCE(SUM(total_qty),0) qty,
+                    0 target_qty,0 target_amount,NULL supervisor_user_id,NULL sales_manager_user_id,
+                    COALESCE(NULLIF(MAX(supervisor_name),''),'نامشخص') supervisor_name,
+                    COALESCE(NULLIF(MAX(sales_manager_name),''),'نامشخص') sales_manager_name
+             FROM vw_active_sales_aggregate_rows
+             WHERE {$activeWhereSql}
+             GROUP BY line_code
+             ORDER BY line_code",
+            $activeParams
+        );
+        $visitorRows = Database::fetchAll(
+            "SELECT line_code,visitor_name,NULL user_name,0 target_qty,
+                    COALESCE(SUM(total_qty),0) qty,0 target_amount,
+                    COALESCE(SUM(net_amount),0) sales_amount
+             FROM vw_active_sales_aggregate_rows
+             WHERE {$activeWhereSql}
+             GROUP BY line_code,visitor_name
+             ORDER BY line_code,visitor_name",
+            $activeParams
+        );
+        $activeSalesTotals = Database::fetch(
+            "SELECT COALESCE(SUM(gross_amount),0) gross_sales,
+                    COALESCE(SUM(discount_total),0) discounts,
+                    COALESCE(SUM(net_amount),0) net_sales,
+                    COALESCE(SUM(total_qty),0) total_qty
+             FROM vw_active_sales_aggregate_rows
+             WHERE {$activeWhereSql}",
+            $activeParams
+        );
+    }
+}
+
 foreach ($lineRows as &$row) {
     $row['sales_value'] = (int)$row['sales_amount'];
     $row['qty_value'] = (int)$row['qty'];
@@ -148,9 +216,9 @@ foreach ($visitorRows as &$row) {
 }
 unset($row);
 
-$grossSales = array_sum(array_map(static fn($row) => (int)$row['sales_amount'], $lineRows));
-$discounts = max(0, (int)setting('ceo_dashboard_discounts_amount', '0'));
-$netSales = max(0, $grossSales - $discounts);
+$grossSales = $activeSalesTotals ? (float)$activeSalesTotals['gross_sales'] : array_sum(array_map(static fn($row) => (int)$row['sales_amount'], $lineRows));
+$discounts = $activeSalesTotals ? max(0, (float)$activeSalesTotals['discounts']) : max(0, (int)setting('ceo_dashboard_discounts_amount', '0'));
+$netSales = $activeSalesTotals ? max(0, (float)$activeSalesTotals['net_sales']) : max(0, $grossSales - $discounts);
 $discountPercent = $grossSales > 0 ? ($discounts / $grossSales) * 100 : 0;
 $totalQty = array_sum(array_map(static fn($row) => (int)$row['qty'], $lineRows));
 $totalTarget = array_sum(array_map(static fn($row) => (int)$row['target_qty'], $lineRows));
@@ -399,13 +467,16 @@ $dashboardNetSales = $dashboardUsesApiMetrics ? $sobhanMetrics['net_sales'] : $n
 $dashboardInvoiceCount = $dashboardUsesApiMetrics ? $sobhanMetrics['invoice_count'] : 0;
 $reportPeriodKey = CeoDashboardManualMetrics::normalizePeriodKey($filters['report_date']);
 $manualSummaryMetrics = $reportPeriodKey !== '' ? CeoDashboardManualMetrics::get($reportPeriodKey) : null;
-if ($manualSummaryMetrics) {
+$useLegacyManualSummary = $manualSummaryMetrics && !$activeSalesBatch;
+if ($useLegacyManualSummary) {
     $dashboardGrossSales = (float)$manualSummaryMetrics['gross_sales'];
     $dashboardDiscounts = (float)$manualSummaryMetrics['discounts'];
     $dashboardNetSales = (float)$manualSummaryMetrics['net_sales'];
     $hasData = true;
 }
-$summarySourceBadge = $manualSummaryMetrics ? 'ورودی دستی از اکسل' : 'محاسبه خودکار';
+$summarySourceBadge = $activeSalesBatch && $hasActiveSalesView
+    ? 'Batch فعال فروش'
+    : ($dashboardUsesApiMetrics ? 'API سبحان' : ($useLegacyManualSummary ? 'داده قدیمی سازگار' : 'محاسبه خودکار'));
 $dashboardDiscountPercent = $dashboardGrossSales > 0 ? ($dashboardDiscounts / $dashboardGrossSales) * 100 : 0;
 $chartData['moneyValues'] = [$dashboardNetSales, $dashboardDiscounts];
 $sobhanDailyRows = sobhan_list_from_result($sobhanDailyResult);
@@ -669,7 +740,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <div class="form-actions ceo-filter-actions">
             <button class="btn btn-primary">اعمال فیلتر</button>
             <a class="btn" href="/admin/ceo-dashboard.php">پاکسازی</a>
-            <?php if (Auth::can('ceo_dashboard', 'edit')): ?><a class="btn" href="/admin/ceo-dashboard-settings.php?period_key=<?= e(urlencode($reportPeriodKey)) ?>#summary-import">تنظیمات داشبورد مدیرعامل</a><?php endif; ?>
+            <?php if (Auth::can('ceo_dashboard', 'edit')): ?><a class="btn" href="/admin/dashboard-settings.php?scope=ceo">تنظیم نمایش داشبورد</a><?php endif; ?>
         </div>
     </div>
 </form>
@@ -736,15 +807,18 @@ require __DIR__ . '/../views/partials/admin-header.php';
 <?php if (!$hasData): ?>
     <div class="card ceo-empty">
         <h2>هنوز اطلاعاتی برای داشبورد مدیرعامل ثبت نشده است.</h2>
+        <p>ابتدا فایل فروش را وارد و Batch معتبر را فعال کنید؛ تنظیمات نمایش جای ثبت عددهای کسب‌وکار نیست.</p>
         <div class="form-actions">
-            <?php if (Auth::can('ceo_dashboard', 'create')): ?><a class="btn btn-primary" href="/admin/ceo-dashboard-settings.php#lines">افزودن اطلاعات لاین</a><?php endif; ?>
-            <?php if (Auth::can('ceo_dashboard', 'create')): ?><a class="btn" href="/admin/ceo-dashboard-settings.php#visitors">افزودن اطلاعات ویزیتور</a><?php endif; ?>
+            <?php if (Auth::can('sales_data_import')): ?><a class="btn btn-primary" href="/admin/sales-aggregate-import.php">ورود اطلاعات فروش</a><?php endif; ?>
         </div>
     </div>
 <?php else: ?>
-    <div class="ceo-dashboard-grid">
+    <?php
+    $ceoWidgetContent = [];
+    ob_start();
+    ?>
         <section class="card ceo-kpi-card">
-            <h2><?= e($labels['page_title']) ?> <span class="badge"><?= e($summarySourceBadge) ?></span></h2>
+            <h2><?= e(DashboardPreferences::title($dashboardPreferences, 'summary_kpis', $labels['page_title'])) ?> <span class="badge"><?= e($summarySourceBadge) ?></span></h2>
             <div class="ceo-kpi-list">
                 <div><span><?= e($labels['gross_sales']) ?></span><strong><?= e(format_money($dashboardGrossSales)) ?></strong></div>
                 <div><span><?= e($labels['discounts']) ?></span><strong><?= e(format_money($dashboardDiscounts)) ?></strong></div>
@@ -753,23 +827,26 @@ require __DIR__ . '/../views/partials/admin-header.php';
                 <?php if ($dashboardUsesApiMetrics): ?><div><span>تعداد فاکتور</span><strong><?= e(format_number($dashboardInvoiceCount)) ?></strong></div><?php endif; ?>
             </div>
         </section>
+    <?php
+    $ceoWidgetContent['summary_kpis'] = (string)ob_get_clean();
 
-        <?php if ($showCharts): ?><section class="card ceo-chart-card">
-            <h2><?= e($labels['net_sales']) ?> / <?= e($labels['discounts']) ?></h2>
+    ob_start();
+    ?>
+        <section class="card ceo-chart-card">
+            <h2><?= e(DashboardPreferences::title($dashboardPreferences, 'sales_trend', $labels['net_sales'] . ' / ' . $labels['discounts'])) ?></h2>
             <canvas id="ceoMoneyDonut"></canvas>
         </section>
-
         <section class="card ceo-chart-card">
             <h2><?= e($labels['line_sales_chart']) ?></h2>
             <canvas id="ceoLineSales"></canvas>
-        </section><?php endif; ?>
-    </div>
+        </section>
+    <?php
+    $ceoWidgetContent['sales_trend'] = (string)ob_get_clean();
 
-    <?php if ($showLineTable || $showCharts): ?>
-    <div class="ceo-dashboard-grid ceo-dashboard-grid-2">
-        <?php if ($showLineTable): ?>
+    ob_start();
+    ?>
         <section class="card">
-            <h2><?= e($labels['line_table']) ?> <span class="badge">منبع: فایل ایمپورت</span></h2>
+            <h2><?= e(DashboardPreferences::title($dashboardPreferences, 'line_performance', $labels['line_table'])) ?> <span class="badge"><?= e($summarySourceBadge) ?></span></h2>
             <div class="table-wrap ceo-table-wrap">
                 <table>
                     <thead><tr><th>لاین</th><th>مبلغ فروش</th><th>تعداد قطعه</th><th>تارگت</th><th>درصد تحقق</th><th>Progress Bar</th></tr></thead>
@@ -796,41 +873,43 @@ require __DIR__ . '/../views/partials/admin-header.php';
                 </table>
             </div>
         </section>
-        <?php endif; ?>
-
-        <?php if ($showCharts): ?><section class="card ceo-chart-card">
+        <section class="card ceo-chart-card">
             <h2><?= e($labels['line_achievement_chart']) ?></h2>
             <canvas id="ceoLineAchievement"></canvas>
-        </section><?php endif; ?>
-    </div>
-    <?php endif; ?>
+        </section>
+    <?php
+    $ceoWidgetContent['line_performance'] = (string)ob_get_clean();
 
-    <?php if ($showVisitorTable): ?>
-    <section class="card">
-        <h2><?= e($labels['visitor_table']) ?> <span class="badge">منبع: فایل ایمپورت</span></h2>
-        <div class="table-wrap ceo-table-wrap">
-            <table>
-                <thead><tr><th>لاین</th><th>ویزیتور</th><th>تارگت</th><th>فروش / قطعه</th><th>درصد تحقق</th></tr></thead>
-                <tbody>
-                <?php foreach ($visitorRows as $row): ?>
-                    <tr>
-                        <td><?= e($row['line_code']) ?></td>
-                        <td><?= e($row['visitor_name']) ?></td>
-                        <td><?= e(format_number($row['target_qty'])) ?></td>
-                        <td><?= e(format_number($row['qty'])) ?></td>
-                        <td><span class="achievement-pill <?= e(ceo_status_class((float)$row['achievement_percent'])) ?>"><?= e(format_percent((float)$row['achievement_percent'], 2)) ?></span></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </section>
-    <?php endif; ?>
-
-    <?php if ($showCharts): ?><section class="card ceo-chart-card ceo-wide-chart">
-        <h2><?= e($labels['visitor_achievement_chart']) ?></h2>
-        <canvas id="ceoVisitorAchievement"></canvas>
-    </section><?php endif; ?>
+    ob_start();
+    ?>
+        <section class="card">
+            <h2><?= e(DashboardPreferences::title($dashboardPreferences, 'visitor_performance', $labels['visitor_table'])) ?> <span class="badge"><?= e($summarySourceBadge) ?></span></h2>
+            <div class="table-wrap ceo-table-wrap">
+                <table>
+                    <thead><tr><th>لاین</th><th>ویزیتور</th><th>تارگت</th><th>فروش / قطعه</th><th>درصد تحقق</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($visitorRows as $row): ?>
+                        <tr>
+                            <td><?= e($row['line_code']) ?></td>
+                            <td><?= e($row['visitor_name']) ?></td>
+                            <td><?= e(format_number($row['target_qty'])) ?></td>
+                            <td><?= e(format_number($row['qty'])) ?></td>
+                            <td><span class="achievement-pill <?= e(ceo_status_class((float)$row['achievement_percent'])) ?>"><?= e(format_percent((float)$row['achievement_percent'], 2)) ?></span></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (!$visitorRows): ?><tr><td colspan="5">برای این دوره داده ویزیتور در Batch فعال وجود ندارد.</td></tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <section class="card ceo-chart-card ceo-wide-chart">
+            <h2><?= e($labels['visitor_achievement_chart']) ?></h2>
+            <canvas id="ceoVisitorAchievement"></canvas>
+        </section>
+    <?php
+    $ceoWidgetContent['visitor_performance'] = (string)ob_get_clean();
+    echo DashboardPreferences::render($dashboardPreferences, $ceoWidgetContent);
+    ?>
 <?php endif; ?>
 
 <?php if ($showAiChat && Auth::can('use_ai_assistant')): ?>

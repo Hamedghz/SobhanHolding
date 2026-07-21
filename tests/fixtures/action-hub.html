@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <link rel="stylesheet" href="/assets/css/app-compact-ui.css">
+  <link rel="stylesheet" href="/assets/css/action-hub.css">
+  <title>مرکز اقدامات</title>
+</head>
+<body class="admin-body app-compact-ui">
+<main class="admin-main" style="max-width:1440px;margin:auto;padding:18px"><section class="admin-content">
+<div class="action-hub-page">
+  <header class="action-hero" data-action-reveal><div><span class="action-kicker">UNIVERSAL ACTION HUB</span><h1>مرکز اقدامات سازمانی</h1><p>تمام اقدام‌های دستی، مصوبات، OKR و برنامه کاری در یک مسیر قابل پیگیری.</p></div><div class="action-hero-tools"><button class="btn">قالب‌های اقدام</button><button class="btn">انواع اقدام</button></div></header>
+  <nav class="action-tabs"><a class="is-active">همه قابل دسترس</a><a>محول‌شده به من</a><a>ایجادشده توسط من</a></nav>
+  <details class="card action-composer" open data-action-reveal><summary><span><b>ایجاد اقدام جدید</b><small>با قالب یا بدون قالب</small></span><span class="action-summary-icon">＋</span></summary><form><div class="action-form-grid"><label class="form-field action-span-2"><span>عنوان</span><input value="پیگیری مصوبه فروش"></label><label class="form-field"><span>نوع</span><select data-action-type><option value="1">عمومی</option></select></label><label class="form-field"><span>قالب</span><select data-action-template><option value="">بدون قالب</option><option value="2" data-type="1">پیگیری مصوبه</option></select></label><label class="form-field"><span>مسئول</span><select><option>علی رضایی</option></select></label><label class="form-field"><span>اولویت</span><select><option>بالا</option></select></label></div><label class="action-check action-planner-check"><input type="checkbox"> ثبت در برنامه کاری</label><button class="btn btn-primary">ثبت اقدام</button></form></details>
+  <form class="card action-filter"><label class="form-field"><span>جستجو</span><input></label><label class="form-field"><span>وضعیت</span><select><option>همه</option></select></label><label class="form-field"><span>اولویت</span><select><option>همه</option></select></label><label class="form-field"><span>نوع</span><select><option>همه</option></select></label><button class="btn">اعمال فیلتر</button></form>
+  <section class="action-list" data-action-reveal>
+    <a class="action-card" style="--action-color:#2563eb"><span class="action-card-rail"></span><div class="action-card-main"><div class="action-card-title"><span class="action-type-dot"></span><h2>پیگیری مصوبه جلسه فروش</h2></div><p>جمع‌بندی برنامه اجرایی لاین A و ثبت نتیجه تا پایان هفته.</p><div class="action-card-meta"><span>عمومی</span><span>مسئول: علی رضایی</span><span>سررسید: ۱۴۰۵/۰۴/۲۸</span></div></div><div class="action-card-state"><span class="action-priority is-high">بالا</span><span class="action-status is-in_progress">در حال انجام</span></div></a>
+    <a class="action-card" style="--action-color:#dc2626"><span class="action-card-rail"></span><div class="action-card-main"><div class="action-card-title"><span class="action-type-dot"></span><h2>بررسی مشتریان بدون خرید</h2></div><p>فهرست مشتریان مسیر شرق بررسی و اقدام اصلاحی ثبت شود.</p><div class="action-card-meta"><span>اقدام فروش</span><span>مسئول: سارا محمدی</span></div></div><div class="action-card-state"><span class="action-priority is-urgent">فوری</span><span class="action-status is-overdue">سررسید گذشته</span></div></a>
+  </section>
+</div>
+</section></main>
+<script>window.SobhanActionHub={users:[],orgUnits:[],salesLines:[]};</script>
+<script src="/assets/vendor/motion/motion-12.42.2.min.js"></script>
+<script src="/assets/js/action-hub.js"></script>
+</body>
+</html>

@@ -19,7 +19,7 @@ class OrgModule
             'last_login_at' => 'DATETIME NULL',
         ];
         foreach ($userColumns as $column => $definition) {
-            if (Database::tableExists('users') && !Database::columnExists('users', $column)) {
+            if (self::tableExists($pdo, 'users') && !self::columnExists($pdo, 'users', $column)) {
                 $pdo->exec("ALTER TABLE users ADD `{$column}` {$definition}");
             }
         }
@@ -36,7 +36,7 @@ class OrgModule
             'archived_at' => 'DATETIME NULL',
         ];
         foreach ($assignmentColumns as $column => $definition) {
-            if (Database::tableExists('hr_assessment_assignments') && !Database::columnExists('hr_assessment_assignments', $column)) {
+            if (self::tableExists($pdo, 'hr_assessment_assignments') && !self::columnExists($pdo, 'hr_assessment_assignments', $column)) {
                 $pdo->exec("ALTER TABLE hr_assessment_assignments ADD `{$column}` {$definition}");
             }
         }
@@ -46,12 +46,12 @@ class OrgModule
             'parent_role_id' => 'INT UNSIGNED NULL',
         ];
         foreach ($roleColumns as $column => $definition) {
-            if (Database::tableExists('org_roles') && !Database::columnExists('org_roles', $column)) {
+            if (self::tableExists($pdo, 'org_roles') && !self::columnExists($pdo, 'org_roles', $column)) {
                 $pdo->exec("ALTER TABLE org_roles ADD `{$column}` {$definition}");
             }
         }
 
-        if (Database::tableExists('hr_kpi_templates') && !Database::columnExists('hr_kpi_templates', 'org_unit_id')) {
+        if (self::tableExists($pdo, 'hr_kpi_templates') && !self::columnExists($pdo, 'hr_kpi_templates', 'org_unit_id')) {
             $pdo->exec('ALTER TABLE hr_kpi_templates ADD `org_unit_id` INT UNSIGNED NULL');
         }
 
@@ -61,12 +61,12 @@ class OrgModule
             'technical_details' => 'LONGTEXT NULL',
         ];
         foreach ($jobColumns as $column => $definition) {
-            if (Database::tableExists('ai_update_jobs') && !Database::columnExists('ai_update_jobs', $column)) {
+            if (self::tableExists($pdo, 'ai_update_jobs') && !self::columnExists($pdo, 'ai_update_jobs', $column)) {
                 $pdo->exec("ALTER TABLE ai_update_jobs ADD `{$column}` {$definition}");
             }
         }
 
-        if (Database::tableExists('users')) {
+        if (self::tableExists($pdo, 'users')) {
             try {
                 $pdo->exec("ALTER TABLE users MODIFY role ENUM('super_admin','admin','manager','employee') NOT NULL DEFAULT 'employee'");
             } catch (Throwable $e) {
@@ -75,6 +75,20 @@ class OrgModule
         }
 
         self::seed($pdo);
+    }
+
+    private static function tableExists(PDO $pdo, string $table): bool
+    {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
+        $stmt->execute([$table]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private static function columnExists(PDO $pdo, string $table, string $column): bool
+    {
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?');
+        $stmt->execute([$table, $column]);
+        return (int)$stmt->fetchColumn() > 0;
     }
 
     public static function schema(): array

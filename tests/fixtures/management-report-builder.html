@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>سازنده گزارش مدیریتی</title>
+  <link rel="stylesheet" href="../../assets/css/management-reports.css">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f4f7fb;color:#172033;font-family:Tahoma,Arial,sans-serif}.shell{max-width:1180px;margin:auto;padding:28px}.card{padding:20px;border:1px solid #e2e8f0;border-radius:18px;background:#fff;box-shadow:0 12px 36px rgba(15,23,42,.06)}h1,h2{margin-top:0}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 14px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#172033;font-weight:800}.btn-primary{border-color:#2563eb;background:#2563eb;color:#fff}.form-field{display:grid;gap:7px}.form-field span{font-size:13px;font-weight:900}.form-field input,.form-field select,.form-field textarea{width:100%;padding:10px 11px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font:inherit}.muted{color:#64748b}.demo-grid{display:grid;grid-template-columns:280px minmax(0,1fr);gap:18px}.side-card{align-self:start}.side-card strong{display:block;font-size:24px}.side-card small{color:#64748b}.mr-template-list{margin-top:14px}.mr-template-list a{text-decoration:none;color:inherit}.mr-template-list a.is-active{color:#1d4ed8}@media(max-width:760px){.shell{padding:16px}.demo-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <div class="mr-head">
+    <div><h1>سازنده تعاملی قالب گزارش</h1><p>تنظیم ساده، نسخه‌دار و سازگار با گزارش‌های قبلی</p></div>
+    <div class="mr-actions"><span class="mr-version">نسخه ۴</span><button class="btn">گزارشات مدیران</button></div>
+  </div>
+  <nav class="mr-tabs"><a class="is-active">فروش</a><a>مالی</a><a>انبار</a><a>فناوری</a></nav>
+  <div class="demo-grid">
+    <aside class="card side-card">
+      <small>قالب فعال</small><strong>گزارش مدیر فروش</strong>
+      <p class="muted">ساختار هر گزارش در زمان ایجاد ثابت می‌شود.</p>
+      <div class="mr-template-list"><a class="is-active">تحلیل عملکرد</a><a>برنامه ماه آینده</a><a>اقدامات و پیشنهادات</a></div>
+    </aside>
+    <section class="card mr-builder" data-field-builder>
+      <div class="mr-builder-head">
+        <div><h2>افزودن فیلد به قالب</h2><p>نوع فیلد را انتخاب کنید؛ پیش‌نمایش به‌صورت زنده تغییر می‌کند.</p></div>
+        <div class="mr-builder-preview" data-field-preview><span>پیش‌نمایش</span><strong>پیشنهاد اجرایی</strong><small>فیلد قابل ویرایش</small></div>
+      </div>
+      <div class="mr-fields">
+        <label class="form-field"><span>عنوان فیلد</span><input data-field-label value="پیشنهاد اجرایی"></label>
+        <label class="form-field"><span>نوع فیلد</span><select data-field-type><option value="editable">فیلد قابل ویرایش</option><option value="action_selector">انتخاب اقدام</option><option value="jalali_deadline">مهلت شمسی</option><option value="attachment">پیوست</option></select></label>
+        <label class="form-field"><span>بخش</span><select><option>اقدامات و پیشنهادات</option></select></label>
+        <label class="form-field"><span>منبع داده</span><select><option>ورودی دستی</option><option>مرکز اقدام</option></select></label>
+        <label class="form-field is-wide"><span>راهنمای کاربر</span><textarea rows="4">پیشنهاد را به شکل قابل اجرا و قابل واگذاری بنویسید.</textarea></label>
+      </div>
+      <div class="mr-actions"><label class="mr-checkbox"><input type="checkbox"> الزامی</label><label class="mr-checkbox"><input type="checkbox" checked> فعال</label><button class="btn btn-primary">ذخیره و ساخت نسخه جدید</button></div>
+    </section>
+  </div>
+  <section class="card mr-action-converter" data-action-converter style="margin-top:18px">
+    <div class="mr-builder-head"><div><h2>تبدیل پیشنهاد به اقدام</h2><p>مسئول و مهلت از محدوده مجاز گزارش انتخاب می‌شوند.</p></div><span class="mr-status">Universal Action Hub</span></div>
+    <div class="mr-fields"><label class="form-field"><span>عنوان اقدام</span><input value="پیگیری پیشنهاد افزایش پوشش مشتری"></label><label class="form-field"><span>مسئول مجاز</span><select><option>سرپرست فروش خط A</option></select></label><label class="form-field"><span>مهلت شمسی</span><input value="۱۴۰۵/۰۵/۰۵"></label><label class="form-field"><span>اولویت</span><select><option>بالا</option></select></label></div>
+  </section>
+</main>
+<script src="../../assets/vendor/motion/motion-12.42.2.min.js"></script>
+<script src="../../assets/js/management-reports.js"></script>
+</body>
+</html>

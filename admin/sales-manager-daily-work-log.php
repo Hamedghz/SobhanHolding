@@ -1,18 +1,6 @@
 <?php
 require_once __DIR__ . '/../core/Auth.php';
-require_once __DIR__ . '/../core/Database.php';
-require_once __DIR__ . '/../core/Response.php';
-require_once __DIR__ . '/../services/SalesOperationsService.php';
-SalesOperationsService::boot(); SalesOperationsService::requireSalesManagerPermission('sales_manager.daily_logs.manage');
-$user=Auth::user();$date=trim((string)($_GET['date']??date('Y-m-d')))?:date('Y-m-d');$fields=SalesOperationsService::dailyLogDefaults();$errors=[];
-if($_SERVER['REQUEST_METHOD']==='POST'){
- try{if(!Auth::verifyCsrf($_POST['csrf_token']??null))throw new InvalidArgumentException('درخواست نامعتبر است.');$date=trim((string)($_POST['log_date']??date('Y-m-d')))?:date('Y-m-d');if(!SalesOperationsService::validDate($date))throw new InvalidArgumentException('تاریخ گزارش معتبر نیست.');$values=[];foreach($fields as $key=>$label)$values[$key]=trim((string)($_POST['fields'][$key]??''));Database::execute('INSERT INTO sales_manager_daily_work_logs(sales_manager_id,log_date,fields_json,created_by,created_at,updated_at) VALUES (?,?,?,?,NOW(),NOW()) ON DUPLICATE KEY UPDATE fields_json=VALUES(fields_json),updated_at=NOW()',[(int)$user['id'],$date,json_encode($values,JSON_UNESCAPED_UNICODE),(int)$user['id']]);flash('گزارش‌کار روزانه ذخیره شد.');redirect('/admin/sales-manager-daily-work-log.php?date='.$date);}catch(Throwable $e){$errors[]=SalesOperationsService::uiError($e,'ذخیره گزارش‌کار روزانه انجام نشد.');}}
-if(SalesOperationsService::canViewAll($user)){$logs=Database::fetchAll('SELECT l.*,u.name manager_name FROM sales_manager_daily_work_logs l LEFT JOIN users u ON u.id=l.sales_manager_id ORDER BY l.log_date DESC,l.id DESC LIMIT 100');}else{$logs=Database::fetchAll('SELECT l.*,u.name manager_name FROM sales_manager_daily_work_logs l LEFT JOIN users u ON u.id=l.sales_manager_id WHERE l.sales_manager_id=? ORDER BY l.log_date DESC,l.id DESC LIMIT 100',[(int)$user['id']]);}
-$current=Database::fetch('SELECT * FROM sales_manager_daily_work_logs WHERE sales_manager_id=? AND log_date=?',[(int)$user['id'],$date]);$currentFields=json_decode((string)($current['fields_json']??'[]'),true)?:[];
-$pageTitle='گزارش‌کار روزانه مدیر فروش';require __DIR__ . '/../views/partials/admin-header.php';
-?>
-<div class="section-heading-row"><div><h1>گزارش‌کار روزانه مدیر فروش</h1><p class="muted">ثبت گزارش داینامیک روزانه برای مشاهده مدیرعامل / Super Admin.</p></div><div class="actions"><a class="btn" href="/admin/sales-manager-supervisor-reports.php">گزارش سرپرستان</a></div></div>
-<?php foreach($errors as $error):?><div class="alert alert-danger"><?=e($error)?></div><?php endforeach;?>
-<form class="card admin-form" method="post"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><h2>ثبت گزارش روزانه</h2><label class="form-field"><span>تاریخ</span><input type="date" name="log_date" value="<?=e($date)?>"></label><?php foreach($fields as $key=>$label):?><label class="form-field"><span><?=e($label)?></span><textarea name="fields[<?=e($key)?>]" rows="3"><?=e($currentFields[$key]??'')?></textarea></label><?php endforeach;?><div class="form-actions"><button class="btn btn-primary">ذخیره گزارش‌کار</button></div></form>
-<section class="card"><h2>گزارش‌های ثبت‌شده</h2><div class="table-wrap"><table><thead><tr><th>تاریخ</th><th>مدیر فروش</th><th>موضوعات امروز</th><th>برنامه فردا</th></tr></thead><tbody><?php foreach($logs as $log):$data=json_decode((string)$log['fields_json'],true)?:[];?><tr><td><?=e($log['log_date'])?></td><td><?=e($log['manager_name']??'-')?></td><td><?=e(mb_substr((string)($data['time_spent']??''),0,120))?></td><td><?=e(mb_substr((string)($data['tomorrow_plan']??''),0,120))?></td></tr><?php endforeach;?><?php if(!$logs):?><tr><td colspan="4">گزارش‌کاری ثبت نشده است.</td></tr><?php endif;?></tbody></table></div></section>
-<?php require __DIR__ . '/../views/partials/admin-footer.php'; ?>
+
+Auth::requireLogin();
+header('Location: /admin/daily-work-report.php', true, 302);
+exit;

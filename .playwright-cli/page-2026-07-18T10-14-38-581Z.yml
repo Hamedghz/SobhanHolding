@@ -1,0 +1,588 @@
+- generic [ref=f23e2]:
+  - complementary [ref=f23e3]:
+    - link "شرکت پخش سبحان پنل مدیریت" [ref=f23e4] [cursor=pointer]:
+      - /url: /admin/
+      - generic [ref=f23e5]: شرکت پخش سبحان
+      - generic [ref=f23e6]: پنل مدیریت
+    - navigation "منوی مدیریت" [ref=f23e7]:
+      - group [ref=f23e8]:
+        - generic "داشبوردها" [ref=f23e9] [cursor=pointer]
+        - generic [ref=f23e10]:
+          - link "داشبورد اصلی" [ref=f23e11] [cursor=pointer]:
+            - /url: /admin/index.php
+          - link "پنل مدیرعامل" [ref=f23e13] [cursor=pointer]:
+            - /url: /admin/ceo-dashboard.php
+          - link "پنل مدیران فروش" [ref=f23e15] [cursor=pointer]:
+            - /url: /admin/manager-dashboard.php
+          - link "پنل سرپرست فروش" [ref=f23e17] [cursor=pointer]:
+            - /url: /admin/supervisor-dashboard.php
+          - link "پنل کارمند" [ref=f23e19] [cursor=pointer]:
+            - /url: /admin/employee-dashboard.php
+      - group [ref=f23e21]:
+        - generic "OKR و اهداف سازمانی" [ref=f23e22] [cursor=pointer]
+      - group [ref=f23e23]:
+        - generic "برنامه کاری من" [ref=f23e24] [cursor=pointer]
+      - group [ref=f23e25]:
+        - generic "گزارش کار روزانه" [ref=f23e26] [cursor=pointer]
+      - group [ref=f23e27]:
+        - generic "مرکز اقدامات" [ref=f23e28] [cursor=pointer]
+      - group [ref=f23e29]:
+        - generic "فروش و تحلیل عملکرد" [ref=f23e30] [cursor=pointer]
+      - group [ref=f23e31]:
+        - generic "مدیریت داده فروش" [ref=f23e32] [cursor=pointer]
+      - group [ref=f23e33]:
+        - generic "پنل سرپرست فروش" [ref=f23e34] [cursor=pointer]
+      - group [ref=f23e35]:
+        - generic "گزارشات مدیران" [ref=f23e36] [cursor=pointer]
+      - group [ref=f23e37]:
+        - generic "قوانین مصوب و صورتجلسات" [ref=f23e38] [cursor=pointer]
+      - group [ref=f23e39]:
+        - generic "منابع انسانی" [ref=f23e40] [cursor=pointer]
+      - group [ref=f23e41]:
+        - generic "KPI و ارزیابی عملکرد" [ref=f23e42] [cursor=pointer]
+      - group [ref=f23e43]:
+        - generic "آزمون‌ها و ارزیابی سازمانی" [ref=f23e44] [cursor=pointer]
+      - group [ref=f23e45]:
+        - generic "مالی، انبار و وصول" [ref=f23e46] [cursor=pointer]
+      - group [ref=f23e47]:
+        - generic "سایت و محتوا" [ref=f23e48] [cursor=pointer]
+      - group [ref=f23e49]:
+        - generic "مکاتبات اداری" [ref=f23e50] [cursor=pointer]
+      - group [ref=f23e51]:
+        - generic "ایمیل سازمانی" [ref=f23e52] [cursor=pointer]
+      - group [ref=f23e53]:
+        - generic "هوش مصنوعی و گزارش‌گیری" [ref=f23e54] [cursor=pointer]
+      - group [ref=f23e55]:
+        - generic "تنظیمات" [ref=f23e56] [cursor=pointer]
+      - group [ref=f23e57]:
+        - generic "ابزارهای سیستم" [ref=f23e58] [cursor=pointer]
+  - main [ref=f23e59]:
+    - generic [ref=f23e60]:
+      - generic [ref=f23e61]:
+        - strong [ref=f23e62]: داشبورد مدیران فروش
+        - generic [ref=f23e63]: شرکت پخش سبحان
+      - generic [ref=f23e64]:
+        - link "هوش مصنوعی سبحان در دسترس نیست" [ref=f23e65] [cursor=pointer]:
+          - /url: /admin/sobhan-api-settings.php
+          - generic [ref=f23e67]: AI قطع
+        - button "اعلان‌ها" [ref=f23e69] [cursor=pointer]:
+          - generic [ref=f23e71]: "0"
+        - generic [ref=f23e72]:
+          - generic [ref=f23e73]: مدیر پذیرش
+          - link "ظاهر" [ref=f23e74] [cursor=pointer]:
+            - /url: /admin/theme-settings.php
+          - link "خروج" [ref=f23e75] [cursor=pointer]:
+            - /url: /logout.php
+    - generic [ref=f23e76]:
+      - generic [ref=f23e77]:
+        - generic [ref=f23e78]:
+          - text: "منبع بروزرسانی:"
+          - strong [ref=f23e79]: Batch فعال → Viewهای گزارش → فرمول‌های منتشرشده
+        - generic [ref=f23e80]: "آخرین بروزرسانی: ثبت نشده"
+        - link "تنظیم نمایش" [ref=f23e81] [cursor=pointer]:
+          - /url: /admin/dashboard-settings.php?scope=sales_manager
+        - button "بروزرسانی داشبورد" [ref=f23e83] [cursor=pointer]
+      - generic [ref=f23e84]:
+        - generic [ref=f23e85]:
+          - text: پنل مستقل مدیران فروش
+          - heading "داشبورد مدیران فروش" [level=1] [ref=f23e86]
+          - paragraph [ref=f23e87]: داده فعال فروش و تارگت — 1405-04 · 1405/04/25
+        - generic [ref=f23e89]:
+          - text: دوره گزارش
+          - combobox "دوره گزارش" [ref=f23e90]:
+            - option "داده فعال Import / View" [selected]
+      - generic [ref=f23e91]: این نما مستقیماً از Batch فعال، Viewهای دارای دامنه دسترسی و فرمول‌های منتشرشده محاسبه شده است. گزارش‌های اکسل قدیمی از فهرست دوره‌ها همچنان قابل مشاهده‌اند.
+      - generic [ref=f23e92]:
+        - generic [ref=f23e94]:
+          - article [ref=f23e95]:
+            - generic [ref=f23e96]: مجموع فروش
+            - strong [ref=f23e97]: 11,500,000
+          - article [ref=f23e98]:
+            - generic [ref=f23e99]: مجموع پورسانت نهایی
+            - strong [ref=f23e100]: "0"
+          - article [ref=f23e101]:
+            - generic [ref=f23e102]: میانگین تحقق
+            - strong [ref=f23e103]: 0.0٪
+          - article [ref=f23e104]:
+            - generic [ref=f23e105]: ویزیتورهای واجد شرایط
+            - strong [ref=f23e106]: "0"
+          - article [ref=f23e107]:
+            - generic [ref=f23e108]: تعداد عدم تحقق
+            - strong [ref=f23e109]: "1"
+          - article [ref=f23e110]:
+            - generic [ref=f23e111]: مجموع پاداش‌ها
+            - strong [ref=f23e112]: "0"
+          - article [ref=f23e113]:
+            - generic [ref=f23e114]: مجموع جرایم
+            - strong [ref=f23e115]: "0"
+          - article [ref=f23e116]:
+            - generic [ref=f23e117]: بهترین ویزیتور
+            - strong [ref=f23e118]: نمونه
+          - article [ref=f23e119]:
+            - generic [ref=f23e120]: ضعیف‌ترین ویزیتور
+            - strong [ref=f23e121]: نمونه
+          - article [ref=f23e122]:
+            - generic [ref=f23e123]: بهترین لاین
+            - strong [ref=f23e124]: A
+        - article [ref=f23e126]:
+          - heading "تحقق ویزیتورها" [level=2] [ref=f23e127]
+        - article [ref=f23e130]:
+          - heading "پورسانت ویزیتورها" [level=2] [ref=f23e131]
+        - article [ref=f23e134]:
+          - heading "تحقق لاین‌ها" [level=2] [ref=f23e135]
+        - article [ref=f23e138]:
+          - heading "پوشش مشتری" [level=2] [ref=f23e139]
+        - article [ref=f23e142]:
+          - heading "تحقق برند" [level=2] [ref=f23e143]
+        - article [ref=f23e146]:
+          - heading "ضرایب کاهنده ویزیتورها" [level=2] [ref=f23e147]
+      - navigation [ref=f23e149]:
+        - link "پوشش مشتری" [ref=f23e150] [cursor=pointer]:
+          - /url: "#widget-customer_coverage"
+        - link "تحقق برندهای تارگت‌دار" [ref=f23e151] [cursor=pointer]:
+          - /url: "#widget-brand_target"
+        - link "خلاصه پورسانت ویزیتورها" [ref=f23e152] [cursor=pointer]:
+          - /url: "#widget-commission_summary"
+        - link "تحقق تارگت تیم فروش" [ref=f23e153] [cursor=pointer]:
+          - /url: "#widget-team_target_achievement"
+        - link "پاداش اچیو، توتال و بالای ۱۰۰٪" [ref=f23e154] [cursor=pointer]:
+          - /url: "#widget-over_achievement_bonus"
+        - link "ضرایب کاهنده ویزیتورها" [ref=f23e155] [cursor=pointer]:
+          - /url: "#widget-visitor_penalty"
+        - link "ضرایب کاهنده سرپرستان" [ref=f23e156] [cursor=pointer]:
+          - /url: "#widget-supervisor_penalty"
+        - link "تحقق هدف مشتری" [ref=f23e157] [cursor=pointer]:
+          - /url: "#widget-customer_target"
+        - link "عملکرد لاین‌ها" [ref=f23e158] [cursor=pointer]:
+          - /url: "#widget-line_performance"
+        - link "عملکرد سرپرستان" [ref=f23e159] [cursor=pointer]:
+          - /url: "#widget-supervisor_performance"
+        - link "عملکرد مدیران فروش" [ref=f23e160] [cursor=pointer]:
+          - /url: "#widget-sales_manager_performance"
+        - link "بینش هوشمند فروش" [ref=f23e161] [cursor=pointer]:
+          - /url: "#widget-ai_insights"
+      - generic [ref=f23e162]:
+        - generic [ref=f23e163]:
+          - heading "پوشش مشتری" [level=2] [ref=f23e165]
+          - generic [ref=f23e166]:
+            - link "بروزرسانی" [ref=f23e167] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-customer_coverage
+            - link "ورود اطلاعات" [ref=f23e168] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e169]:
+          - textbox "جستجو..." [ref=f23e170]
+          - combobox [ref=f23e171]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e172]
+          - textbox "سرپرست" [ref=f23e173]
+          - button "اعمال فیلتر" [ref=f23e174] [cursor=pointer]
+        - table [ref=f23e176]:
+          - rowgroup [ref=f23e177]:
+            - row [ref=f23e178]:
+              - columnheader "تاریخ گزارش" [ref=f23e179]
+              - columnheader "نام ویزیتور" [ref=f23e180]
+              - columnheader "تعداد مشتری" [ref=f23e181]
+              - columnheader "پوشش" [ref=f23e182]
+              - columnheader "کف مشتری" [ref=f23e183]
+              - columnheader "پاداش / جریمه" [ref=f23e184]
+              - columnheader "مانده تا هدف" [ref=f23e185]
+          - rowgroup [ref=f23e186]:
+            - row [ref=f23e187]:
+              - cell "داده‌ای برای این گزارش ثبت نشده است." [ref=f23e188]
+      - generic [ref=f23e189]:
+        - generic [ref=f23e190]:
+          - heading "تحقق برند" [level=2] [ref=f23e192]
+          - generic [ref=f23e193]:
+            - link "بروزرسانی" [ref=f23e194] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-brand_target
+            - link "ورود اطلاعات" [ref=f23e195] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e196]:
+          - textbox "جستجو..." [ref=f23e197]
+          - combobox [ref=f23e198]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e199]
+          - textbox "سرپرست" [ref=f23e200]
+          - button "اعمال فیلتر" [ref=f23e201] [cursor=pointer]
+        - table [ref=f23e203]:
+          - rowgroup [ref=f23e204]:
+            - row [ref=f23e205]:
+              - columnheader "تاریخ گزارش" [ref=f23e206]
+              - columnheader "نام ویزیتور" [ref=f23e207]
+              - columnheader "برند تارگت‌دار" [ref=f23e208]
+              - columnheader "برند تارگت زده" [ref=f23e209]
+              - columnheader "درصد تحقق" [ref=f23e210]
+              - columnheader "وضعیت پورسانت" [ref=f23e211]
+          - rowgroup [ref=f23e212]:
+            - row [ref=f23e213]:
+              - cell "داده‌ای برای این گزارش ثبت نشده است." [ref=f23e214]
+      - generic [ref=f23e215]:
+        - generic [ref=f23e216]:
+          - heading "خلاصه پورسانت ویزیتورها" [level=2] [ref=f23e218]
+          - generic [ref=f23e219]:
+            - link "بروزرسانی" [ref=f23e220] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-commission_summary
+            - link "ورود اطلاعات" [ref=f23e221] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e222]:
+          - textbox "جستجو..." [ref=f23e223]
+          - combobox [ref=f23e224]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e225]
+          - textbox "سرپرست" [ref=f23e226]
+          - button "اعمال فیلتر" [ref=f23e227] [cursor=pointer]
+        - table [ref=f23e229]:
+          - rowgroup [ref=f23e230]:
+            - row [ref=f23e231]:
+              - columnheader "تاریخ گزارش" [ref=f23e232]
+              - columnheader "ویزیتور" [ref=f23e233]
+              - columnheader "شعبه / لاین" [ref=f23e234]
+              - columnheader "مبلغ فروش" [ref=f23e235]
+              - columnheader "درصد تحقق" [ref=f23e236]
+              - columnheader "شرط دریافت پورسانت" [ref=f23e237]
+              - columnheader "پورسانت با ضریب فعالیت" [ref=f23e238]
+              - columnheader "ضریب کاهنده" [ref=f23e239]
+              - columnheader "پورسانت با ضریب کاهنده" [ref=f23e240]
+              - columnheader "خسارت مرجوعی" [ref=f23e241]
+              - columnheader "پاداش کیفی" [ref=f23e242]
+              - columnheader "تعداد لاین تارگت‌دار" [ref=f23e243]
+              - columnheader "تعداد لاین اچیو شده" [ref=f23e244]
+              - columnheader "درصد تحقق تارگت" [ref=f23e245]
+              - columnheader "پاداش تارگت قبل از شرط" [ref=f23e246]
+              - columnheader "وضعیت پاداش تارگت" [ref=f23e247]
+              - columnheader "مبلغ نهایی پاداش تارگت" [ref=f23e248]
+              - columnheader "تعداد اچیو پایین ۷۵٪" [ref=f23e249]
+              - columnheader "تعداد اچیو بین ۷۵ تا ۹۵٪" [ref=f23e250]
+              - columnheader "پاداش اچیو گروه" [ref=f23e251]
+              - columnheader "پاداش اچیو توتال" [ref=f23e252]
+              - columnheader "پاداش پوشش مشتری" [ref=f23e253]
+              - columnheader "پورسانت نهایی" [ref=f23e254]
+          - rowgroup [ref=f23e255]:
+            - row [ref=f23e256]:
+              - cell "1405/04/25" [ref=f23e257]
+              - cell "نمونه" [ref=f23e258]
+              - cell "A" [ref=f23e259]
+              - cell "11,500,000 ریال" [ref=f23e260]
+              - cell "0.0٪" [ref=f23e261]
+              - cell "عدم تحقق" [ref=f23e263]
+              - cell "0 ریال" [ref=f23e264]
+              - cell "75.0٪" [ref=f23e265]
+              - cell "0 ریال" [ref=f23e267]
+              - cell "0 ریال" [ref=f23e268]
+              - cell "0 ریال" [ref=f23e269]
+              - cell "0" [ref=f23e270]
+              - cell "0" [ref=f23e271]
+              - cell "0.0٪" [ref=f23e272]
+              - cell "0 ریال" [ref=f23e274]
+              - cell [ref=f23e275]
+              - cell "0 ریال" [ref=f23e276]
+              - cell "0" [ref=f23e277]
+              - cell "0" [ref=f23e278]
+              - cell "0 ریال" [ref=f23e279]
+              - cell "0 ریال" [ref=f23e280]
+              - cell "0 ریال" [ref=f23e281]
+              - cell "0 ریال" [ref=f23e282]
+      - generic [ref=f23e283]:
+        - generic [ref=f23e284]:
+          - heading "تحقق تارگت تیم فروش" [level=2] [ref=f23e286]
+          - generic [ref=f23e287]:
+            - link "بروزرسانی" [ref=f23e288] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-team_target_achievement
+            - link "ورود اطلاعات" [ref=f23e289] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e290]:
+          - textbox "جستجو..." [ref=f23e291]
+          - combobox [ref=f23e292]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e293]
+          - textbox "سرپرست" [ref=f23e294]
+          - button "اعمال فیلتر" [ref=f23e295] [cursor=pointer]
+        - table [ref=f23e297]:
+          - rowgroup [ref=f23e298]:
+            - row [ref=f23e299]:
+              - columnheader "تاریخ گزارش" [ref=f23e300]
+              - columnheader "نوع شخص" [ref=f23e301]
+              - columnheader "لاین" [ref=f23e302]
+              - columnheader "نام" [ref=f23e303]
+              - columnheader "تارگت" [ref=f23e304]
+              - columnheader "فروش" [ref=f23e305]
+              - columnheader "درصد تحقق" [ref=f23e306]
+              - columnheader "پاداش اور توتال" [ref=f23e307]
+          - rowgroup [ref=f23e308]:
+            - row [ref=f23e309]:
+              - cell "1405/04/25" [ref=f23e310]
+              - cell "ویزیتور" [ref=f23e311]
+              - cell "A" [ref=f23e312]
+              - cell "نمونه" [ref=f23e313]
+              - cell "0" [ref=f23e314]
+              - cell "12" [ref=f23e315]
+              - cell "0.0٪" [ref=f23e316]
+              - cell "0 ریال" [ref=f23e318]
+      - generic [ref=f23e319]:
+        - generic [ref=f23e320]:
+          - heading "پاداش اچیو و توتال" [level=2] [ref=f23e322]
+          - generic [ref=f23e323]:
+            - link "بروزرسانی" [ref=f23e324] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-over_achievement_bonus
+            - link "ورود اطلاعات" [ref=f23e325] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e326]:
+          - textbox "جستجو..." [ref=f23e327]
+          - combobox [ref=f23e328]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e329]
+          - textbox "سرپرست" [ref=f23e330]
+          - button "اعمال فیلتر" [ref=f23e331] [cursor=pointer]
+        - table [ref=f23e333]:
+          - rowgroup [ref=f23e334]:
+            - row [ref=f23e335]:
+              - columnheader "تاریخ گزارش" [ref=f23e336]
+              - columnheader "نوع شخص" [ref=f23e337]
+              - columnheader "لاین" [ref=f23e338]
+              - columnheader "نام" [ref=f23e339]
+              - columnheader "پاداش اور اچیو گروه" [ref=f23e340]
+              - columnheader "پاداش اور توتال" [ref=f23e341]
+              - columnheader "پاداش تحقق ویزیتور ۱۰۰٪" [ref=f23e342]
+              - columnheader "تعداد ویزیتور زده" [ref=f23e343]
+          - rowgroup [ref=f23e344]:
+            - row [ref=f23e345]:
+              - cell "داده‌ای برای این گزارش ثبت نشده است." [ref=f23e346]
+      - generic [ref=f23e347]:
+        - generic [ref=f23e348]:
+          - heading "ضرایب کاهنده ویزیتورها" [level=2] [ref=f23e350]
+          - generic [ref=f23e351]:
+            - link "بروزرسانی" [ref=f23e352] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-visitor_penalty
+            - link "ورود اطلاعات" [ref=f23e353] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e354]:
+          - textbox "جستجو..." [ref=f23e355]
+          - combobox [ref=f23e356]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e357]
+          - textbox "سرپرست" [ref=f23e358]
+          - button "اعمال فیلتر" [ref=f23e359] [cursor=pointer]
+        - table [ref=f23e361]:
+          - rowgroup [ref=f23e362]:
+            - row [ref=f23e363]:
+              - columnheader "تاریخ گزارش" [ref=f23e364]
+              - columnheader "نام ویزیتور" [ref=f23e365]
+              - columnheader "درصد جریمه" [ref=f23e366]
+              - columnheader "پورسانت با ضریب" [ref=f23e367]
+              - columnheader "پورسانت بعد از جریمه" [ref=f23e368]
+          - rowgroup [ref=f23e369]:
+            - row [ref=f23e370]:
+              - cell "1405/04/25" [ref=f23e371]
+              - cell "نمونه" [ref=f23e372]
+              - cell "75.0٪" [ref=f23e373]
+              - cell "0 ریال" [ref=f23e375]
+              - cell "0 ریال" [ref=f23e376]
+      - generic [ref=f23e377]:
+        - generic [ref=f23e378]:
+          - heading "ضرایب کاهنده سرپرستان" [level=2] [ref=f23e380]
+          - generic [ref=f23e381]:
+            - link "بروزرسانی" [ref=f23e382] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-supervisor_penalty
+            - link "ورود اطلاعات" [ref=f23e383] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e384]:
+          - textbox "جستجو..." [ref=f23e385]
+          - combobox [ref=f23e386]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e387]
+          - textbox "سرپرست" [ref=f23e388]
+          - button "اعمال فیلتر" [ref=f23e389] [cursor=pointer]
+        - table [ref=f23e391]:
+          - rowgroup [ref=f23e392]:
+            - row [ref=f23e393]:
+              - columnheader "تاریخ گزارش" [ref=f23e394]
+              - columnheader "نام سرپرست" [ref=f23e395]
+              - columnheader "درصد جریمه" [ref=f23e396]
+              - columnheader "پورسانت با ضریب" [ref=f23e397]
+              - columnheader "پورسانت بعد از جریمه" [ref=f23e398]
+          - rowgroup [ref=f23e399]:
+            - row [ref=f23e400]:
+              - cell "داده‌ای برای این گزارش ثبت نشده است." [ref=f23e401]
+      - generic [ref=f23e402]:
+        - generic [ref=f23e403]:
+          - heading "تحقق هدف مشتری" [level=2] [ref=f23e405]
+          - generic [ref=f23e406]:
+            - link "بروزرسانی" [ref=f23e407] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-customer_target
+            - link "ورود اطلاعات" [ref=f23e408] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e409]:
+          - textbox "جستجو..." [ref=f23e410]
+          - combobox [ref=f23e411]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e412]
+          - textbox "سرپرست" [ref=f23e413]
+          - button "اعمال فیلتر" [ref=f23e414] [cursor=pointer]
+        - table [ref=f23e416]:
+          - rowgroup [ref=f23e417]:
+            - row [ref=f23e418]:
+              - columnheader "تاریخ گزارش" [ref=f23e419]
+              - columnheader "ویزیتور" [ref=f23e420]
+              - columnheader "کف مشتری" [ref=f23e421]
+              - columnheader "تحقق تعداد هدف مشتری" [ref=f23e422]
+              - columnheader "درصد تحقق" [ref=f23e423]
+              - columnheader "پاداش هدف مشتری" [ref=f23e424]
+              - columnheader "مانده تا ورود" [ref=f23e425]
+              - columnheader "سرپرست" [ref=f23e426]
+          - rowgroup [ref=f23e427]:
+            - row [ref=f23e428]:
+              - cell "داده‌ای برای این گزارش ثبت نشده است." [ref=f23e429]
+      - generic [ref=f23e430]:
+        - generic [ref=f23e431]:
+          - heading "عملکرد لاین‌ها" [level=2] [ref=f23e433]
+          - generic [ref=f23e434]:
+            - link "بروزرسانی" [ref=f23e435] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-line_performance
+            - link "ورود اطلاعات" [ref=f23e436] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e437]:
+          - textbox "جستجو..." [ref=f23e438]
+          - combobox [ref=f23e439]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e440]
+          - textbox "سرپرست" [ref=f23e441]
+          - button "اعمال فیلتر" [ref=f23e442] [cursor=pointer]
+        - table [ref=f23e444]:
+          - rowgroup [ref=f23e445]:
+            - row [ref=f23e446]:
+              - columnheader "تاریخ گزارش" [ref=f23e447]
+              - columnheader "لاین" [ref=f23e448]
+              - columnheader "فروش لاین" [ref=f23e449]
+              - columnheader "قطعه" [ref=f23e450]
+              - columnheader "تارگت" [ref=f23e451]
+              - columnheader "درصد تحقق" [ref=f23e452]
+          - rowgroup [ref=f23e453]:
+            - row [ref=f23e454]:
+              - cell "1405/04/25" [ref=f23e455]
+              - cell "A" [ref=f23e456]
+              - cell "11,500,000 ریال" [ref=f23e457]
+              - cell "12" [ref=f23e458]
+              - cell "0" [ref=f23e459]
+              - cell "0.0٪" [ref=f23e460]
+      - generic [ref=f23e462]:
+        - generic [ref=f23e463]:
+          - heading "عملکرد سرپرستان" [level=2] [ref=f23e465]
+          - generic [ref=f23e466]:
+            - link "بروزرسانی" [ref=f23e467] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-supervisor_performance
+            - link "ورود اطلاعات" [ref=f23e468] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e469]:
+          - textbox "جستجو..." [ref=f23e470]
+          - combobox [ref=f23e471]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e472]
+          - textbox "سرپرست" [ref=f23e473]
+          - button "اعمال فیلتر" [ref=f23e474] [cursor=pointer]
+        - table [ref=f23e476]:
+          - rowgroup [ref=f23e477]:
+            - row [ref=f23e478]:
+              - columnheader "تاریخ گزارش" [ref=f23e479]
+              - columnheader "لاین" [ref=f23e480]
+              - columnheader "سرپرست" [ref=f23e481]
+              - columnheader "تارگت" [ref=f23e482]
+              - columnheader "فروش" [ref=f23e483]
+              - columnheader "ریال فروش" [ref=f23e484]
+              - columnheader "درصد تحقق" [ref=f23e485]
+          - rowgroup [ref=f23e486]:
+            - row [ref=f23e487]:
+              - cell "داده‌ای برای این گزارش ثبت نشده است." [ref=f23e488]
+      - generic [ref=f23e489]:
+        - generic [ref=f23e490]:
+          - heading "عملکرد مدیران فروش" [level=2] [ref=f23e492]
+          - generic [ref=f23e493]:
+            - link "بروزرسانی" [ref=f23e494] [cursor=pointer]:
+              - /url: /admin/manager-dashboard.php#widget-sales_manager_performance
+            - link "ورود اطلاعات" [ref=f23e495] [cursor=pointer]:
+              - /url: /admin/import-center.php?source=sales_aggregate
+        - generic [ref=f23e496]:
+          - textbox "جستجو..." [ref=f23e497]
+          - combobox [ref=f23e498]:
+            - option "همه لاین‌ها" [selected]
+            - option "A"
+            - option "B"
+            - option "C"
+            - option "D"
+            - option "A-B"
+            - option "C-D"
+          - textbox "ویزیتور" [ref=f23e499]
+          - textbox "سرپرست" [ref=f23e500]
+          - button "اعمال فیلتر" [ref=f23e501] [cursor=pointer]
+        - table [ref=f23e503]:
+          - rowgroup [ref=f23e504]:
+            - row [ref=f23e505]:
+              - columnheader "تاریخ گزارش" [ref=f23e506]
+              - columnheader "لاین" [ref=f23e507]
+              - columnheader "مدیر فروش" [ref=f23e508]
+              - columnheader "تارگت" [ref=f23e509]
+              - columnheader "فروش" [ref=f23e510]
+              - columnheader "ریال فروش" [ref=f23e511]
+              - columnheader "درصد تحقق" [ref=f23e512]
+          - rowgroup [ref=f23e513]:
+            - row [ref=f23e514]:
+              - cell "داده‌ای برای این گزارش ثبت نشده است." [ref=f23e515]

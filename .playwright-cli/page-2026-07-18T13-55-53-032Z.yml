@@ -1,0 +1,46 @@
+- main [ref=e2]:
+  - heading "نصب سامانه" [level=1] [ref=e3]
+  - heading "پیش‌نیازها" [level=3] [ref=e4]
+  - paragraph [ref=e5]: ✅ PHP 8.1+
+  - paragraph [ref=e6]: ✅ PDO
+  - paragraph [ref=e7]: ✅ PDO MySQL
+  - paragraph [ref=e8]: ✅ JSON
+  - paragraph [ref=e9]: ✅ Mbstring
+  - paragraph [ref=e10]: ✅ Fileinfo برای آپلود امن
+  - paragraph [ref=e11]: ✅ ZipArchive برای Excel
+  - paragraph [ref=e12]: ✅ XMLReader برای Excel بزرگ
+  - paragraph [ref=e13]: ✅ پوشه config قابل نوشتن
+  - paragraph [ref=e14]: ✅ پوشه uploads قابل نوشتن
+  - generic [ref=e15]:
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]: هاست دیتابیس
+        - textbox "هاست دیتابیس" [ref=e19]: localhost
+      - generic [ref=e20]:
+        - generic [ref=e21]: پورت دیتابیس
+        - spinbutton "پورت دیتابیس" [ref=e22]: "3306"
+      - generic [ref=e23]:
+        - generic [ref=e24]: نام دیتابیس
+        - textbox "نام دیتابیس" [ref=e25]
+      - generic [ref=e26]:
+        - generic [ref=e27]: نام کاربری دیتابیس
+        - textbox "نام کاربری دیتابیس" [ref=e28]
+      - generic [ref=e29]:
+        - generic [ref=e30]: رمز دیتابیس
+        - textbox "رمز دیتابیس" [ref=e31]
+      - generic [ref=e32]:
+        - generic [ref=e33]: آدرس برنامه
+        - textbox "آدرس برنامه" [ref=e34]
+      - generic [ref=e35]:
+        - generic [ref=e36]: نام مدیر
+        - textbox "نام مدیر" [ref=e37]
+      - generic [ref=e38]:
+        - generic [ref=e39]: ایمیل مدیر
+        - textbox "ایمیل مدیر" [ref=e40]
+      - generic [ref=e41]:
+        - generic [ref=e42]: نام کاربری مدیر
+        - textbox "نام کاربری مدیر" [ref=e43]
+      - generic [ref=e44]:
+        - generic [ref=e45]: رمز مدیر
+        - textbox "رمز مدیر" [ref=e46]
+    - button "اتصال به دیتابیس و شروع نصب" [ref=e47] [cursor=pointer]

@@ -51,7 +51,7 @@ $metadata = $batch ? (json_decode((string)$batch['metadata_json'],true) ?: []) :
 $pageTitle = 'ورود اطلاعات فروش تجمیعی';
 require __DIR__ . '/../views/partials/admin-header.php';
 ?>
-<div class="section-heading-row"><div><h1><?=e($pageTitle)?></h1><p class="muted">این فایل منبع مرجع محاسبات فروش، گزارش‌ها و داشبوردهای مرحله‌های بعدی می‌شود.</p></div><a class="btn btn-light" href="/admin/sales-reference-status.php">وضعیت دیتای مرجع</a></div>
+<div class="section-heading-row"><div><h1><?=e($pageTitle)?></h1><p class="muted">این فایل منبع مرجع محاسبات فروش، گزارش‌ها و داشبوردهای مرحله‌های بعدی می‌شود.</p></div><div class="form-actions actions"><a class="btn btn-light" href="/admin/import-template.php?source=sales_aggregate">دانلود قالب فایل</a><a class="btn btn-light" href="/admin/sales-reference-status.php">وضعیت دیتای مرجع</a></div></div>
 
 <section class="card">
     <h2>بارگذاری فایل</h2>
@@ -63,7 +63,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
         <label><span>Import mode</span><select name="import_mode">
             <option value="replace_reference">جایگزینی مرجع فعلی</option><option value="append">افزودن به داده‌های فعلی</option><option value="update_existing">بروزرسانی رکوردهای موجود</option><option value="skip_duplicates">رد کردن تکراری‌ها</option>
         </select></label>
-        <button class="btn btn-primary" type="submit">بارگذاری و بررسی فایل</button>
+        <div class="form-actions actions"><a class="btn btn-light" href="/admin/import-template.php?source=sales_aggregate">دانلود قالب فایل</a><button class="btn btn-primary" type="submit">بارگذاری و بررسی فایل</button></div>
     </form>
 </section>
 

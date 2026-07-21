@@ -1,14 +1,100 @@
 <?php
-require_once __DIR__.'/../core/Auth.php';require_once __DIR__.'/../core/Response.php';require_once __DIR__.'/../core/JalaliDate.php';require_once __DIR__.'/../lib/HrAttendanceRepository.php';
-Auth::requireLogin();$user=Auth::user();$userId=(int)$user['id'];
+require_once __DIR__.'/../core/Auth.php';
+require_once __DIR__.'/../core/Response.php';
+require_once __DIR__.'/../core/JalaliDate.php';
+require_once __DIR__.'/../lib/AppDate.php';
+require_once __DIR__.'/../lib/HrAttendanceRepository.php';
+
+Auth::requireLogin();
+$user=Auth::user();
+$userId=(int)$user['id'];
 function my_attendance_minutes(int $minutes):string{return format_number(intdiv($minutes,60)).' ساعت و '.format_number($minutes%60).' دقیقه';}
-$todayJ=explode('/',JalaliDate::toJalali(date('Y-m-d')));$year=max(1200,min(1600,(int)($_GET['year']??$todayJ[0])));$month=max(1,min(12,(int)($_GET['month']??$todayJ[1])));
-$dateFrom=trim((string)($_GET['date_from']??''));$dateTo=trim((string)($_GET['date_to']??''));$filters=['year'=>$year,'month'=>$month,'date_from'=>$dateFrom,'date_to'=>$dateTo];
-$fromGregorian=$dateFrom!==''?(JalaliDate::toGregorian($dateFrom)??''):(JalaliDate::toGregorian(sprintf('%04d/%02d/01',$year,$month))??'');$toGregorian=$dateTo!==''?(JalaliDate::toGregorian($dateTo)??''):(JalaliDate::toGregorian(sprintf('%04d/%02d/%02d',$year,$month,JalaliDate::monthLength($year,$month)))??'');
-try{$rows=HrAttendanceRepository::myReport($userId,$filters);$stats=HrAttendanceRepository::myReportStats($rows,['date_from'=>$fromGregorian,'date_to'=>$toGregorian,'group_code'=>HrAttendanceRepository::groupCodeForUser($userId)]);}catch(InvalidArgumentException $e){flash($e->getMessage(),'danger');$rows=[];$stats=HrAttendanceRepository::myReportStats([],[]);}catch(Throwable $e){error_log('My attendance: '.$e->getMessage());flash('دریافت گزارش کارکرد انجام نشد.','danger');$rows=[];$stats=HrAttendanceRepository::myReportStats([],[]);}
-if(($_GET['export']??'')==='csv'){header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="my-attendance-'.date('Ymd-His').'.csv"');echo "\xEF\xBB\xBF";$out=fopen('php://output','wb');fputcsv($out,['تاریخ','وضعیت روز','ورود','خروج','کار مصوب دقیقه','کارکرد دقیقه','تأخیر','تعجیل','اضافه‌کاری عادی','اضافه‌کاری تعطیل','وضعیت تأیید اضافه‌کاری','توضیحات']);$safe=static fn($value)=>(is_string($value)&&preg_match('/^[=+\-@]/u',$value)?"'":'').$value;foreach($rows as $row)fputcsv($out,[JalaliDate::toJalali($row['attendance_date']),HrAttendanceRepository::DAY_STATUSES[$row['display_day_status']]??$row['display_day_status'],substr((string)$row['actual_in_time'],0,5),substr((string)$row['actual_out_time'],0,5),$row['scheduled_work_minutes'],$row['work_minutes'],$row['late_minutes'],$row['early_leave_minutes'],$row['normal_overtime_minutes'],$row['holiday_overtime_minutes'],HrAttendanceRepository::OVERTIME_STATUSES[$row['overtime_status']]??$row['overtime_status'],$safe($row['notes']??'')]);fclose($out);exit;}
-$query=$_GET;unset($query['employee_id'],$query['export']);$pageTitle='کارکرد من';$adminExtraStylesheets=['/assets/css/hr-attendance.css'];require __DIR__.'/../views/partials/admin-header.php';?>
-<div class="attendance-page"><header class="attendance-hero"><div><small>پنل شخصی منابع انسانی</small><h1>کارکرد من</h1><p>ورود، خروج، تأخیر، تعجیل و اضافه‌کاری ثبت‌شده برای حساب شما</p></div><a class="btn" href="?<?=e(http_build_query([...$query,'export'=>'csv']))?>">خروجی CSV</a></header>
-<section class="card attendance-filter-card"><form class="attendance-filter" method="get"><label>سال شمسی<input type="number" name="year" min="1200" max="1600" value="<?=$year?>"></label><label>ماه شمسی<select name="month"><?php for($number=1;$number<=12;$number++):?><option value="<?=$number?>" <?=$month===$number?'selected':''?>><?=format_number($number)?></option><?php endfor?></select></label><label>از تاریخ شمسی<input name="date_from" value="<?=e($dateFrom)?>" placeholder="۱۴۰۵/۰۱/۰۱"></label><label>تا تاریخ شمسی<input name="date_to" value="<?=e($dateTo)?>" placeholder="۱۴۰۵/۰۱/۳۱"></label><div class="attendance-actions"><button class="btn btn-primary">نمایش</button><a class="btn" href="/employee/my-attendance.php">ماه جاری</a></div></form></section>
-<section class="attendance-kpis"><?php foreach(['work_minutes'=>'مجموع کارکرد','late_minutes'=>'مجموع تأخیر','early_leave_minutes'=>'مجموع تعجیل','approved_overtime_minutes'=>'اضافه‌کاری تأییدشده'] as $key=>$label):?><article class="attendance-kpi"><span><?=e($label)?></span><strong><?=e(my_attendance_minutes((int)$stats[$key]))?></strong></article><?php endforeach?><?php foreach(['absent'=>'تعداد غیبت','leave'=>'تعداد مرخصی','mission'=>'تعداد مأموریت','holiday_count'=>'تعداد روز تعطیل'] as $key=>$label):?><article class="attendance-kpi"><span><?=e($label)?></span><strong><?=format_number($stats[$key])?></strong></article><?php endforeach?></section>
-<section class="card"><p class="muted">روز کاری مورد انتظار در بازه: <?=format_number($stats['expected_work_days'])?> روز از <?=format_number($stats['calendar_days'])?> روز تقویمی؛ تعطیلی نیمه‌روز معادل نیم‌روز محاسبه شده است.</p><div class="table-wrap"><table class="attendance-table"><thead><tr><th>تاریخ</th><th>وضعیت روز</th><th>ورود</th><th>خروج</th><th>کار مصوب</th><th>کارکرد</th><th>تأخیر</th><th>تعجیل</th><th>اضافه‌کاری عادی</th><th>اضافه‌کاری تعطیل</th><th>تأیید اضافه‌کاری</th><th>توضیحات</th></tr></thead><tbody><?php foreach($rows as $row):?><tr><td><?=e(JalaliDate::toJalali($row['attendance_date']))?></td><td><span class="attendance-badge attendance-<?=e($row['display_day_status'])?>"><?=e(HrAttendanceRepository::DAY_STATUSES[$row['display_day_status']]??$row['display_day_status'])?></span><?php if(!empty($row['holiday_title'])):?><small><?=e($row['holiday_title'])?></small><?php endif?></td><td><?=e(substr((string)$row['actual_in_time'],0,5)?:'—')?></td><td><?=e(substr((string)$row['actual_out_time'],0,5)?:'—')?></td><td><?=format_number($row['scheduled_work_minutes'])?> دقیقه</td><td><?=format_number($row['work_minutes'])?> دقیقه</td><td><?=format_number($row['late_minutes'])?> دقیقه</td><td><?=format_number($row['early_leave_minutes'])?> دقیقه</td><td><?=format_number($row['normal_overtime_minutes'])?> دقیقه</td><td><?=format_number($row['holiday_overtime_minutes'])?> دقیقه</td><td><?=e(HrAttendanceRepository::OVERTIME_STATUSES[$row['overtime_status']]??$row['overtime_status'])?></td><td><?=e($row['notes']?:'—')?></td></tr><?php endforeach?><?php if(!$rows):?><tr><td colspan="12">برای این بازه کارکردی ثبت نشده است.</td></tr><?php endif?></tbody></table></div></section></div><?php require __DIR__.'/../views/partials/admin-footer.php';?>
+
+$periodKey=trim((string)($_GET['period_key']??''));
+$customFrom=trim((string)($_GET['date_from']??''));
+$customTo=trim((string)($_GET['date_to']??''));
+try{
+    $period=AppDate::resolvePeriod($periodKey,$customFrom,$customTo,'monthly');
+}catch(InvalidArgumentException $e){
+    flash($e->getMessage(),'danger');
+    $period=AppDate::resolvePeriod('',null,null,'monthly');
+    $periodKey='';
+    $customFrom=$customTo='';
+}
+$fromGregorian=(string)$period['start_date'];
+$toGregorian=(string)$period['end_date'];
+$filters=['date_from'=>$fromGregorian,'date_to'=>$toGregorian];
+try{
+    $rows=HrAttendanceRepository::myReport($userId,$filters);
+    $stats=HrAttendanceRepository::myReportStats($rows,['date_from'=>$fromGregorian,'date_to'=>$toGregorian,'group_code'=>HrAttendanceRepository::groupCodeForUser($userId)]);
+}catch(InvalidArgumentException $e){
+    flash($e->getMessage(),'danger');$rows=[];$stats=HrAttendanceRepository::myReportStats([],[]);
+}catch(Throwable $e){
+    error_log('My attendance: '.$e->getMessage());flash('دریافت گزارش کارکرد انجام نشد.','danger');$rows=[];$stats=HrAttendanceRepository::myReportStats([],[]);
+}
+if(($_GET['export']??'')==='csv'){
+    header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="my-attendance-'.date('Ymd-His').'.csv"');echo "\xEF\xBB\xBF";
+    $out=fopen('php://output','wb');fputcsv($out,['تاریخ','وضعیت روز','ورود','خروج','کار مصوب دقیقه','کارکرد دقیقه','تأخیر','تعجیل','اضافه‌کاری عادی','اضافه‌کاری تعطیل','وضعیت تأیید اضافه‌کاری','جزئیات','توضیحات ایمپورت']);
+    $safe=static fn($value)=>(is_string($value)&&preg_match('/^[=+\-@]/u',$value)?"'":'').$value;
+    foreach($rows as $row){
+        $details=$row['day_status']==='leave'?($row['leave_type']??''):($row['day_status']==='mission'?($row['mission_details']??''):($row['notes']??''));
+        fputcsv($out,[
+            JalaliDate::toJalali($row['attendance_date']),
+            HrAttendanceRepository::DAY_STATUSES[$row['display_day_status']]??$row['display_day_status'],
+            substr((string)$row['actual_in_time'],0,5),
+            substr((string)$row['actual_out_time'],0,5),
+            (int)$row['scheduled_work_minutes'],
+            (int)$row['work_minutes'],
+            (int)$row['late_minutes'],
+            (int)$row['early_leave_minutes'],
+            (int)$row['normal_overtime_minutes'],
+            (int)$row['holiday_overtime_minutes'],
+            HrAttendanceRepository::OVERTIME_STATUSES[$row['overtime_status']]??$row['overtime_status'],
+            $safe($details),
+            $safe($row['import_time_notes']??''),
+        ]);
+    }
+    fclose($out);exit;
+}
+$query=$_GET;unset($query['employee_id'],$query['export']);
+$pageTitle='کارکرد من';
+$adminExtraStylesheets=['/assets/css/hr-attendance.css'];
+$adminExtraScripts=['/assets/js/hr-attendance.js'];
+require __DIR__.'/../views/partials/admin-header.php';
+?>
+<div class="attendance-page attendance-own-page">
+    <header class="attendance-hero">
+        <div><small>پنل شخصی منابع انسانی</small><h1>کارکرد من</h1><p><?=e((string)$period['title'])?> · <?=e(JalaliDate::toJalali($fromGregorian))?> تا <?=e(JalaliDate::toJalali($toGregorian))?></p></div>
+        <a class="btn attendance-export" href="?<?=e(http_build_query([...$query,'export'=>'csv']))?>">خروجی CSV</a>
+    </header>
+    <section class="card attendance-filter-card">
+        <form class="attendance-filter attendance-period-filter" method="get">
+            <label><span>دوره کارکرد</span><?=app_period_select('period_key',$periodKey,['weekly','monthly','quarterly','half_yearly','yearly','custom'],['placeholder'=>'ماه جاری','custom_target'=>'#attendance-custom-period'])?></label>
+            <div id="attendance-custom-period" class="attendance-custom-period" hidden>
+                <label><span>از تاریخ</span><?=app_date_input('date_from',$customFrom,['required'=>true])?></label>
+                <label><span>تا تاریخ</span><?=app_date_input('date_to',$customTo,['required'=>true])?></label>
+            </div>
+            <div class="attendance-actions"><button class="btn btn-primary">نمایش دوره</button><a class="btn" href="/employee/my-attendance.php">ماه جاری</a></div>
+        </form>
+    </section>
+    <section class="attendance-kpis" data-attendance-reveal>
+        <?php foreach(['work_minutes'=>'مجموع کارکرد','late_minutes'=>'مجموع تأخیر','early_leave_minutes'=>'مجموع تعجیل','approved_overtime_minutes'=>'اضافه‌کاری تأییدشده'] as $key=>$label):?>
+            <article class="attendance-kpi"><span><?=e($label)?></span><strong><?=e(my_attendance_minutes((int)$stats[$key]))?></strong></article>
+        <?php endforeach?>
+    </section>
+    <section class="attendance-status-strip" aria-label="خلاصه وضعیت روزها" data-attendance-reveal>
+        <?php foreach(['absent'=>'غیبت','leave'=>'مرخصی','mission'=>'مأموریت','holiday_count'=>'تعطیل'] as $key=>$label):?>
+            <article><span><?=e($label)?></span><strong><?=format_number($stats[$key])?></strong></article>
+        <?php endforeach?>
+        <p>روز کاری مورد انتظار: <strong><?=format_number($stats['expected_work_days'])?></strong> از <?=format_number($stats['calendar_days'])?> روز تقویمی</p>
+    </section>
+    <section class="card attendance-record-card" data-attendance-reveal>
+        <div class="attendance-section-heading"><div><span>ریز کارکرد</span><h2><?=e((string)$period['title'])?></h2></div><small>تمام تاریخ‌ها شمسی نمایش داده می‌شوند.</small></div>
+        <div class="table-wrap"><table class="attendance-table"><thead><tr><th>تاریخ</th><th>وضعیت</th><th>ورود / خروج</th><th>کارکرد</th><th>تأخیر / تعجیل</th><th>اضافه‌کاری</th><th>جزئیات</th></tr></thead><tbody>
+        <?php foreach($rows as $row):$details=$row['day_status']==='leave'?($row['leave_type']??''):($row['day_status']==='mission'?($row['mission_details']??''):($row['notes']??''));?>
+            <tr><td><strong><?=e(JalaliDate::toJalali($row['attendance_date']))?></strong></td><td><span class="attendance-badge attendance-<?=e($row['display_day_status'])?>"><?=e(HrAttendanceRepository::DAY_STATUSES[$row['display_day_status']]??$row['display_day_status'])?></span><?php if(!empty($row['holiday_title'])):?><small><?=e($row['holiday_title'])?></small><?php endif?></td><td><span class="attendance-time-pair"><?=e(substr((string)$row['actual_in_time'],0,5)?:'—')?> <b>تا</b> <?=e(substr((string)$row['actual_out_time'],0,5)?:'—')?></span></td><td><?=e(my_attendance_minutes((int)$row['work_minutes']))?><small>مصوب: <?=format_number($row['scheduled_work_minutes'])?> دقیقه</small></td><td><?=format_number($row['late_minutes'])?> / <?=format_number($row['early_leave_minutes'])?> دقیقه</td><td><?=format_number((int)$row['normal_overtime_minutes']+(int)$row['holiday_overtime_minutes'])?> دقیقه<small><?=e(HrAttendanceRepository::OVERTIME_STATUSES[$row['overtime_status']]??$row['overtime_status'])?></small></td><td><?=e($details?:'—')?><?php if(!empty($row['import_time_notes'])):?><small><?=e($row['import_time_notes'])?></small><?php endif?></td></tr>
+        <?php endforeach?><?php if(!$rows):?><tr><td colspan="7"><div class="attendance-empty"><strong>رکوردی برای این دوره ثبت نشده است.</strong><span>با تغییر دوره، بازه دیگری را بررسی کنید.</span></div></td></tr><?php endif?>
+        </tbody></table></div>
+    </section>
+</div>
+<?php require __DIR__.'/../views/partials/admin-footer.php';?>

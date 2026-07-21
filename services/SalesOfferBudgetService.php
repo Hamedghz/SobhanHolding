@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/SalesOfferBudgetModule.php';
+require_once __DIR__ . '/../lib/AppDate.php';
+require_once __DIR__ . '/FormulaRuntime.php';
 
 class SalesOfferBudgetService
 {
@@ -14,17 +16,23 @@ class SalesOfferBudgetService
     {
         $price=self::number($data['purchase_price']??0,'قیمت خرید');$qty=self::number($data['requested_offer_qty']??0,'تعداد آفر');$soldQty=self::number($data['sold_qty']??0,'تعداد فروش');$soldAmount=self::number($data['sold_amount']??0,'مبلغ فروش');$rate=self::number($data['provisional_offer_rate']??0,'نرخ آفر');
         if($price<0||$qty<0||$soldQty<0||$soldAmount<0||$rate<0)throw new InvalidArgumentException('مقادیر عددی نمی‌توانند منفی باشند.');
-        $base=$price*$qty;$budget=$base*$rate;
-        return ['purchase_price'=>$price,'requested_offer_qty'=>$qty,'purchase_base'=>$base,'sold_qty'=>$soldQty,'sold_amount'=>$soldAmount,'sales_ratio'=>$base>0?$soldAmount/$base:0,'provisional_offer_rate'=>$rate,'provisional_budget'=>$budget,'formula_version'=>'provisional_v1','calculated_at'=>date('c')];
+        $base=$price*$qty;$budget=$base*$rate;$formulaVersion='provisional_v1';
+        $runtime=FormulaRuntime::evaluateByKey('offer_budget_provisional',[
+            'purchase_price'=>$price,'requested_offer_qty'=>$qty,'purchase_base'=>$base,
+            'sold_qty'=>$soldQty,'sold_amount'=>$soldAmount,'offer_rate_percent'=>$rate*100,
+        ]);
+        if($runtime!==null){$budget=max(0,(float)$runtime['final_result']);$formulaVersion='formula_builder_v'.$runtime['formula_version_no'];}
+        return ['purchase_price'=>$price,'requested_offer_qty'=>$qty,'purchase_base'=>$base,'sold_qty'=>$soldQty,'sold_amount'=>$soldAmount,'sales_ratio'=>$base>0?$soldAmount/$base:0,'provisional_offer_rate'=>$rate,'provisional_budget'=>$budget,'formula_version'=>$formulaVersion,'calculated_at'=>date('c')];
     }
     private static function number(mixed $value,string $label): float { if($value===''||$value===null)return 0;if(!is_numeric($value))throw new InvalidArgumentException($label.' معتبر نیست.');return (float)$value; }
     private static function normalized(array $data): array
     {
-        $snapshot=self::calculateProvisionalBudget($data);$from=trim((string)($data['date_from']??''));$to=trim((string)($data['date_to']??''));
-        foreach([$from,$to] as $date)if($date!==''&&!self::validDate($date))throw new InvalidArgumentException('بازه تاریخ معتبر نیست.');if($from&&$to&&$from>$to)throw new InvalidArgumentException('تاریخ شروع باید پیش از تاریخ پایان باشد.');
-        return ['period_key'=>trim((string)($data['period_key']??''))?:null,'date_from'=>$from?:null,'date_to'=>$to?:null,'sales_line'=>trim((string)($data['sales_line']??''))?:null,'product_code'=>trim((string)($data['product_code']??''))?:null,'product_name'=>trim((string)($data['product_name']??''))?:null,'brand_name'=>trim((string)($data['brand_name']??''))?:null,'supplier_name'=>trim((string)($data['supplier_name']??''))?:null,'manager_note'=>trim((string)($data['manager_note']??''))?:null,'snapshot'=>$snapshot];
+        $snapshot=self::calculateProvisionalBudget($data);$periodKey=trim((string)($data['period_key']??''));$rawFrom=trim((string)($data['date_from']??''));$rawTo=trim((string)($data['date_to']??''));$from=$rawFrom===''?null:AppDate::toGregorian($rawFrom);$to=$rawTo===''?null:AppDate::toGregorian($rawTo);
+        if(($rawFrom!==''&&$from===null)||($rawTo!==''&&$to===null))throw new InvalidArgumentException('بازه تاریخ معتبر نیست.');
+        if($periodKey!==''&&(!$from||!$to)){try{$period=AppDate::resolvePeriod($periodKey,$rawFrom,$rawTo);$from=$period['start_date'];$to=$period['end_date'];}catch(Throwable $e){if(!$from||!$to)throw new InvalidArgumentException('دوره انتخاب‌شده معتبر نیست.');}}
+        if($from&&$to&&$from>$to)throw new InvalidArgumentException('تاریخ شروع باید پیش از تاریخ پایان باشد.');
+        return ['period_key'=>$periodKey?:null,'date_from'=>$from,'date_to'=>$to,'sales_line'=>trim((string)($data['sales_line']??''))?:null,'product_code'=>trim((string)($data['product_code']??''))?:null,'product_name'=>trim((string)($data['product_name']??''))?:null,'brand_name'=>trim((string)($data['brand_name']??''))?:null,'supplier_name'=>trim((string)($data['supplier_name']??''))?:null,'manager_note'=>trim((string)($data['manager_note']??''))?:null,'snapshot'=>$snapshot];
     }
-    private static function validDate(string $date): bool {$d=DateTimeImmutable::createFromFormat('!Y-m-d',$date);return $d&&$d->format('Y-m-d')===$date;}
     public static function createRequest(array $data,int $userId): int
     {
         $n=self::normalized($data);$user=Auth::user();$managerId=self::isAdmin($user)?((int)($data['sales_manager_id']??0)?:$userId):$userId;$line=self::isAdmin($user)?$n['sales_line']:((string)($user['sales_line']??'')?:$n['sales_line']);$code='OFR-'.date('YmdHis').'-'.str_pad((string)random_int(0,9999),4,'0',STR_PAD_LEFT);$s=$n['snapshot'];
@@ -38,7 +46,7 @@ class SalesOfferBudgetService
     public static function listRequests(array $filters,array $userContext): array
     {
         $where=[];$p=[];if(!self::isAdmin($userContext)){$where[]='(r.requested_by=? OR r.sales_manager_id=?'.(!empty($userContext['sales_line'])?' OR r.sales_line=?':'').')';$p[]=(int)$userContext['id'];$p[]=(int)$userContext['id'];if(!empty($userContext['sales_line']))$p[]=$userContext['sales_line'];}
-        foreach(['period_key','sales_line','status'] as $k)if(trim((string)($filters[$k]??''))!==''){$where[]="r.{$k}=?";$p[]=trim((string)$filters[$k]);}foreach(['product','brand_name'] as $k)if(trim((string)($filters[$k]??''))!==''){$column=$k==='product'?'CONCAT_WS(" ",r.product_code,r.product_name)':'r.brand_name';$where[]="$column LIKE ?";$p[]='%'.trim((string)$filters[$k]).'%';}if(!empty($filters['date_from'])){$where[]='r.date_to>=?';$p[]=$filters['date_from'];}if(!empty($filters['date_to'])){$where[]='r.date_from<=?';$p[]=$filters['date_to'];}
+        foreach(['period_key','sales_line','status'] as $k)if(trim((string)($filters[$k]??''))!==''){$where[]="r.{$k}=?";$p[]=trim((string)$filters[$k]);}foreach(['product','brand_name'] as $k)if(trim((string)($filters[$k]??''))!==''){$column=$k==='product'?'CONCAT_WS(" ",r.product_code,r.product_name)':'r.brand_name';$where[]="$column LIKE ?";$p[]='%'.trim((string)$filters[$k]).'%';}$dateFrom=AppDate::toGregorian((string)($filters['date_from']??''));$dateTo=AppDate::toGregorian((string)($filters['date_to']??''));if($dateFrom){$where[]='r.date_to>=?';$p[]=$dateFrom;}if($dateTo){$where[]='r.date_from<=?';$p[]=$dateTo;}
         return Database::fetchAll('SELECT r.*,u.name requested_by_name FROM sales_offer_budget_requests r LEFT JOIN users u ON u.id=r.requested_by'.($where?' WHERE '.implode(' AND ',$where):'').' ORDER BY r.id DESC LIMIT 500',$p);
     }
     public static function changeStatus(int $id,string $status,string $note,int $userId): void {$old=self::getRequest($id,Auth::user());if(!$old)throw new InvalidArgumentException('استعلام پیدا نشد.');if(!self::isAdmin()){if($status!=='submitted'||$old['status']!=='draft'||(int)$old['requested_by']!==$userId)throw new InvalidArgumentException('مجوز تغییر این وضعیت را ندارید.');Database::execute('UPDATE sales_offer_budget_requests SET status="submitted",updated_at=NOW() WHERE id=?',[$id]);self::logAction($id,'submit',['status'=>'draft'],['status'=>'submitted'],$userId);return;}if(!in_array($status,self::STATUSES,true)||$status==='draft')throw new InvalidArgumentException('وضعیت معتبر نیست.');Database::execute('UPDATE sales_offer_budget_requests SET status=?,admin_note=?,reviewed_by=?,reviewed_at=NOW(),updated_at=NOW() WHERE id=?',[$status,trim($note)?:null,$userId,$id]);self::logAction($id,'status_change',['status'=>$old['status'],'admin_note'=>$old['admin_note']],['status'=>$status,'admin_note'=>$note],$userId);}

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Formula builder fixture</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="/assets/css/app.css">
+    <link rel="stylesheet" href="/assets/css/admin.css">
+    <link rel="stylesheet" href="/assets/css/app-compact-ui.css">
+    <link rel="stylesheet" href="/assets/css/formula-builder.css">
+</head>
+<body class="admin-body app-compact-ui">
+<main class="admin-main" style="margin:0">
+<section class="admin-content">
+    <div class="section-heading-row formula-heading">
+        <div><span class="formula-eyebrow">Formula Builder</span><h1>فرمول‌ساز تصویری</h1><p class="muted">بدون JSON، SQL یا عبارت اجرایی</p></div>
+        <button class="btn btn-primary">پنل آزمون فرمول</button>
+    </div>
+    <div class="alert alert-warning">نسخه پیش‌نویس تا زمان انتشار روی اعداد فعال اثر ندارد.</div>
+    <nav class="formula-category-tabs"><a class="is-active">همه</a><a>پورسانت</a><a>ضریب کاهنده</a><a>تارگت</a><a>KPI</a><a>کارکرد</a></nav>
+    <div class="formula-workspace">
+        <aside class="card formula-library">
+            <div class="formula-library-head"><div><h2>کتابخانه فرمول‌ها</h2><small>۴ فرمول</small></div><button class="btn btn-small">فرمول جدید</button></div>
+            <div class="formula-library-list">
+                <a class="formula-library-item is-active"><span>پورسانت نهایی مدیر فروش</span><small>پورسانت · پیش‌نویس ۱</small></a>
+                <a class="formula-library-item"><span>ضریب کاهنده مدیر فروش</span><small>ضریب کاهنده · پیش‌نویس ۱</small></a>
+                <a class="formula-library-item"><span>پوشش مشتری</span><small>پوشش مشتری · پیش‌نویس ۱</small></a>
+            </div>
+        </aside>
+        <section class="formula-main">
+            <form class="card admin-form formula-builder-form" data-formula-builder data-prevent-dashboard-refresh="1">
+                <ol class="formula-steps"><li class="is-active"><span>۱</span>هویت</li><li><span>۲</span>منبع و شاخص</li><li><span>۳</span>شرط و نتیجه</li><li><span>۴</span>اعتبار و انتشار</li></ol>
+                <section class="formula-section">
+                    <header><span>۱</span><div><h2>هویت فرمول</h2><p>عنوان و دسته را مشخص کنید.</p></div></header>
+                    <div class="grid grid-3"><label class="form-field"><span>عنوان فرمول</span><input value="پورسانت نهایی مدیر فروش"></label><label class="form-field"><span>کلید انگلیسی</span><input value="manager_commission"></label><label class="form-field"><span>دسته</span><select><option>پورسانت</option></select></label></div>
+                </section>
+                <section class="formula-section">
+                    <header><span>۲</span><div><h2>منبع و شاخص</h2><p>فقط از فهرست امن انتخاب می‌شود.</p></div></header>
+                    <div class="grid grid-3">
+                        <label class="form-field"><span>منبع داده</span><select name="data_source_key" data-formula-source><option value="sample_input">ورودی نمونه کنترل‌شده</option><option value="active_sales">فروش تجمیعی فعال</option></select></label>
+                        <label class="form-field"><span>شاخص</span><select name="metric_key" data-formula-metric data-selected="final_commission"></select></label>
+                        <label class="form-field"><span>نوع تجمیع</span><select name="aggregation_key" data-formula-aggregation><option value="SUM">جمع</option><option value="PERCENT">درصد</option></select></label>
+                        <label class="form-field" data-comparison-field><span>شاخص مقایسه</span><select name="comparison_metric_key" data-formula-comparison></select></label>
+                    </div>
+                    <div class="formula-filter-head"><div><h3>فیلترهای منبع</h3><p class="muted">ساختاریافته و محدود</p></div><button class="btn btn-small" type="button" data-add-formula-filter>افزودن فیلتر</button></div>
+                    <div class="formula-filter-list" data-formula-filters></div>
+                </section>
+                <section class="formula-section">
+                    <header><span>۳</span><div><h2>شرط و نتیجه</h2><p>قاعده قابل خواندن برای کاربر</p></div></header>
+                    <div class="formula-rule-sentence"><span>اگر</span><select><option>بزرگ‌تر یا برابر</option></select><input value="75"><span>آنگاه</span><select><option>خود مقدار شاخص</option></select><input value="0"></div>
+                </section>
+                <section class="formula-section"><header><span>۴</span><div><h2>اعتبار و وابستگی</h2><p>نسخه‌بندی و کنترل تداخل</p></div></header><div class="grid grid-3"><label class="form-field"><span>شروع اعتبار</span><input value="۱۴۰۵/۰۱/۰۱"></label><label class="form-field"><span>پایان اعتبار</span><input value="۱۴۰۵/۱۲/۲۹"></label><label class="form-field"><span>وابستگی</span><select><option>بدون وابستگی</option></select></label></div></section>
+                <div class="form-actions"><button class="btn btn-primary">ذخیره نسخه پیش‌نویس</button></div>
+            </form>
+        </section>
+    </div>
+</section>
+</main>
+<script>
+window.SOBHAN_FORMULA_SOURCES = {
+  sample_input: {
+    title: "ورودی نمونه کنترل‌شده",
+    metrics: {final_commission: "پورسانت نهایی", achievement_percent: "درصد تحقق", net_amount: "فروش خالص"},
+    filters: {line_code: "لاین", user_id: "کاربر"}
+  },
+  active_sales: {
+    title: "فروش تجمیعی فعال",
+    metrics: {net_amount: "فروش خالص", total_qty: "تعداد فروش"},
+    filters: {line_code: "لاین", product_code: "کالا", customer_code: "مشتری"}
+  }
+};
+</script>
+<script src="/assets/vendor/motion/motion-12.42.2.min.js"></script>
+<script src="/assets/js/app-motion.js"></script>
+<script src="/assets/js/app-compact-ui.js"></script>
+<script src="/assets/js/formula-builder.js"></script>
+</body>
+</html>

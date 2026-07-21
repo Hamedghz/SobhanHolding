@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <link rel="stylesheet" href="/assets/css/app-compact-ui.css">
+  <link rel="stylesheet" href="/assets/css/daily-work-report.css">
+  <title>گزارش کار روزانه</title>
+</head>
+<body class="admin-body app-compact-ui">
+<main class="admin-main" style="max-width:1320px;margin:auto;padding:18px"><section class="admin-content">
+<div class="daily-report-page">
+  <section class="daily-report-hero" data-daily-reveal><div><span class="daily-report-kicker">DAILY WORK REPORT</span><h1>گزارش کار روزانه</h1><p>فعالیت‌های دستی و داده‌های واقعی Action Hub، پلنر، KPI، حضور و ورود اطلاعات در یک گزارش قابل پیگیری جمع می‌شوند.</p></div><div class="daily-report-hero-actions"><button class="btn">مدیریت قالب‌ها</button><button class="btn">اقدامات من</button></div></section>
+  <form class="card daily-report-switcher"><label class="form-field"><span>کاربر گزارش</span><select><option>سارا محمدی</option></select></label><label class="form-field"><span>تاریخ گزارش</span><input value="۱۴۰۵/۰۴/۲۹"></label><label class="form-field"><span>قالب گزارش</span><select><option>گزارش کار روزانه — نسخه ۱</option></select></label><button class="btn">نمایش گزارش</button></form>
+  <section class="daily-report-meta"><div><span>کاربر</span><strong>سارا محمدی</strong></div><div><span>تاریخ</span><strong>۱۴۰۵/۰۴/۲۹</strong></div><div><span>قالب</span><strong>گزارش کار روزانه</strong></div><div><span>وضعیت</span><strong class="daily-report-status is-draft">پیش‌نویس</strong></div></section>
+  <form class="daily-report-form">
+    <section class="daily-report-fields">
+      <article class="card daily-readonly-field"><header><span class="daily-source-dot"></span><div><h2>اقدامات انجام‌شده امروز</h2><small>اقدامات محول‌شده</small></div><b>۳</b></header><p>پیگیری مشتریان بدون خرید • ثبت گزارش مسیر • هماهنگی سفارش ویژه</p><div class="daily-link-row"><a>پیگیری مشتریان</a><a>ثبت گزارش مسیر</a></div></article>
+      <article class="card daily-readonly-field"><header><span class="daily-source-dot"></span><div><h2>تسک‌های تکمیل‌شده</h2><small>وظایف تکمیل‌شده</small></div><b>۵</b></header><p>پنج وظیفه امروز در پلنر تکمیل شده است.</p><div class="daily-link-row"><a>مشاهده وظیفه</a><a>گزارش پایان روز</a></div></article>
+      <article class="card daily-readonly-field"><header><span class="daily-source-dot"></span><div><h2>حضور و کارکرد امروز</h2><small>حضور و کارکرد</small></div><b>۴۸۰</b></header><p>حاضر — ۸ ساعت، تأخیر ۱۰ دقیقه</p></article>
+      <article class="card daily-readonly-field"><header><span class="daily-source-dot"></span><div><h2>وضعیت KPI</h2><small>مقادیر KPI</small></div><b>۸.۴</b></header><p>میانگین ۸.۴ در «دوره تیرماه»</p></article>
+      <label class="card daily-manual-field"><span class="daily-field-label">مشکلات و موانع</span><textarea>کمبود موجودی دو قلم پرتقاضا و نیاز به تصمیم خرید.</textarea><small>موانع و موارد نیازمند تصمیم را بنویسید.</small></label>
+      <label class="card daily-manual-field"><span class="daily-field-label">برنامه فردا *</span><textarea>پیگیری مشتریان مسیر غرب و تکمیل گزارش تحقق هدف.</textarea></label>
+    </section>
+    <div class="daily-report-submit"><button class="btn">ذخیره پیش‌نویس</button><button class="btn btn-primary">ثبت و ارسال گزارش</button></div>
+  </form>
+  <details class="card daily-action-composer" open data-daily-reveal><summary><span><b>ساخت اقدام از «اقدامات و پیشنهادات»</b><small>گزارش فقط لینک اقدام را نگه می‌دارد.</small></span><span>＋</span></summary><form><div class="daily-action-grid"><label class="form-field daily-span-2"><span>عنوان اقدام</span><input value="پیگیری تامین موجودی"></label><label class="form-field"><span>مسئول</span><select><option>علی رضایی</option></select></label><label class="form-field"><span>نوع اقدام</span><select><option>عمومی</option></select></label><label class="form-field"><span>موعد جلالی</span><input value="۱۴۰۵/۰۵/۰۱"></label><label class="form-field"><span>اولویت</span><select><option>بالا</option></select></label><label class="form-field daily-span-2"><span>شرح اقدام</span><textarea>بررسی تامین دو قلم پرتقاضا و اعلام زمان ورود.</textarea></label></div><label class="daily-planner-check"><input type="checkbox" checked> هم‌زمان به پلنر مسئول اضافه شود</label><button class="btn btn-primary">ساخت و پیوند اقدام</button></form></details>
+</div>
+</section></main>
+<script src="/assets/vendor/motion/motion-12.42.2.min.js"></script>
+<script src="/assets/js/daily-work-report.js"></script>
+</body>
+</html>

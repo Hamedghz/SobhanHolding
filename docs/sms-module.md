@@ -22,14 +22,14 @@ Admin و Super Admin طبق رفتار موجود `Auth::can()` همه این م
 3. `/install/sms_seed.php` را اجرا کنید؛ اجرای تکراری قالب duplicate نمی‌سازد.
 4. در `/admin/sms-settings.php` تنظیمات را ذخیره و «تست اتصال SOAP» یا «دریافت اعتبار» را اجرا کنید.
 5. شماره تست را وارد و «ارسال پیام تست» را بزنید. این دکمه واقعاً یک پیام خارجی ارسال می‌کند.
-6. ارسال دستی از `/admin/sms-send.php` انجام می‌شود و نتیجه هر batch جدا ثبت می‌گردد.
+6. ارسال دستی از `/admin/sms-send.php` انجام می‌شود و نتیجه هر batch جدا ثبت می‌گردد. هر فرم یک request key یک‌بارمصرف دارد تا ارسال تکراری ناشی از دوبار کلیک یا retry هم‌زمان دوباره به gateway نرود.
 7. در `/admin/sms-delivery-sync.php` برای هر bulk code وضعیت تحویل را بروزرسانی کنید.
 
 ## امنیت و داده
 
 رمز با AES-256-GCM ذخیره می‌شود، در UI برگردانده نمی‌شود و ارسال فیلد خالی رمز قبلی را حفظ می‌کند. POSTها CSRF دارند، خروجی‌ها escape می‌شوند و exception خام، username کامل، password یا متن پیام در gateway log نوشته نمی‌شود. URL API فقط یک فیلد غیرفعال است و هیچ درخواست URL-based اجرا نمی‌شود.
 
-جداول `sms_settings`، `sms_templates`، `sms_messages`، `sms_message_recipients` و `sms_gateway_logs` افزایشی و idempotent هستند. rollback امن با غیرفعال‌کردن سرویس و برداشتن مجوزها انجام می‌شود؛ حذف جدول یا داده rollback پشتیبانی‌شده نیست.
+جداول `sms_settings`، `sms_templates`، `sms_messages`، `sms_message_recipients` و `sms_gateway_logs` افزایشی و idempotent هستند. ستون‌های `request_key` و `segment_count` و ایندکس یکتای request key به‌صورت idempotent افزوده می‌شوند. تعداد تقریبی قطعه‌های پیام پیش از ارسال نمایش داده و همراه رکورد پیام ذخیره می‌شود. rollback امن با غیرفعال‌کردن سرویس و برداشتن مجوزها انجام می‌شود؛ حذف جدول، ستون یا داده rollback پشتیبانی‌شده نیست.
 
 ## محدودیت‌ها
 
