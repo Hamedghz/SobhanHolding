@@ -64,3 +64,5 @@ uploads/management-followups/*
 # Codex local runtime
 .codex-runtime/
 *.pre-sobhan-codex.bak
+
+SobhanNotificationHub/
