@@ -4,6 +4,10 @@ $root = dirname(__DIR__);
 require_once $root . '/core/SpreadsheetImportReader.php';
 require_once $root . '/tests/support/xlsx_fixture.php';
 
+if (SpreadsheetImportReader::MAX_UNCOMPRESSED_SIZE < 256 * 1024 * 1024) {
+    throw new RuntimeException('The XLSX structure limit is too small for wide ERP exports.');
+}
+
 $path = tempnam(sys_get_temp_dir(), 'xlsx-stream-') . '.xlsx';
 $rows = [];
 for ($index = 1; $index <= 650; $index++) {

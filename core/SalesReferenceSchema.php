@@ -142,7 +142,7 @@ class SalesReferenceSchema
     {
         if (self::tableExists($pdo, 'sales_aggregate_rows')) {
             $salesText = [
-                'period_key'=>'VARCHAR(50) NULL','invoice_sub_number'=>'VARCHAR(100) NULL','visitor_name'=>'VARCHAR(255) NULL',
+                'period_key'=>'VARCHAR(50) NULL','turnover_month'=>'VARCHAR(100) NULL','invoice_sub_number'=>'VARCHAR(100) NULL','visitor_name'=>'VARCHAR(255) NULL',
                 'line_name'=>'VARCHAR(100) NULL','customer_address'=>'TEXT NULL','customer_mobile'=>'VARCHAR(100) NULL',
                 'customer_phone'=>'VARCHAR(100) NULL','customer_grade'=>'VARCHAR(100) NULL','customer_national_code'=>'VARCHAR(100) NULL',
                 'customer_guild_code'=>'VARCHAR(100) NULL','customer_guild_name'=>'VARCHAR(255) NULL','customer_role_code'=>'VARCHAR(100) NULL',
@@ -166,11 +166,12 @@ class SalesReferenceSchema
             ];
             $salesDecimal = ['product_weight','product_volume','carton_size','carton_qty','part_qty','total_qty','net_carton_qty','unit_price','discount_percent_1','discount_amount_1','discount_percent_2','discount_amount_2','discount_percent_3','discount_amount_3','discount_percent_4','discount_amount_4','discount_percent_5','discount_amount_5','discount_total','amount_after_discount','tax_amount','duty_amount','tax_duty_total','fifo_cost','average_cost','tax_percent','duty_percent','purchase_cost_price','coefficient','coefficient_sales_amount'];
             foreach ($salesText as $column => $definition) self::addColumn($pdo, 'sales_aggregate_rows', $column, $definition);
+            self::addColumn($pdo, 'sales_aggregate_rows', 'turnover_year', 'SMALLINT NULL');
             foreach ($salesDecimal as $column) self::addColumn($pdo, 'sales_aggregate_rows', $column, 'DECIMAL(18,4) NULL');
             self::addColumn($pdo, 'sales_aggregate_rows', 'customer_birth_date', 'DATE NULL');
             self::aliasColumn($pdo, 'sales_aggregate_rows', 'discount_total', 'discount_amount');
             self::aliasColumn($pdo, 'sales_aggregate_rows', 'total_qty', 'quantity');
-            foreach (['period_key','invoice_number','visitor_code','visitor_name','customer_code','product_code','brand_code','brand_name','line_code','line_name','supervisor_code','supervisor_name','sales_manager_code','sales_manager_name','city_code','city_name','route_code','route_name'] as $column) {
+            foreach (['period_key','turnover_month','turnover_year','invoice_number','visitor_code','visitor_name','customer_code','product_code','brand_code','brand_name','line_code','line_name','supervisor_code','supervisor_name','sales_manager_code','sales_manager_name','city_code','city_name','route_code','route_name'] as $column) {
                 self::addIndex($pdo, 'sales_aggregate_rows', 'idx_sales_ref_' . $column, $column);
             }
         }

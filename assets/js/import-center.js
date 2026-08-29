@@ -7,12 +7,16 @@
   const period = form.querySelector('[data-period-field]');
   const refresh = () => {
     const value = source?.value || '';
+    const templateSource = value === 'sales_aggregate' ? 'budget_inputs' : (value || 'all');
     if (templateLink) {
-      templateLink.href = `/admin/import-template.php?source=${encodeURIComponent(value || 'all')}`;
-      templateLink.textContent = value ? `دانلود قالب ${source.options[source.selectedIndex]?.text || ''}` : 'دانلود قالب همه منابع مجاز';
+      templateLink.href = `/admin/import-template.php?source=${encodeURIComponent(templateSource)}`;
+      templateLink.textContent = value === 'sales_aggregate'
+        ? 'دانلود قالب سه شیت بودجه آفر'
+        : (value ? `دانلود قالب ${source.options[source.selectedIndex]?.text || ''}` : 'دانلود قالب همه منابع مجاز');
     }
-    const snapshotRequired = ['inventory_aggregate', 'attendance'].includes(value);
-    const periodRequired = ['inventory_aggregate', 'sales_targets', 'product_priorities', 'customer_coefficients'].includes(value);
+    const budgetBundle = value === 'sales_aggregate';
+    const snapshotRequired = ['inventory_aggregate', 'attendance'].includes(value) || budgetBundle;
+    const periodRequired = ['inventory_aggregate', 'sales_targets', 'product_priorities', 'customer_coefficients'].includes(value) || budgetBundle;
     snapshot?.classList.toggle('is-required', snapshotRequired);
     period?.classList.toggle('is-required', periodRequired);
     const snapshotInput = snapshot?.querySelector('input');

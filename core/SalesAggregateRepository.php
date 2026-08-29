@@ -15,6 +15,7 @@ class SalesAggregateRepository
              $data['import_mode'],$data['status'],$data['started_by'],$data['metadata_json']]
         );
         $id = (int)Database::lastInsertId();
+        if (!empty($data['detected_range'])) Database::execute('UPDATE sales_import_batches SET detected_range=? WHERE id=?', [$data['detected_range'],$id]);
         SalesReferenceRepository::mirrorBatch($id, [
             'source_module' => 'sales_aggregate',
             'source_type' => $data['source_type'],
@@ -54,13 +55,13 @@ class SalesAggregateRepository
     public static function updateBatchDetection(int $batchId, array $candidate, string $status, array $metadata): void
     {
         Database::execute(
-            'UPDATE sales_import_batches SET detected_sheet=?,detected_table=?,status=?,metadata_json=?,updated_at=NOW() WHERE id=?',
-            [$candidate['sheet_name']??null,$candidate['table_name']??null,$status,json_encode($metadata,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),$batchId]
+            'UPDATE sales_import_batches SET detected_sheet=?,detected_table=?,detected_range=?,status=?,metadata_json=?,updated_at=NOW() WHERE id=?',
+            [$candidate['sheet_name']??null,$candidate['table_name']??null,$candidate['ref']??null,$status,json_encode($metadata,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),$batchId]
         );
         SalesReferenceRepository::mirrorBatchFromLegacy($batchId);
     }
 
-    public static function addStagingRow(int $batchId, int $rowNumber, array $raw, array $normalized, string $status, array $errors, string $sourceKey): void
+    public static function addStagingRow(int $batchId, int $rowNumber, array $raw, array $normalized, string $status, array $errors, string $sourceKey, ?int $sourceRowNumber = null): void
     {
         $rawJson = json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $normalizedJson = json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -69,12 +70,12 @@ class SalesAggregateRepository
             'INSERT INTO staging_sales_data
              (import_batch_id,source_module,`row_number`,source_row_number,source_row_hash,raw_json,normalized_json,validation_status,validation_errors_json,source_unique_key,created_at)
              VALUES (?,"sales_aggregate",?,?,?,?,?,?,?,?,NOW())',
-            [$batchId,$rowNumber,$rowNumber,$rowHash,$rawJson,
+            [$batchId,$rowNumber,$sourceRowNumber,$rowHash,$rawJson,
              $normalizedJson,$status,
              $errors?json_encode($errors,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES):null,$sourceKey]
         );
         $stagingId = (int)Database::lastInsertId();
-        SalesReferenceRepository::mirrorStagingRow($stagingId, $batchId, 'sales_aggregate', $rowNumber, $raw, $normalized, $status, $errors, $sourceKey);
+        SalesReferenceRepository::mirrorStagingRow($stagingId, $batchId, 'sales_aggregate', $rowNumber, $raw, $normalized, $status, $errors, $sourceKey, $sourceRowNumber);
         foreach ($errors as $error) {
             Database::execute(
                 'INSERT INTO sales_import_errors
@@ -201,7 +202,7 @@ class SalesAggregateRepository
     private static function updateReferenceFields(string $sourceKey, array $data): void
     {
         $map = [
-            'period_key'=>'period_key','invoice_sub_number'=>'sub_invoice_number','visitor_name'=>'visitor_name','line_name'=>'line_name',
+            'period_key'=>'period_key','turnover_month'=>'turnover_month','turnover_year'=>'turnover_year','invoice_sub_number'=>'sub_invoice_number','visitor_name'=>'visitor_name','line_name'=>'line_name',
             'customer_address'=>'customer_address','customer_mobile'=>'mobile','customer_phone'=>'phone','customer_grade'=>'customer_grade',
             'customer_national_code'=>'national_code','customer_guild_code'=>'customer_class_code','customer_guild_name'=>'customer_class_name',
             'customer_role_code'=>'customer_role_code','city_code'=>'city_code','city_name'=>'city_name','province_code'=>'province_code',

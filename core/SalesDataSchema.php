@@ -19,6 +19,7 @@ class SalesDataSchema
             $pdo->exec($statement);
         }
 
+        self::repairImportBatchColumns($pdo);
         self::repairSalesAggregateColumns($pdo);
         self::repairInventoryAggregateColumns($pdo);
 
@@ -88,11 +89,17 @@ class SalesDataSchema
             'invoice_type' => 'VARCHAR(100) NULL AFTER unique_code',
             'sub_invoice_number' => 'VARCHAR(100) NULL AFTER invoice_number',
             'invoice_date_raw' => 'VARCHAR(100) NULL AFTER sub_invoice_number',
+            'turnover_month' => 'VARCHAR(100) NULL AFTER invoice_date_raw',
+            'turnover_year' => 'SMALLINT NULL AFTER turnover_month',
+            'period_key' => 'VARCHAR(50) NULL AFTER turnover_year',
         ];
         foreach ($columns as $column => $definition) {
             if (!self::columnExists($pdo, 'sales_aggregate_rows', $column)) {
                 $pdo->exec("ALTER TABLE sales_aggregate_rows ADD `{$column}` {$definition}");
             }
+        }
+        if (!self::indexExists($pdo, 'sales_aggregate_rows', 'idx_sales_aggregate_turnover_period')) {
+            $pdo->exec('ALTER TABLE sales_aggregate_rows ADD INDEX idx_sales_aggregate_turnover_period (turnover_year,turnover_month)');
         }
         if (!self::indexExists($pdo, 'sales_aggregate_rows', 'uq_sales_aggregate_source_key')) {
             $duplicates = $pdo->query(
@@ -102,6 +109,14 @@ class SalesDataSchema
             if ($duplicates === false) {
                 $pdo->exec('ALTER TABLE sales_aggregate_rows ADD UNIQUE KEY uq_sales_aggregate_source_key (source_unique_key)');
             }
+        }
+    }
+
+    private static function repairImportBatchColumns(PDO $pdo): void
+    {
+        if (!self::tableExists($pdo, 'sales_import_batches')) return;
+        if (!self::columnExists($pdo, 'sales_import_batches', 'detected_range')) {
+            $pdo->exec('ALTER TABLE sales_import_batches ADD detected_range VARCHAR(100) NULL AFTER detected_table');
         }
     }
 
@@ -133,6 +148,7 @@ class SalesDataSchema
                 file_hash VARCHAR(128) NULL,
                 detected_sheet VARCHAR(255) NULL,
                 detected_table VARCHAR(255) NULL,
+                detected_range VARCHAR(100) NULL,
                 import_mode VARCHAR(30) NOT NULL DEFAULT 'skip_duplicates',
                 status VARCHAR(30) NOT NULL DEFAULT 'uploaded',
                 total_rows INT NOT NULL DEFAULT 0,
@@ -213,6 +229,9 @@ class SalesDataSchema
                 sub_invoice_number VARCHAR(100) NULL,
                 invoice_date_raw VARCHAR(100) NULL,
                 invoice_date DATE NULL,
+                turnover_month VARCHAR(100) NULL,
+                turnover_year SMALLINT NULL,
+                period_key VARCHAR(50) NULL,
                 customer_code VARCHAR(100) NULL,
                 customer_name VARCHAR(255) NULL,
                 product_code VARCHAR(100) NULL,
@@ -231,6 +250,7 @@ class SalesDataSchema
                 INDEX idx_sales_aggregate_batch (import_batch_id),
                 UNIQUE KEY uq_sales_aggregate_source_key (source_unique_key),
                 INDEX idx_sales_aggregate_date (invoice_date),
+                INDEX idx_sales_aggregate_turnover_period (turnover_year,turnover_month),
                 INDEX idx_sales_aggregate_customer (customer_code),
                 INDEX idx_sales_aggregate_product (product_code),
                 INDEX idx_sales_aggregate_visitor (visitor_code)

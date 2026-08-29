@@ -19,6 +19,7 @@ final class UnifiedImportService
     }
 
     public const MODES = ['replace_reference','append','update_existing','skip_duplicates','fail_on_duplicate'];
+    public const BUDGET_INPUT_SOURCES = ['sales_aggregate','purchase_aggregate','inventory_aggregate'];
 
     public static function upload(array $file, string $sourceHint, string $mode, int $actorId, array $context = [], bool $allowStoredFile = false): array
     {
@@ -29,10 +30,16 @@ final class UnifiedImportService
         if ($sourceHint !== '') self::assertSourcePermission($sourceHint, 'upload');
         $stored = SpreadsheetImportReader::store($file, 'unified-imports', $allowStoredFile);
         $batchId = 0;
+        $bundleStarted = false;
         try {
             $workbook = SpreadsheetImportReader::read($stored['path'], $stored['extension']);
             $candidates = self::detectWorkbook($workbook, $sourceHint);
             if (!$candidates) throw new InvalidArgumentException('هیچ جدول یا محدوده قابل تشخیصی در فایل پیدا نشد.');
+            $bundleCandidates = self::budgetInputCandidates($candidates, $sourceHint);
+            if (count($bundleCandidates) >= 2) {
+                $bundleStarted = true;
+                return self::stageBudgetInputBundle($stored, $bundleCandidates, $mode, $actorId, $context);
+            }
             $selected = self::automaticCandidate($candidates);
             $snapshotDate = self::optionalDate($context['snapshot_date'] ?? '');
             if (
@@ -53,6 +60,7 @@ final class UnifiedImportService
                 'candidates' => array_map([self::class, 'candidateMetadata'], $candidates),
                 'detection_priority' => ['table','sheet','headers','confidence'],
             ];
+            if ($selected) self::addSourceContractMetadata($metadata, $selected);
             $sourceModule = $selected['source_module'] ?? ($candidates[0]['source_module'] ?? $sourceHint);
             $batchId = self::createBatch([
                 'source_type' => $stored['source_type'],
@@ -80,7 +88,7 @@ final class UnifiedImportService
             return ['batch_id'=>$batchId,'needs_selection'=>false,'summary'=>$summary];
         } catch (Throwable $e) {
             if ($batchId > 0) self::markFailed($batchId);
-            else @unlink($stored['path']);
+            elseif (!$bundleStarted) @unlink($stored['path']);
             throw $e;
         }
     }
@@ -98,9 +106,10 @@ final class UnifiedImportService
             if (self::alreadyImported((string)$batch['file_hash'], $candidate['source_module'])) {
                 throw new DomainException('این فایل با همین نوع منبع قبلاً فعال شده است.');
             }
+            self::addSourceContractMetadata($metadata, $candidate);
             Database::execute(
-                'UPDATE sales_import_batches SET source_module=?,detected_sheet=?,detected_table=?,detected_range=?,source_confidence=?,status="uploaded",updated_at=NOW() WHERE id=?',
-                [$candidate['source_module'],$candidate['sheet_name'],$candidate['table_name'],$candidate['ref'],$candidate['confidence'],$batchId]
+                'UPDATE sales_import_batches SET source_module=?,detected_sheet=?,detected_table=?,detected_range=?,source_confidence=?,status="uploaded",metadata_json=?,updated_at=NOW() WHERE id=?',
+                [$candidate['source_module'],$candidate['sheet_name'],$candidate['table_name'],$candidate['ref'],$candidate['confidence'],json_encode($metadata,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),$batchId]
             );
             SalesReferenceRepository::mirrorBatchFromLegacy($batchId);
             return self::stageCandidate($batchId, $candidate);
@@ -172,6 +181,52 @@ final class UnifiedImportService
             error_log('Unified import commit: ' . $e->getMessage());
             throw new RuntimeException('ثبت نهایی اطلاعات انجام نشد.');
         }
+    }
+
+    public static function commitBundle(array|string $batchIds, int $actorId, bool $isAdmin): array
+    {
+        $ids = self::normalizeBatchIds($batchIds);
+        if (count($ids) < 2) throw new InvalidArgumentException('حداقل دو Batch برای ثبت گروهی لازم است.');
+        $batches = self::batchesForActor($ids, $actorId, $isAdmin);
+        if (count($batches) !== count($ids)) throw new InvalidArgumentException('یکی از Batchهای گروهی در دسترس نیست.');
+        $bundleKey = null;
+        foreach ($batches as $batch) {
+            if (!in_array((string)($batch['source_module'] ?? ''), self::BUDGET_INPUT_SOURCES, true)) {
+                throw new InvalidArgumentException('ثبت گروهی فقط برای ورودی‌های بودجه آفر مجاز است.');
+            }
+            if (($batch['pipeline_status'] ?? '') !== 'ready_to_commit') {
+                throw new InvalidArgumentException('همه شیت‌ها باید معتبر و آماده ثبت باشند.');
+            }
+            $metadata = json_decode((string)($batch['metadata_json'] ?? ''), true) ?: [];
+            $declaredIds = self::normalizeBatchIds($metadata['bundle_batch_ids'] ?? []);
+            $declaredKey = trim((string)($metadata['bundle_key'] ?? ''));
+            if ($declaredKey === '' || $bundleKey !== null && $bundleKey !== $declaredKey || $declaredIds !== $ids) {
+                throw new InvalidArgumentException('Batchهای انتخاب‌شده به یک گروه واردات تعلق ندارند.');
+            }
+            $bundleKey = $declaredKey;
+        }
+        $results = [];
+        foreach ($ids as $id) $results[$id] = self::commit($id, $actorId, $isAdmin);
+        return ['batches'=>$results];
+    }
+
+    public static function batchesForActor(array $batchIds, int $actorId, bool $isAdmin): array
+    {
+        $ids = self::normalizeBatchIds($batchIds);
+        if (!$ids) return [];
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $params = $ids;
+        $sql = 'SELECT * FROM sales_import_batches WHERE id IN ('.$placeholders.')';
+        if (!$isAdmin) {
+            $sql .= ' AND started_by=?';
+            $params[] = $actorId;
+        }
+        $rows = Database::fetchAll($sql, $params);
+        $byId = [];
+        foreach ($rows as $row) $byId[(int)$row['id']] = $row;
+        $ordered = [];
+        foreach ($ids as $id) if (isset($byId[$id])) $ordered[] = $byId[$id];
+        return $ordered;
     }
 
     public static function rollback(int $batchId, int $actorId, bool $isAdmin): void
@@ -374,7 +429,10 @@ final class UnifiedImportService
     public static function detectWorkbook(array $workbook, string $sourceHint = ''): array
     {
         $sources = ImportSourceRegistry::all();
-        if ($sourceHint !== '' && isset($sources[$sourceHint])) $sources = [$sourceHint => $sources[$sourceHint]];
+        $sourceKeys = self::sourceKeysForHint($sourceHint);
+        if ($sourceKeys) {
+            $sources = array_intersect_key($sources, array_flip($sourceKeys));
+        }
         $candidates = [];
         foreach ($workbook['sheets'] ?? [] as $sheet) {
             if (!($sheet['visible'] ?? true)) continue;
@@ -404,6 +462,84 @@ final class UnifiedImportService
         $candidates = array_values($unique);
         usort($candidates, static fn(array $a, array $b): int => $b['score'] <=> $a['score']);
         return $candidates;
+    }
+
+    private static function sourceKeysForHint(string $sourceHint): array
+    {
+        if ($sourceHint === 'sales_aggregate') return self::BUDGET_INPUT_SOURCES;
+        if ($sourceHint !== '' && isset(ImportSourceRegistry::all()[$sourceHint])) return [$sourceHint];
+        return [];
+    }
+
+    private static function budgetInputCandidates(array $candidates, string $sourceHint): array
+    {
+        if ($sourceHint !== '' && $sourceHint !== 'sales_aggregate') return [];
+        $selected = [];
+        foreach ($candidates as $candidate) {
+            $source = (string)($candidate['source_module'] ?? '');
+            if (!in_array($source, self::BUDGET_INPUT_SOURCES, true) || isset($selected[$source])) continue;
+            $selected[$source] = $candidate;
+        }
+        return array_values($selected);
+    }
+
+    private static function stageBudgetInputBundle(array $stored, array $candidates, string $mode, int $actorId, array $context): array
+    {
+        $snapshotDate = self::optionalDate($context['snapshot_date'] ?? '');
+        $baseMetadata = [
+            'stored_name' => $stored['stored_name'],
+            'extension' => $stored['extension'],
+            'mime' => $stored['mime'],
+            'candidates' => array_map([self::class, 'candidateMetadata'], $candidates),
+            'detection_priority' => ['table','sheet','headers','confidence'],
+            'bundle_type' => 'sales_offer_budget_inputs',
+        ];
+        $batchIds = [];
+        $summaries = [];
+        try {
+            foreach ($candidates as $candidate) {
+                self::assertSourcePermission((string)$candidate['source_module'], 'upload');
+                if (self::alreadyImported($stored['file_hash'], (string)$candidate['source_module'])) {
+                    throw new DomainException('یکی از شیت‌های این فایل قبلاً با همین نوع منبع فعال شده است.');
+                }
+                $metadata = $baseMetadata;
+                $metadata['selected_candidate'] = self::candidateMetadata($candidate);
+                self::addSourceContractMetadata($metadata, $candidate);
+                $batchId = self::createBatch([
+                    'source_type' => $stored['source_type'],
+                    'source_module' => $candidate['source_module'],
+                    'file_name' => $stored['file_name'],
+                    'stored_file_path' => 'storage/unified-imports/' . $stored['stored_name'],
+                    'file_hash' => $stored['file_hash'],
+                    'detected_sheet' => $candidate['sheet_name'],
+                    'detected_table' => $candidate['table_name'],
+                    'detected_range' => $candidate['ref'],
+                    'source_confidence' => $candidate['confidence'],
+                    'period_key' => self::text($context['period_key'] ?? '', 50) ?: null,
+                    'snapshot_date' => $snapshotDate,
+                    'period_id' => max(0, (int)($context['period_id'] ?? 0)) ?: null,
+                    'import_mode' => $mode,
+                    'status' => 'uploaded',
+                    'pipeline_status' => 'detected',
+                    'started_by' => $actorId,
+                    'metadata_json' => json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ]);
+                $batchIds[] = $batchId;
+                $summaries[$batchId] = self::stageCandidate($batchId, $candidate);
+            }
+            $bundleKey = hash('sha256', $stored['file_hash'].'|'.implode(',', $batchIds));
+            self::linkBundleMetadata($batchIds, $bundleKey);
+            return [
+                'batch_id' => $batchIds[0],
+                'batch_ids' => $batchIds,
+                'bundle' => true,
+                'needs_selection' => false,
+                'summaries' => $summaries,
+            ];
+        } catch (Throwable $e) {
+            foreach ($batchIds as $batchId) self::markFailed((int)$batchId);
+            throw $e;
+        }
     }
 
     public static function inferWorkbookDate(array $workbook): ?string
@@ -1001,6 +1137,33 @@ final class UnifiedImportService
         return $id;
     }
 
+    private static function linkBundleMetadata(array $batchIds, string $bundleKey): void
+    {
+        $batchIds = self::normalizeBatchIds($batchIds);
+        foreach ($batchIds as $batchId) {
+            $row = Database::fetch('SELECT metadata_json FROM sales_import_batches WHERE id=?', [$batchId]);
+            $metadata = json_decode((string)($row['metadata_json'] ?? ''), true) ?: [];
+            $metadata['bundle_key'] = $bundleKey;
+            $metadata['bundle_batch_ids'] = $batchIds;
+            Database::execute(
+                'UPDATE sales_import_batches SET metadata_json=?,updated_at=NOW() WHERE id=?',
+                [json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $batchId]
+            );
+            SalesReferenceRepository::mirrorBatchFromLegacy($batchId);
+        }
+    }
+
+    private static function normalizeBatchIds(array|string $batchIds): array
+    {
+        if (is_string($batchIds)) $batchIds = preg_split('/[^0-9]+/', $batchIds, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $ids = [];
+        foreach ($batchIds as $id) {
+            $id = (int)$id;
+            if ($id > 0) $ids[$id] = $id;
+        }
+        return array_values($ids);
+    }
+
     private static function setReadyStatus(int $batchId, array $summary): void
     {
         $status = (int)($summary['ready_rows'] ?? 0) > 0 ? 'ready_to_commit' : 'validation_failed';
@@ -1094,6 +1257,18 @@ final class UnifiedImportService
             'sheet_name'=>$candidate['sheet_name'],'table_name'=>$candidate['table_name'],'detection'=>$candidate['detection'],
             'ref'=>$candidate['ref'],'headers'=>$candidate['headers'],'score'=>$candidate['score'],'confidence'=>$candidate['confidence'],
         ];
+    }
+
+    private static function addSourceContractMetadata(array &$metadata, array $candidate): void
+    {
+        $sourceModule = (string)($candidate['source_module'] ?? '');
+        if ($sourceModule === '') return;
+        $source = ImportSourceRegistry::get($sourceModule);
+        if (empty($source['canonical_headers'])) return;
+        $metadata['source_profile'] = (string)($source['source_profile'] ?? '');
+        $metadata['header_contract'] = $sourceModule === 'sales_aggregate'
+            ? SalesAggregateImportService::canonicalHeaderReport($candidate['headers'] ?? [])
+            : ImportSourceRegistry::canonicalHeaderReport($candidate['headers'] ?? [], $source);
     }
 
     private static function refreshBatchSummary(int $batchId): void

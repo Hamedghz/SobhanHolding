@@ -1440,7 +1440,7 @@ CREATE TABLE IF NOT EXISTS sales_reference_import_errors (
 CREATE TABLE IF NOT EXISTS sales_aggregate_rows (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, import_batch_id BIGINT UNSIGNED NULL, source_unique_key VARCHAR(191) NULL,
   unique_code VARCHAR(191) NULL, invoice_type VARCHAR(100) NULL, invoice_number VARCHAR(100) NULL, sub_invoice_number VARCHAR(100) NULL,
-  invoice_date_raw VARCHAR(100) NULL, invoice_date DATE NULL, period_key VARCHAR(50) NULL,
+  invoice_date_raw VARCHAR(100) NULL, invoice_date DATE NULL, turnover_month VARCHAR(100) NULL, turnover_year SMALLINT NULL, period_key VARCHAR(50) NULL,
   customer_code VARCHAR(100) NULL, customer_name VARCHAR(255) NULL, customer_guild_code VARCHAR(100) NULL, customer_guild_name VARCHAR(255) NULL,
   product_code VARCHAR(100) NULL, product_name VARCHAR(255) NULL, brand_code VARCHAR(100) NULL, brand_name VARCHAR(255) NULL,
   visitor_code VARCHAR(100) NULL, visitor_name VARCHAR(255) NULL,
@@ -1451,7 +1451,8 @@ CREATE TABLE IF NOT EXISTS sales_aggregate_rows (
   discount_total DECIMAL(18,4) NULL, return_quantity DECIMAL(18,4) NULL, return_amount DECIMAL(20,2) NULL, raw_json LONGTEXT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NULL,
   INDEX idx_sales_aggregate_batch(import_batch_id), UNIQUE KEY uq_sales_aggregate_source_key(source_unique_key), INDEX idx_sales_aggregate_date(invoice_date),
-  INDEX idx_sales_aggregate_customer(customer_code), INDEX idx_sales_aggregate_product(product_code), INDEX idx_sales_aggregate_visitor(visitor_code)
+  INDEX idx_sales_aggregate_customer(customer_code), INDEX idx_sales_aggregate_product(product_code), INDEX idx_sales_aggregate_visitor(visitor_code),
+  INDEX idx_sales_aggregate_turnover_period(turnover_year,turnover_month)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS purchase_aggregate_rows (

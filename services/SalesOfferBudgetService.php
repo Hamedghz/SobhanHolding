@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/SalesOfferBudgetModule.php';
+require_once __DIR__ . '/../core/SalesDataNormalizer.php';
 require_once __DIR__ . '/../lib/AppDate.php';
 require_once __DIR__ . '/FormulaRuntime.php';
 
@@ -54,6 +55,64 @@ class SalesOfferBudgetService
     public static function canAccessRequest(array $request,array $userContext): bool {if(self::isAdmin($userContext))return true;$id=(int)($userContext['id']??0);return (int)$request['requested_by']===$id||(int)$request['sales_manager_id']===$id||(!empty($userContext['sales_line'])&&hash_equals((string)$userContext['sales_line'],(string)$request['sales_line']));}
     public static function getAvailableFormulaSettings(): array {return Database::fetchAll('SELECT * FROM sales_offer_formula_settings WHERE active=1 ORDER BY id');}
     public static function logs(int $id): array {return Database::fetchAll('SELECT l.*,u.name performed_by_name FROM sales_offer_budget_logs l LEFT JOIN users u ON u.id=l.performed_by WHERE l.request_id=? ORDER BY l.id DESC',[$id]);}
+    public static function finalBrandReport(array $filters, array $userContext): array
+    {
+        $months = self::reportMonths();
+        $where = ['TRIM(COALESCE(s.brand_name, ""))<>""'];
+        $params = [];
+        $year = (int)SalesDataNormalizer::normalizePersianArabicDigits($filters['year'] ?? 0);
+        if ($year >= 1300 && $year <= 1600) {
+            $where[] = '(s.turnover_year=? OR s.period_key LIKE ?)';
+            $params[] = $year;
+            $params[] = $year . '-%';
+        }
+        $month = max(0, min(12, (int)SalesDataNormalizer::normalizePersianArabicDigits($filters['month'] ?? 0)));
+        if ($month > 0) {
+            $where[] = 's.turnover_month LIKE ?';
+            $params[] = $month . '-%';
+        }
+        $brand = trim((string)($filters['brand'] ?? ''));
+        if ($brand !== '') {
+            $where[] = 's.brand_name LIKE ?';
+            $params[] = '%' . $brand . '%';
+        }
+        if (!self::isAdmin($userContext) && trim((string)($userContext['sales_line'] ?? '')) !== '') {
+            $line = trim((string)$userContext['sales_line']);
+            $where[] = '(s.line_code=? OR s.line_name=?)';
+            $params[] = $line;
+            $params[] = $line;
+        }
+        $monthSelect = [];
+        foreach ($months as $number => $label) {
+            $pattern = $number . '-%';
+            $quotedPattern = "'" . $pattern . "'";
+            $monthSelect[] = 'COALESCE(SUM(CASE WHEN s.turnover_month LIKE ' . $quotedPattern . ' THEN COALESCE(s.discount_amount,0) ELSE 0 END) / NULLIF(SUM(CASE WHEN s.turnover_month LIKE ' . $quotedPattern . ' THEN COALESCE(s.gross_amount,0) ELSE 0 END),0),0) discount_m' . $number;
+            $monthSelect[] = 'COUNT(DISTINCT CASE WHEN s.turnover_month LIKE ' . $quotedPattern . ' AND COALESCE(s.gross_amount,0)>0 AND NULLIF(TRIM(s.customer_code),"") IS NOT NULL THEN s.customer_code END) active_m' . $number;
+        }
+        $sql = 'SELECT s.brand_name,
+                    SUM(COALESCE(s.gross_amount,0)) gross_amount,
+                    SUM(COALESCE(s.discount_amount,0)) discount_amount,
+                    COALESCE(SUM(COALESCE(s.discount_amount,0)) / NULLIF(SUM(COALESCE(s.gross_amount,0)),0),0) discount_rate,
+                    COALESCE(b.provisional_offer_rate,0) budget_rate,
+                    ' . implode(',', $monthSelect) . '
+                FROM vw_active_sales_aggregate_rows s
+                LEFT JOIN (
+                    SELECT r.brand_name,r.provisional_offer_rate
+                    FROM sales_offer_budget_requests r
+                    INNER JOIN (
+                        SELECT brand_name,MAX(id) id
+                        FROM sales_offer_budget_requests
+                        WHERE status="approved" AND TRIM(COALESCE(brand_name,""))<>""
+                        GROUP BY brand_name
+                    ) latest ON latest.id=r.id
+                ) b ON b.brand_name=s.brand_name
+                WHERE ' . implode(' AND ', $where) . '
+                GROUP BY s.brand_name,b.provisional_offer_rate
+                ORDER BY s.brand_name
+                LIMIT 500';
+        return Database::fetchAll($sql, $params);
+    }
+    public static function reportMonths(): array { return [1=>'1- فروردین',2=>'2- اردیبهشت',3=>'3- خرداد',4=>'4- تیر',5=>'5- مرداد',6=>'6- شهریور',7=>'7- مهر',8=>'8- آبان',9=>'9- آذر',10=>'10- دی',11=>'11- بهمن',12=>'12- اسفند']; }
     public static function statusLabel(string $s): string{return ['draft'=>'پیش‌نویس','submitted'=>'ارسال‌شده','under_review'=>'در حال بررسی','approved'=>'تأیید شده','rejected'=>'رد شده','needs_revision'=>'نیازمند اصلاح'][$s]??$s;}
     public static function uiError(Throwable $e,string $fallback): string {if($e instanceof InvalidArgumentException)return $e->getMessage();error_log('Sales offer budget: '.$e->getMessage());return $fallback;}
     private static function json(mixed $v): ?string {if($v===null)return null;$j=json_encode($v,JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION);if($j===false)throw new RuntimeException('JSON encode failed');return $j;}

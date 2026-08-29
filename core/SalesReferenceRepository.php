@@ -88,7 +88,7 @@ class SalesReferenceRepository
         ]);
     }
 
-    public static function mirrorStagingRow(int $legacyId, int $batchId, string $sourceModule, int $rowNumber, array $raw, array $normalized, string $status, array $errors, string $sourceKey): void
+    public static function mirrorStagingRow(int $legacyId, int $batchId, string $sourceModule, int $rowNumber, array $raw, array $normalized, string $status, array $errors, string $sourceKey, ?int $sourceRowNumber = null): void
     {
         $rawJson = json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $normalizedJson = json_encode($normalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -103,7 +103,7 @@ class SalesReferenceRepository
                 $batchId,
                 $sourceModule,
                 $rowNumber,
-                $rowNumber,
+                $sourceRowNumber ?? $rowNumber,
                 $rowHash,
                 $sourceKey,
                 $rawJson,

@@ -52,6 +52,7 @@ class SalesAggregateImportService
                 'source_type' => $extension === 'xlsx' ? 'excel_upload' : 'csv_upload',
                 'file_name' => $originalName, 'file_hash' => hash_file('sha256', $path),
                 'detected_sheet' => $selected['sheet_name'] ?? null, 'detected_table' => $selected['table_name'] ?? null,
+                'detected_range' => $selected['ref'] ?? null,
                 'import_mode' => $importMode, 'status' => $selected ? 'uploaded' : 'awaiting_source_selection',
                 'started_by' => $actorId, 'period_key' => self::cleanPeriodKey($periodKey),
                 'metadata_json' => json_encode($metadata, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
@@ -80,12 +81,12 @@ class SalesAggregateImportService
         foreach ($workbook['sheets'] ?? [] as $sheet) {
             if (!($sheet['visible'] ?? true)) continue;
             foreach ($sheet['tables'] ?? [] as $table) {
-                if (SalesDataNormalizer::normalizeHeader($table['name'] ?? '') === 'tbltajmi') {
+                if (in_array(SalesDataNormalizer::normalizeHeader($table['name'] ?? ''), ['tbltajmii','tbltajmi','tblsales','tblsales_raw'], true)) {
                     $rows = self::cropRows($sheet['rows'], (string)($table['ref'] ?? ''));
                     $tableMatches[] = self::candidate($sheet, $rows, 'table', (string)$table['name'], (string)($table['ref'] ?? ''));
                 }
             }
-            if (SalesDataNormalizer::normalizeHeader($sheet['name'] ?? '') === SalesDataNormalizer::normalizeHeader('تجمیعی')) {
+            if (in_array(SalesDataNormalizer::normalizeHeader($sheet['name'] ?? ''), [SalesDataNormalizer::normalizeHeader(SalesDataNormalizer::SALES_AGGREGATE_SHEET),SalesDataNormalizer::normalizeHeader('تجمیعی')], true)) {
                 $sheetMatches[] = self::candidate($sheet, $sheet['rows'] ?? [], 'sheet');
             }
             if (self::hasRequiredHeaders(($sheet['rows'][0] ?? []))) {
@@ -113,7 +114,41 @@ class SalesAggregateImportService
         $mappedKeys = array_column($columns, 'normalized_key');
         $missing = [];
         foreach (SalesDataNormalizer::REQUIRED as $label => $key) if (!in_array($key, $mappedKeys, true)) $missing[] = $label;
-        return ['columns'=>$columns,'missing_required'=>$missing];
+        return ['columns'=>$columns,'missing_required'=>$missing,'contract'=>self::canonicalHeaderReport($headers)];
+    }
+
+    public static function canonicalHeaderReport(array $headers): array
+    {
+        $actual = array_map(static fn($value): string => trim((string)$value), $headers);
+        $profiles = [
+            [SalesDataNormalizer::SALES_AGGREGATE_PROFILE, SalesDataNormalizer::CANONICAL_HEADERS],
+            ['ERP_SALES_AGGREGATE_RAW_V1', SalesDataNormalizer::rawCanonicalHeaders()],
+        ];
+        $reports = [];
+        foreach ($profiles as [$profile, $expected]) {
+            $normalizedActual = SalesDataNormalizer::normalizeHeaders($actual);
+            $normalizedExpected = SalesDataNormalizer::normalizeHeaders($expected);
+            $counts = array_count_values(array_filter($normalizedActual, static fn(string $value): bool => $value !== ''));
+            $expectedCounts = array_count_values(array_filter($normalizedExpected, static fn(string $value): bool => $value !== ''));
+            $duplicates = [];
+            foreach ($counts as $header => $count) if ($count > 1) $duplicates[] = $header;
+            $missing = [];
+            foreach ($expectedCounts as $header => $count) {
+                if (($counts[$header] ?? 0) < $count) $missing[] = $expected[array_search($header, $normalizedExpected, true)];
+            }
+            $extra = [];
+            foreach ($counts as $header => $count) if ($count > ($expectedCounts[$header] ?? 0)) $extra[] = $actual[array_search($header, $normalizedActual, true)];
+            $orderMismatch = count($normalizedActual) !== count($normalizedExpected) || $normalizedActual !== $normalizedExpected;
+            $matched = 0;
+            foreach ($normalizedExpected as $index => $header) if (($normalizedActual[$index] ?? null) === $header) $matched++;
+            $reports[] = [
+                'source_profile'=>$profile,'expected_count'=>count($expected),'actual_count'=>count($actual),'exact_matched_headers'=>$matched,
+                'missing_headers'=>array_values(array_unique($missing)),'extra_headers'=>array_values(array_unique($extra)),'duplicate_headers'=>array_values(array_unique($duplicates)),'order_mismatch'=>$orderMismatch,
+                'is_exact'=>$matched === count($expected) && !$missing && !$extra && !$duplicates && !$orderMismatch,
+            ];
+        }
+        usort($reports, static fn(array $a, array $b): int => ($b['is_exact'] <=> $a['is_exact']) ?: (($b['exact_matched_headers'] ?? 0) <=> ($a['exact_matched_headers'] ?? 0)));
+        return $reports[0];
     }
 
     public static function normalizePersianArabicDigits(mixed $value): string
@@ -153,6 +188,11 @@ class SalesAggregateImportService
                 if (($normalized[$key] ?? null) !== null && (float)$normalized[$key] < 0) $errors[] = ['code'=>'negative_non_return','message'=>"مقدار منفی «{$label}» فقط برای فاکتور برگشتی مجاز است."];
             }
         }
+        $invoiceMonth = self::jalaliMonth($normalized['invoice_date_raw'] ?? '');
+        $turnoverMonth = self::turnoverMonthNumber($normalized['turnover_month'] ?? '');
+        if ($invoiceMonth !== null && $turnoverMonth !== null && $invoiceMonth !== $turnoverMonth) {
+            $errors[] = ['code'=>'PERIOD_MISMATCH','severity'=>'warning','message'=>'ماه گردش با ماه تاریخ فاکتور یکسان نیست؛ مقدار ERP بدون تغییر حفظ شد.'];
+        }
         return $errors;
     }
 
@@ -179,7 +219,7 @@ class SalesAggregateImportService
         try {
         $mode = in_array($batch['import_mode'], self::MODES, true) ? $batch['import_mode'] : 'replace_reference';
         $seen = [];
-        $counts = ['total_rows'=>0,'valid_rows'=>0,'invalid_rows'=>0,'duplicate_rows'=>0,'ready_rows'=>0];
+        $counts = ['total_rows'=>0,'valid_rows'=>0,'warning_rows'=>0,'invalid_rows'=>0,'duplicate_rows'=>0,'ready_rows'=>0];
         $headers = null;
         $mapping = null;
         foreach (SpreadsheetImportReader::candidateRows($candidate) as $item) {
@@ -188,6 +228,9 @@ class SalesAggregateImportService
                 $headers = array_map(static fn($v) => trim((string)$v), $values);
                 $mapping = self::mapColumns($headers);
                 if ($mapping['missing_required']) throw new InvalidArgumentException('سرستون‌های الزامی یافت نشد: ' . implode('، ', $mapping['missing_required']));
+                if (self::isCanonicalCandidate($candidate) && empty($mapping['contract']['is_exact'])) {
+                    throw new InvalidArgumentException('ساختار ۱۰۹ ستونی فایل ERP معتبر نیست؛ گزارش اختلاف سرستون‌ها را بررسی کنید.');
+                }
                 continue;
             }
             if ($counts['total_rows'] >= self::MAX_ROWS) throw new InvalidArgumentException('تعداد ردیف‌های فایل بیش از حد مجاز است.');
@@ -196,15 +239,20 @@ class SalesAggregateImportService
             $raw = [];
             foreach ($headers as $index=>$header) if ($header !== '') $raw[$header] = (string)($values[$index] ?? '');
             $normalized = self::normalizeMappedRow($values, $mapping['columns'] ?? []);
+            self::enrichPeriodFields($normalized);
             $sourceKey = self::buildSourceUniqueKey($normalized);
             $duplicate = self::detectDuplicate($sourceKey, $seen);
             $seen[$sourceKey] = true;
             $normalized['_duplicate'] = $duplicate;
             $errors = self::validateRow($normalized, $raw);
-            if ($duplicate && $mode === 'fail_on_duplicate') $errors[] = ['code'=>'duplicate','message'=>'این ردیف با داده موجود یا ردیف دیگری در فایل تکراری است.'];
-            $status = $errors ? 'invalid' : (($duplicate && in_array($mode, ['skip_duplicates','append'], true)) ? 'duplicate' : 'valid');
-            SalesAggregateRepository::addStagingRow($batchId,$rowNumber,$raw,$normalized,$status,$errors,$sourceKey);
+            if ($duplicate && $mode === 'fail_on_duplicate') $errors[] = ['code'=>'duplicate','severity'=>'error','message'=>'این ردیف با داده موجود یا ردیف دیگری در فایل تکراری است.'];
+            $fatalErrors = array_filter($errors, static fn(array $error): bool => ($error['severity'] ?? 'error') !== 'warning');
+            $hasWarning = (bool)array_filter($errors, static fn(array $error): bool => ($error['severity'] ?? 'error') === 'warning');
+            $status = $fatalErrors ? 'invalid' : (($duplicate && in_array($mode, ['skip_duplicates','append'], true)) ? 'duplicate' : 'valid');
+            $sourceRowNumber = self::sourceRowNumber($normalized['source_row_number'] ?? null);
+            SalesAggregateRepository::addStagingRow($batchId,$rowNumber,$raw,$normalized,$status,$errors,$sourceKey,$sourceRowNumber);
             $counts['total_rows']++;
+            if ($hasWarning) $counts['warning_rows']++;
             if ($duplicate) $counts['duplicate_rows']++;
             if ($status === 'invalid') $counts['invalid_rows']++; else $counts['valid_rows']++;
             if ($status === 'valid') $counts['ready_rows']++;
@@ -212,6 +260,9 @@ class SalesAggregateImportService
         if ($headers === null) throw new InvalidArgumentException('منبع انتخاب‌شده فاقد داده است.');
         $metadata = json_decode((string)$batch['metadata_json'], true) ?: [];
         $metadata['selected_candidate'] = self::candidateMetadata($candidate);
+        $metadata['source_profile'] = self::isCanonicalCandidate($candidate) ? SalesDataNormalizer::SALES_AGGREGATE_PROFILE : 'legacy_compatible';
+        $metadata['header_contract'] = $mapping['contract'] ?? self::canonicalHeaderReport($headers);
+        $metadata['warning_rows'] = $counts['warning_rows'];
         SalesAggregateRepository::updateBatchDetection($batchId,$candidate,'preview',$metadata);
         SalesAggregateRepository::updateBatchCounts($batchId,$counts,'preview');
         if($startedHere)$pdo->commit();
@@ -226,9 +277,11 @@ class SalesAggregateImportService
     {
         $batch = Database::fetch('SELECT * FROM sales_import_batches WHERE id=? AND source_module="sales_aggregate"', [$batchId]);
         if (!$batch) throw new InvalidArgumentException('Batch پیدا نشد.');
+        $metadata = json_decode((string)$batch['metadata_json'], true) ?: [];
         return [
             'total_rows'=>(int)$batch['total_rows'],'valid_rows'=>(int)$batch['valid_rows'],'invalid_rows'=>(int)$batch['invalid_rows'],
             'duplicate_rows'=>(int)$batch['duplicate_rows'],'ready_rows'=>max(0,(int)$batch['valid_rows']-(in_array($batch['import_mode'], ['skip_duplicates','append'], true)?(int)$batch['duplicate_rows']:0)),
+            'warning_rows'=>(int)($metadata['warning_rows'] ?? 0),
         ];
     }
 
@@ -272,7 +325,7 @@ class SalesAggregateImportService
                 foreach ($rows as $row) {
                     $afterValidId = (int)$row['id'];
                     $data = json_decode((string)$row['normalized_json'], true) ?: [];
-                    $data['period_key'] = $batch['period_key'] ?? null;
+                    if (!empty($batch['period_key'])) $data['period_key'] = $batch['period_key'];
                     $raw = json_decode((string)$row['raw_json'], true) ?: [];
                     $existing = SalesAggregateRepository::finalRowBySourceKey((string)$row['source_unique_key'],true);
                     if ($existing && $batch['import_mode'] === 'fail_on_duplicate') throw new DomainException('داده تکراری یافت شد؛ ورود نهایی لغو شد.');
@@ -323,6 +376,41 @@ class SalesAggregateImportService
         return $normalized;
     }
 
+    private static function enrichPeriodFields(array &$normalized): void
+    {
+        $year = null;
+        $invoiceRaw = SalesDataNormalizer::normalizePersianArabicDigits($normalized['invoice_date_raw'] ?? '');
+        if (preg_match('/^(1[34]\d{2})[\/\-]/', $invoiceRaw, $match)) $year = (int)$match[1];
+        $month = self::turnoverMonthNumber($normalized['turnover_month'] ?? '');
+        if ($year !== null) $normalized['turnover_year'] = (string)$year;
+        if ($year !== null && $month !== null) $normalized['period_key'] = sprintf('%04d-%02d', $year, $month);
+    }
+
+    private static function jalaliMonth(mixed $value): ?int
+    {
+        $value = SalesDataNormalizer::normalizePersianArabicDigits($value);
+        return preg_match('/^1[34]\d{2}[\/\-](\d{1,2})[\/\-]/', $value, $match) && (int)$match[1] >= 1 && (int)$match[1] <= 12 ? (int)$match[1] : null;
+    }
+
+    private static function turnoverMonthNumber(mixed $value): ?int
+    {
+        $value = SalesDataNormalizer::normalizePersianArabicDigits($value);
+        return preg_match('/(?:^|\s)(\d{1,2})(?:\s*[-\/]|\s|$)/u', $value, $match) && (int)$match[1] >= 1 && (int)$match[1] <= 12 ? (int)$match[1] : null;
+    }
+
+    private static function sourceRowNumber(mixed $value): ?int
+    {
+        $value = SalesDataNormalizer::normalizePersianArabicDigits($value);
+        return preg_match('/^\d+$/', $value) && (int)$value > 0 ? (int)$value : null;
+    }
+
+    private static function isCanonicalCandidate(array $candidate): bool
+    {
+        return in_array(SalesDataNormalizer::normalizeHeader($candidate['table_name'] ?? ''), ['tbltajmii','tblsales_raw'], true)
+            || SalesDataNormalizer::normalizeHeader($candidate['sheet_name'] ?? '') === SalesDataNormalizer::normalizeHeader(SalesDataNormalizer::SALES_AGGREGATE_SHEET)
+            || !empty(self::canonicalHeaderReport($candidate['headers'] ?? [])['is_exact']);
+    }
+
     private static function cleanPeriodKey(?string $periodKey): ?string
     {
         $periodKey = SalesDataNormalizer::normalizePersianArabicDigits((string)$periodKey);
@@ -357,7 +445,8 @@ class SalesAggregateImportService
     private static function candidateMetadata(array $candidate): array
     {
         return ['key'=>$candidate['key'],'sheet_name'=>$candidate['sheet_name'],'table_name'=>$candidate['table_name'],
-            'detection'=>$candidate['detection'],'ref'=>$candidate['ref'],'headers'=>$candidate['headers']];
+            'detection'=>$candidate['detection'],'ref'=>$candidate['ref'],'headers'=>$candidate['headers'],
+            'header_contract'=>self::canonicalHeaderReport($candidate['headers'] ?? [])];
     }
 
     private static function storageDirectory(): string

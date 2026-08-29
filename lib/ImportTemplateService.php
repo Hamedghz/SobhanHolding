@@ -6,10 +6,21 @@ final class ImportTemplateService
 {
     public static function workbook(array $sourceKeys): array
     {
+        $sourceKeys = array_values(array_unique($sourceKeys));
+        if ($sourceKeys === ['sales_aggregate']) {
+            $source = ImportSourceRegistry::get('sales_aggregate');
+            return [
+                (string)$source['canonical_sheet'] => [
+                    'rows' => [(array)$source['canonical_headers']],
+                    'table_name' => (string)$source['canonical_table'],
+                ],
+            ];
+        }
+
         $sheets = [];
         $guideRows = [['منبع', 'ستون فایل', 'کلید داخلی', 'الزامی', 'نوع داده']];
 
-        foreach (array_values(array_unique($sourceKeys)) as $sourceKey) {
+        foreach ($sourceKeys as $sourceKey) {
             $source = ImportSourceRegistry::get($sourceKey);
             $columns = self::columns($source);
             if (!$columns) continue;
@@ -20,7 +31,9 @@ final class ImportTemplateService
                 $columns
             );
             $sheetName = self::sheetName((string)$source['title'], $sourceKey, array_keys($sheets));
-            $sheets[$sheetName] = [$headers, $examples];
+            $sheets[$sheetName] = !empty($source['canonical_headers'])
+                ? ['rows' => [$headers], 'table_name' => (string)($source['canonical_table'] ?? '')]
+                : [$headers, $examples];
 
             foreach ($columns as $column) {
                 $guideRows[] = [
@@ -41,6 +54,7 @@ final class ImportTemplateService
     public static function fileName(array $sourceKeys): string
     {
         $keys = array_values(array_unique($sourceKeys));
+        if ($keys === ['sales_aggregate']) return 'sobhan-sales-aggregate-erp-v1-template.xlsx';
         return count($keys) === 1
             ? 'sobhan-' . preg_replace('/[^a-z0-9_-]+/i', '-', $keys[0]) . '-import-template.xlsx'
             : 'sobhan-import-templates.xlsx';
@@ -48,6 +62,26 @@ final class ImportTemplateService
 
     public static function columns(array $source): array
     {
+        if (!empty($source['canonical_headers'])) {
+            $byHeader = [];
+            foreach (($source['mappings'] ?? []) as $mapping) {
+                $byHeader[(string)($mapping['source_header'] ?? '')] = $mapping;
+            }
+            $canonical = [];
+            foreach ($source['canonical_headers'] as $header) {
+                if (!isset($byHeader[$header])) {
+                    $canonical[] = [
+                        'source_header' => (string)$header,
+                        'normalized_key' => 'raw_' . (string)count($canonical),
+                        'required' => 0,
+                        'data_type' => 'string',
+                    ];
+                    continue;
+                }
+                $canonical[] = $byHeader[$header];
+            }
+            return $canonical;
+        }
         $columns = [];
         foreach (($source['mappings'] ?? []) as $mapping) {
             $key = trim((string)($mapping['normalized_key'] ?? ''));

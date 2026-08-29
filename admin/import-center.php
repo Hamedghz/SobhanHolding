@@ -40,6 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'period_id' => $_POST['period_id'] ?? 0,
                 ]
             );
+            if (!empty($result['bundle']) && !empty($result['batch_ids'])) {
+                flash('سه ورودی بودجه آفر در Batchهای مستقل staging شد؛ پس از بررسی می‌توانید همه را فعال کنید.');
+                redirect('/admin/import-center.php?batch='.(int)$result['batch_id'].'&bundle='.rawurlencode(implode(',', $result['batch_ids'])));
+            }
             flash($result['needs_selection'] ? 'چند منبع نزدیک پیدا شد؛ جدول صحیح را انتخاب کنید.' : 'فایل تشخیص داده شد و ردیف‌ها در staging اعتبارسنجی شدند.');
             redirect('/admin/import-center.php?batch='.(int)$result['batch_id']);
         }
@@ -52,6 +56,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$canCommit) throw new DomainException('مجوز تایید و فعال‌سازی Batch را ندارید.');
             $result = UnifiedImportService::commit($batchId, $actorId, $isAdmin);
             flash('Batch فعال شد: '.$result['inserted'].' جدید، '.$result['updated'].' بروزرسانی و '.$result['skipped'].' ردشده.');
+        } elseif ($action === 'commit_bundle') {
+            if (!$canCommit) throw new DomainException('مجوز تایید و فعال‌سازی Batch را ندارید.');
+            $result = UnifiedImportService::commitBundle((string)($_POST['batch_ids'] ?? ''), $actorId, $isAdmin);
+            $inserted = $updated = $skipped = 0;
+            foreach ($result['batches'] as $item) {
+                $inserted += (int)($item['inserted'] ?? 0);
+                $updated += (int)($item['updated'] ?? 0);
+                $skipped += (int)($item['skipped'] ?? 0);
+            }
+            flash('همه ورودی‌های بودجه آفر فعال شد: '.$inserted.' جدید، '.$updated.' بروزرسانی و '.$skipped.' ردشده.');
         } elseif ($action === 'rollback') {
             if (!$canUpload) throw new DomainException('مجوز بازگردانی Batch را ندارید.');
             UnifiedImportService::rollback($batchId, $actorId, $isAdmin);
@@ -89,6 +103,8 @@ $batchId = max(0, (int)($_GET['batch'] ?? 0));
 $batch = $batchId ? UnifiedImportService::batchForActor($batchId, $actorId, $isAdmin) : null;
 $summary = $batch ? UnifiedImportService::summary($batchId) : null;
 $metadata = $batch ? (json_decode((string)$batch['metadata_json'], true) ?: []) : [];
+$bundleIds = array_values(array_unique(array_filter(array_map('intval', is_array($metadata['bundle_batch_ids'] ?? null) ? $metadata['bundle_batch_ids'] : preg_split('/[^0-9]+/', (string)($_GET['bundle'] ?? ''), -1, PREG_SPLIT_NO_EMPTY)))));
+$bundleBatches = count($bundleIds) > 1 ? UnifiedImportService::batchesForActor($bundleIds, $actorId, $isAdmin) : [];
 $preview = $batch ? Database::fetchAll('SELECT id,`row_number`,validation_status,validation_errors_json,normalized_json FROM staging_sales_data WHERE import_batch_id=? ORDER BY `row_number`,id LIMIT 20', [$batchId]) : [];
 $canMapAttendance = $batch
     && ($batch['source_module']??'')==='attendance'
@@ -98,6 +114,8 @@ $recent = ($isAdmin || $canView)
     ? Database::fetchAll('SELECT id,source_module,file_name,pipeline_status,total_rows,valid_rows,invalid_rows,created_at FROM sales_import_batches ORDER BY id DESC LIMIT 12')
     : Database::fetchAll('SELECT id,source_module,file_name,pipeline_status,total_rows,valid_rows,invalid_rows,created_at FROM sales_import_batches WHERE started_by=? ORDER BY id DESC LIMIT 12', [$actorId]);
 $limits = ImportSettings::serverLimits();
+$templateSource = $sourceHint === 'sales_aggregate' ? 'budget_inputs' : ($sourceHint ?: 'all');
+$templateLabel = $sourceHint === 'sales_aggregate' ? 'قالب سه شیت بودجه آفر' : ($sourceHint !== '' ? $labels[$sourceHint] : 'همه منابع مجاز');
 $pageTitle = 'مرکز یکپارچه ورود اطلاعات';
 $adminExtraStylesheets = ['/assets/css/import-center.css'];
 $adminExtraScripts = ['/assets/js/import-center.js'];
@@ -130,7 +148,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
             <div class="import-section-title">
                 <div><span>مرحله ۱</span><h2>بارگذاری و تشخیص</h2></div>
                 <div class="actions">
-                    <a class="btn btn-light" data-import-template-link href="/admin/import-template.php?source=<?=e($sourceHint ?: 'all')?>">دانلود قالب <?= $sourceHint !== '' ? e($labels[$sourceHint]) : 'همه منابع مجاز' ?></a>
+                    <a class="btn btn-light" data-import-template-link href="/admin/import-template.php?source=<?=e($templateSource)?>">دانلود قالب <?=e($templateLabel)?></a>
                     <span class="import-auto-badge">Auto mapping</span>
                 </div>
             </div>
@@ -143,7 +161,7 @@ require __DIR__ . '/../views/partials/admin-header.php';
                     <span>نام فایل برای تشخیص استفاده نمی‌شود؛ Table، Sheet و امضای سرستون ملاک است.</span>
                 </label>
                 <div class="grid grid-2">
-                    <label><span>نوع منبع</span><select name="source_hint" data-source-select><option value="">تشخیص خودکار</option><?php foreach ($labels as $key=>$title): ?><option value="<?=e($key)?>" <?=$sourceHint===$key?'selected':''?>><?=e($title)?></option><?php endforeach; ?></select></label>
+                    <label><span>نوع منبع</span><select name="source_hint" data-source-select><option value="">تشخیص خودکار</option><?php foreach ($labels as $key=>$title): ?><option value="<?=e($key)?>" <?=$sourceHint===$key?'selected':''?>><?=e($title)?></option><?php endforeach; ?></select><small class="muted">با انتخاب «ورود تجمیعی فروش»، شیت‌های فروش، خرید و موجودی انبار از یک فایل هم قابل تشخیص و staging هستند.</small></label>
                     <label><span>روش ورود</span><select name="import_mode"><option value="replace_reference">مرجع جدید و فعال‌سازی پس از تایید</option><option value="update_existing">بروزرسانی کلیدهای موجود</option><option value="skip_duplicates">نادیده‌گرفتن تکراری‌ها</option><option value="fail_on_duplicate">توقف در صورت تکراری</option></select></label>
                     <label><span>کلید دوره</span><input name="period_key" maxlength="50" placeholder="مثلاً 1405-04"></label>
                     <label data-snapshot-field><span>تاریخ snapshot / کارکرد</span><input name="snapshot_date" class="jalali-date-input" placeholder="1405/04/25"></label>
@@ -177,6 +195,16 @@ require __DIR__ . '/../views/partials/admin-header.php';
                 <span>Snapshot <strong><?=e((string)($batch['snapshot_date'] ?: '—'))?></strong></span>
             </div>
 
+            <?php if ($bundleBatches): ?>
+                <?php $allBundleReady = count($bundleBatches) === count($bundleIds) && !array_filter($bundleBatches, static fn(array $item): bool => ($item['pipeline_status'] ?? '') !== 'ready_to_commit'); ?>
+                <section class="import-bundle-panel" aria-labelledby="budget-input-bundle-title">
+                    <div class="import-section-title"><div><span>ورودی یکپارچه بودجه آفر</span><h3 id="budget-input-bundle-title">وضعیت سه شیت</h3></div></div>
+                    <div class="table-responsive"><table><thead><tr><th>منبع</th><th>Sheet</th><th>وضعیت</th><th>ردیف معتبر</th><th></th></tr></thead><tbody>
+                    <?php foreach ($bundleBatches as $bundleBatch): ?><tr><td><?=e($labels[$bundleBatch['source_module']]??$bundleBatch['source_module'])?></td><td><?=e((string)($bundleBatch['detected_sheet']?:'—'))?></td><td><?=e($statusLabels[$bundleBatch['pipeline_status']]??$bundleBatch['pipeline_status'])?></td><td><?=e((string)$bundleBatch['valid_rows'])?></td><td><a class="btn btn-light btn-sm" href="/admin/import-center.php?batch=<?=(int)$bundleBatch['id']?>">بررسی</a></td></tr><?php endforeach; ?></tbody></table></div>
+                    <?php if ($canCommit && $allBundleReady): ?><form method="post" class="form-actions"><input type="hidden" name="csrf_token" value="<?=e(Auth::csrfToken())?>"><input type="hidden" name="action" value="commit_bundle"><input type="hidden" name="batch_ids" value="<?=e(implode(',', $bundleIds))?>"><button class="btn btn-primary">تایید و فعال‌سازی همه شیت‌ها</button></form><?php elseif (!$allBundleReady): ?><p class="muted">تا معتبر شدن همه شیت‌ها، فعال‌سازی گروهی در دسترس نیست.</p><?php endif; ?>
+                </section>
+            <?php endif; ?>
+
             <?php if (($batch['pipeline_status'] ?? '') === 'detected' && !empty($metadata['candidates'])): ?>
                 <div class="alert alert-info">تشخیص قطعی نیست. فقط Table/محدوده صحیح را انتخاب کنید؛ جداول تحلیلی نامرتبط وارد نمی‌شوند.</div>
                 <form method="post" class="import-candidate-list">
@@ -186,7 +214,23 @@ require __DIR__ . '/../views/partials/admin-header.php';
                 </form>
             <?php endif; ?>
 
-            <?php if ($summary): ?><div class="import-summary-grid"><?php foreach (['total_rows'=>'کل ردیف','valid_rows'=>'معتبر','invalid_rows'=>'خطادار','duplicate_rows'=>'تکراری','ready_rows'=>'آماده ثبت'] as $key=>$label): ?><article><span><?=e($label)?></span><strong><?=e((string)$summary[$key])?></strong></article><?php endforeach; ?></div><?php endif; ?>
+            <?php if ($summary): ?><div class="import-summary-grid"><?php foreach (['total_rows'=>'کل ردیف','valid_rows'=>'معتبر','warning_rows'=>'هشدار','invalid_rows'=>'خطادار','duplicate_rows'=>'تکراری','ready_rows'=>'آماده ثبت'] as $key=>$label): if(!array_key_exists($key,$summary))continue; ?><article><span><?=e($label)?></span><strong><?=e((string)$summary[$key])?></strong></article><?php endforeach; ?></div><?php endif; ?>
+
+            <?php $headerContract=$metadata['header_contract']??($metadata['selected_candidate']['header_contract']??null); if(is_array($headerContract)): ?>
+                <section class="card import-contract-report">
+                    <h3>تطبیق قرارداد <?=e((string)($headerContract['source_profile']??($metadata['source_profile']??'منبع استاندارد')))?></h3>
+                    <p><?=e((string)($headerContract['exact_matched_headers']??0))?> / <?=e((string)($headerContract['expected_count']??0))?> سرستون در جای صحیح تطبیق یافت.</p>
+                    <div class="import-summary-grid">
+                        <article><span>تعداد فایل</span><strong><?=e((string)($headerContract['actual_count']??0))?></strong></article>
+                        <article><span>مفقود</span><strong><?=e((string)count($headerContract['missing_headers']??[]))?></strong></article>
+                        <article><span>اضافی</span><strong><?=e((string)count($headerContract['extra_headers']??[]))?></strong></article>
+                        <article><span>تکراری</span><strong><?=e((string)count($headerContract['duplicate_headers']??[]))?></strong></article>
+                        <article><span>ترتیب</span><strong><?=!empty($headerContract['order_mismatch'])?'ناسازگار':'منطبق'?></strong></article>
+                    </div>
+                    <?php if(!empty($headerContract['missing_headers'])):?><p class="alert alert-warning">سرستون‌های مفقود: <?=e(implode('، ',$headerContract['missing_headers']))?></p><?php endif?>
+                    <?php if(!empty($headerContract['extra_headers'])):?><p class="alert alert-warning">سرستون‌های اضافی: <?=e(implode('، ',$headerContract['extra_headers']))?></p><?php endif?>
+                </section>
+            <?php endif; ?>
 
             <?php if (!empty($metadata['mapping_required'])): ?>
                 <div class="alert alert-warning">سرستون‌های الزامی تطبیق داده نشد: <?=e(implode('، ', $metadata['missing_required'] ?? []))?>.</div>

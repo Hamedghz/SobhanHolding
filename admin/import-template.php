@@ -19,7 +19,9 @@ if (!$canDownload) {
 
 $requested = trim((string)($_GET['source'] ?? 'all'));
 $available = array_keys(ImportSourceRegistry::all());
-$candidates = $requested === 'all' ? $available : [$requested];
+$candidates = $requested === 'all'
+    ? $available
+    : ($requested === 'budget_inputs' ? UnifiedImportService::BUDGET_INPUT_SOURCES : [$requested]);
 $allowed = [];
 foreach ($candidates as $source) {
     if (!in_array($source, $available, true)) continue;

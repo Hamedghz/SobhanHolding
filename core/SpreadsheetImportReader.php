@@ -3,7 +3,8 @@ require_once __DIR__ . '/../lib/ImportSettings.php';
 
 class SpreadsheetImportReader
 {
-    public const MAX_UNCOMPRESSED_SIZE=209715200,MAX_ROWS=150000,SAMPLE_ROWS=500;
+    // Large ERP exports may be wide and highly compressible; keep the reader streamed while bounding ZIP expansion.
+    public const MAX_UNCOMPRESSED_SIZE=536870912,MAX_ROWS=150000,SAMPLE_ROWS=500;
 
     public static function store(array $file,string $folder,bool $allowStoredFile=false):array
     {
