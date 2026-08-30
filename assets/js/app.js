@@ -80,6 +80,33 @@ if (activeAdminMenuLink) {
   requestAnimationFrame(() => activeAdminMenuLink.scrollIntoView({block: 'nearest'}));
 }
 
+const adminMenuSearch = document.querySelector('[data-admin-menu-search]');
+const adminMenuEmpty = document.querySelector('[data-admin-menu-empty]');
+if (adminMenuSearch) {
+  const normalizeAdminMenu = value => String(value || '')
+    .replace(/[۰-۹]/g, char => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(char)))
+    .replace(/[٠-٩]/g, char => String('٠١٢٣٤٥٦٧٨٩'.indexOf(char)))
+    .trim()
+    .toLocaleLowerCase('fa');
+  adminMenuSearch.addEventListener('input', () => {
+    const query = normalizeAdminMenu(adminMenuSearch.value);
+    let found = 0;
+    adminMenuSections.forEach(section => {
+      const links = [...section.querySelectorAll('.admin-menu-link')];
+      let sectionFound = 0;
+      links.forEach(link => {
+        const visible = !query || normalizeAdminMenu(link.textContent).includes(query);
+        link.hidden = !visible;
+        if (visible) sectionFound++;
+      });
+      section.hidden = sectionFound === 0;
+      if (query && sectionFound) section.open = true;
+      found += sectionFound;
+    });
+    if (adminMenuEmpty) adminMenuEmpty.hidden = found > 0;
+  });
+}
+
 const persianDigits = {'۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9','٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
 document.querySelectorAll('.jalali-date-input').forEach(input => {
   input.setAttribute('dir', 'ltr');
