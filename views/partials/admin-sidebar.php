@@ -8,6 +8,12 @@ $menuPath = (string)($_SERVER['PHP_SELF'] ?? '');
         <span><?= e(setting('company_name', 'شرکت پخش سبحان')) ?></span>
         <small>پنل مدیریت</small>
     </a>
+    <label class="admin-menu-search">
+        <span class="sr-only">جستجو در منو</span>
+        <input type="search" data-admin-menu-search autocomplete="off" placeholder="جستجو در منو…">
+        <b aria-hidden="true">⌕</b>
+    </label>
+    <p class="admin-menu-empty" data-admin-menu-empty hidden>موردی در منو پیدا نشد.</p>
     <nav class="admin-menu" aria-label="منوی مدیریت">
         <?php foreach (admin_menu_registry() as $groupKey => $group): ?>
             <?php
