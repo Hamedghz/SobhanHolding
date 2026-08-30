@@ -1,0 +1,40 @@
+/*
+ * SOBHANHOLDING admin layout contract.
+ * Loaded after page styles and theme profiles so every module shares the same
+ * spacing, information hierarchy, responsive grids, and dense-data behavior.
+ */
+.admin-body{--layout-gap:18px;--layout-gap-lg:24px;--layout-panel-radius:14px;--layout-field-height:42px}
+.admin-content{width:min(100%,1680px);margin-inline:auto}
+.admin-content>:is(.section-heading-row,.workforce-head,.manager-hero,.ceo-mobile-page-head){margin-block:0 var(--layout-gap-lg)}
+.admin-content>:is(.card,.grid,.stats,.table-wrap,.workforce-tabs,.manager-tabs,.ceo-settings-tabs,.manager-chart-grid,.ceo-dashboard-grid,.letter-layout,.letter-tabs,form)+:is(.card,.grid,.stats,.table-wrap,.workforce-tabs,.manager-tabs,.ceo-settings-tabs,.manager-chart-grid,.ceo-dashboard-grid,.letter-layout,.letter-tabs,form){margin-top:var(--layout-gap)}
+.section-heading-row,.workforce-head{min-height:54px;align-items:center}
+.section-heading-row>div:first-child,.workforce-head>div:first-child,.admin-topbar-title{min-width:0}
+.section-heading-row h1,.workforce-head h1,.manager-hero h1,.admin-content>h1{margin:0;color:#17334a;font-size:clamp(1.3rem,1.1rem + .55vw,1.8rem);line-height:1.55;letter-spacing:-.55px}
+.section-heading-row p,.workforce-head p,.manager-hero p{max-width:72ch;margin:3px 0 0}
+.admin-content>h1{margin-bottom:var(--layout-gap-lg)}
+.card{min-width:0;overflow-wrap:anywhere}
+.card>:is(h2,h3):first-child{margin-top:0}
+.card>h2:first-child{margin-bottom:16px;padding-bottom:13px;border-bottom:1px solid #e7edef;font-size:1rem;line-height:1.7}
+.card>:last-child{margin-bottom:0}
+.grid{align-items:start}.grid-2{grid-template-columns:repeat(2,minmax(260px,1fr))}.grid-3{grid-template-columns:repeat(3,minmax(220px,1fr))}.grid-4{grid-template-columns:repeat(4,minmax(190px,1fr))}
+.stats{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));align-items:stretch}
+.stat-card{min-height:116px;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+.stat-card strong{font-variant-numeric:tabular-nums;line-height:1.25}
+.form-field,.admin-form label,.compact-grid label,.manager-form-grid label,.letter-filter-grid label,.attendance-filter label{min-width:0}
+.form-field>span,.admin-form label>span,.compact-grid label>span,.manager-form-grid label>span{min-height:24px;display:flex;align-items:end;margin-bottom:6px;color:#647987;font-size:12px;font-weight:700}
+.admin-content :is(input:not([type="checkbox"]):not([type="radio"]),select){min-height:var(--layout-field-height)}
+.admin-content textarea{min-height:112px;line-height:1.85}
+.form-actions,.actions,.row-actions,.attendance-actions{gap:9px}
+.card>.form-actions:last-child,.card form>.form-actions:last-child,.card form>.actions:last-child{margin-top:18px;padding-top:15px;border-top:1px solid #e8eef0}
+.table-wrap{width:100%;max-width:100%;border-radius:11px!important;isolation:isolate}
+.table-wrap table{margin:0;font-size:13px}.table-wrap thead{position:sticky;top:0;z-index:2}.table-wrap tbody tr{transition:background-color .15s ease}.table-wrap tbody tr:hover td{background:#f7fbfb!important}
+.table-wrap td>:is(strong,small){display:block}.table-wrap td>small{margin-top:3px}.card>.table-wrap:only-child,.card>form+.table-wrap:last-child{margin-bottom:0}
+.ui-table-toolbar{padding:12px;margin-bottom:0;border:1px solid #e1e9ec;border-bottom:0;border-radius:11px 11px 0 0;background:#f7fafb}.ui-table-toolbar+.table-wrap{border-radius:0 0 11px 11px!important}
+.checkbox-grid,.permission-manager,.data-source-options{align-items:stretch}.checkbox-item{min-height:44px;display:flex;align-items:center;gap:9px}.checkbox-item input{flex:0 0 auto}
+.ceo-settings-tabs,.manager-tabs,.workforce-tabs,.letter-tabs{overflow-x:auto;scrollbar-width:thin;white-space:nowrap}
+.ceo-dashboard-grid,.manager-chart-grid{align-items:stretch}.ceo-chart-card,.manager-chart-grid>.card{min-width:0;overflow:hidden}.manager-chart-grid canvas,.ceo-chart-card canvas{max-width:100%}
+dialog,.modal,[role="dialog"]{max-width:min(760px,calc(100vw - 28px));max-height:min(88vh,860px);overflow:auto}
+@media(max-width:1180px){.grid-3,.grid-4{grid-template-columns:repeat(2,minmax(240px,1fr))}.manager-chart-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.admin-body{--layout-gap:14px;--layout-gap-lg:18px}.section-heading-row,.workforce-head{align-items:stretch}.section-heading-row>:is(.actions,.form-actions,.btn),.workforce-head>:is(.actions,.form-actions,.btn){width:100%}.section-heading-row>.btn,.workforce-head>.btn{justify-content:center}.grid-2,.grid-3,.grid-4,.manager-chart-grid,.manager-form-grid,.letter-filter-grid,.attendance-filter{grid-template-columns:1fr!important}.grid-span-2{grid-column:auto}.stat-card{min-height:96px}.card>h2:first-child{margin-bottom:13px;padding-bottom:10px}.form-actions,.actions{align-items:stretch}.form-actions>:is(.btn,button,a),.actions>:is(.btn,button,a){flex:1 1 auto}}
+@media(max-width:460px){.admin-content{padding-inline:12px}.card{padding:15px!important;border-radius:12px!important}.stats{grid-template-columns:1fr}}
+@media print{.admin-content{width:100%;max-width:none}.card,.table-wrap{box-shadow:none!important}}
