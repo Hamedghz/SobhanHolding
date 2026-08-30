@@ -43,6 +43,7 @@ try {
     <link rel="stylesheet" href="/assets/css/ui-modernization.css">
     <?php foreach ($adminExtraStylesheets as $stylesheet): ?><link rel="stylesheet" href="<?= e($stylesheet) ?>"><?php endforeach; ?>
     <link rel="stylesheet" href="/assets/css/admin-theme-profiles.css">
+    <link rel="stylesheet" href="/assets/css/admin-redesign-2026.css">
 </head>
 <body class="<?= e($adminBodyClass) ?>"<?= !empty($adminBodyStyle) ? ' style="' . e($adminBodyStyle) . '"' : '' ?>>
 <div class="admin-shell">
